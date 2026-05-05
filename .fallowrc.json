@@ -9,11 +9,6 @@
   ],
   "workspaces": { "patterns": ["packages/*"] },
   "rules": {
-    "unused-files": "error",
-    "unused-exports": "warn",
-    "unused-types": "warn",
-    "circular-dependency": "error",
-    "unresolved-imports": "error",
     "private-type-leaks": "warn"
   },
   "overrides": [
