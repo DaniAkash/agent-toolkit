@@ -1,0 +1,63 @@
+{
+  "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
+  "entry": ["packages/*/src/index.ts"],
+  "ignorePatterns": [
+    "**/*.generated.ts",
+    "**/*.d.ts",
+    "**/dist/**",
+    "**/node_modules/**"
+  ],
+  "workspaces": { "patterns": ["packages/*"] },
+  "rules": {
+    "unused-files": "error",
+    "unused-exports": "warn",
+    "unused-types": "warn",
+    "circular-dependency": "error",
+    "unresolved-imports": "error",
+    "private-type-leaks": "warn"
+  },
+  "overrides": [
+    {
+      "files": ["**/*.test.ts", "**/*.spec.ts", "**/test/**", "**/*.config.ts"],
+      "rules": {
+        "unused-exports": "off",
+        "unused-files": "off"
+      }
+    }
+  ],
+  "boundaries": {
+    "zones": [
+      {
+        "name": "acpx-ai-provider-public",
+        "patterns": ["packages/acpx-ai-provider/src/index.ts"]
+      },
+      {
+        "name": "acpx-ai-provider-internal",
+        "patterns": ["packages/acpx-ai-provider/src/**"]
+      },
+      {
+        "name": "acpx-ai-provider-tests",
+        "patterns": ["packages/acpx-ai-provider/test/**"]
+      }
+    ],
+    "rules": [
+      {
+        "from": "acpx-ai-provider-internal",
+        "allow": ["acpx-ai-provider-internal", "acpx-ai-provider-public"]
+      },
+      {
+        "from": "acpx-ai-provider-public",
+        "allow": ["acpx-ai-provider-internal"]
+      },
+      {
+        "from": "acpx-ai-provider-tests",
+        "allow": ["acpx-ai-provider-public", "acpx-ai-provider-internal"]
+      }
+    ]
+  },
+  "health": {
+    "maxCyclomatic": 20,
+    "maxCognitive": 15,
+    "ignore": ["**/*.generated.ts", "**/dist/**"]
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "name": "acpx-ai-provider",
+  "version": "0.0.0",
+  "description": "Vercel AI SDK provider on top of acpx/runtime — bring any ACP agent (Claude, Codex, Gemini, Copilot, Cursor…) to AI SDK with one install.",
+  "license": "MIT",
+  "author": "Dani Akash",
+  "homepage": "https://github.com/DaniAkash/acpx#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DaniAkash/acpx.git",
+    "directory": "packages/acpx-ai-provider"
+  },
+  "bugs": "https://github.com/DaniAkash/acpx/issues",
+  "keywords": [
+    "ai-sdk",
+    "ai-sdk-provider",
+    "acp",
+    "agent-client-protocol",
+    "acpx",
+    "claude-code",
+    "codex",
+    "gemini",
+    "copilot",
+    "cursor"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "bunup",
+    "dev": "bunup --watch",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "acpx": ">=0.6.0",
+    "ai": ">=5.0.0"
+  },
+  "devDependencies": {
+    "bunup": "^0.16.31",
+    "typescript": "^5.9.3"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
