@@ -9,7 +9,8 @@
   ],
   "workspaces": { "patterns": ["packages/*"] },
   "rules": {
-    "private-type-leaks": "warn"
+    "private-type-leaks": "warn",
+    "unused-class-members": "off"
   },
   "overrides": [
     {
