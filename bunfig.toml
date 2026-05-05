@@ -1,0 +1,6 @@
+[install]
+# Project-level override: allow packages ≥ 1 day old (default is 7 days).
+# Reason: this package tracks the AI SDK and acpx upstream closely; a 7-day
+# gate would lock us out of fresh fixes during active development. Still
+# non-zero so we don't blindly install brand-new tarballs.
+minimumReleaseAge = 86400

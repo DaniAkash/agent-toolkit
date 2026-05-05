@@ -45,12 +45,16 @@
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
-    "acpx": ">=0.6.0",
-    "ai": ">=5.0.0"
+    "acpx": ">=0.6.1",
+    "ai": ">=6.0.0"
   },
   "devDependencies": {
+    "@ai-sdk/provider": "^3.0.10",
+    "@ai-sdk/provider-utils": "^4.0.26",
+    "acpx": "^0.6.1",
+    "ai": "^6.0.175",
     "bunup": "^0.16.31",
-    "typescript": "^5.9.3"
+    "typescript": "^6.0.3"
   },
   "publishConfig": {
     "access": "public"
