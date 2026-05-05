@@ -1,6 +1,11 @@
 import type { AcpxProviderSettings } from './types.ts'
 
 export type {
+  EventTranslatorOptions,
+  FinishOptions,
+} from './convert-events.ts'
+export { EventTranslator } from './convert-events.ts'
+export type {
   ConvertPromptAttachment,
   ConvertPromptInput,
   ConvertPromptMode,
