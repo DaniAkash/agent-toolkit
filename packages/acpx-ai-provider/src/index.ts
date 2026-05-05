@@ -15,6 +15,10 @@ export {
   AcpxTurnTimeoutError,
   fromRuntimeError,
 } from './errors.ts'
+export {
+  createJsonCleanupTransform,
+  stripMarkdownFences,
+} from './json-output.ts'
 
 export type {
   AcpRuntime,
