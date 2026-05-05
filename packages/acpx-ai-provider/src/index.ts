@@ -1,5 +1,12 @@
 import type { AcpxProviderSettings } from './types.ts'
 
+export type {
+  ConvertPromptAttachment,
+  ConvertPromptInput,
+  ConvertPromptMode,
+  ConvertPromptOutput,
+} from './convert-prompt.ts'
+export { convertPrompt } from './convert-prompt.ts'
 export type { AcpxErrorOptions } from './errors.ts'
 export {
   AcpxAgentNotFoundError,
