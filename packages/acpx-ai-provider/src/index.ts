@@ -1,5 +1,3 @@
-import type { AcpxProviderSettings } from './types.ts'
-
 export type {
   EventTranslatorOptions,
   FinishOptions,
@@ -24,7 +22,9 @@ export {
   createJsonCleanupTransform,
   stripMarkdownFences,
 } from './json-output.ts'
-
+export { AcpxLanguageModel } from './language-model.ts'
+export type { EnsureHandleResult } from './provider.ts'
+export { AcpxProvider, createAcpxProvider } from './provider.ts'
 export type {
   AcpRuntime,
   AcpRuntimeDoctorReport,
@@ -41,12 +41,5 @@ export type {
   AcpxProviderSettings,
   AcpxSessionMode,
 } from './types.ts'
-
-const NOT_IMPLEMENTED =
-  'createAcpxProvider is not wired up yet — landing in a follow-up release. See https://github.com/DaniAkash/acpx for progress.'
-
-export function createAcpxProvider(_settings: AcpxProviderSettings): never {
-  throw new Error(NOT_IMPLEMENTED)
-}
 
 export const VERSION = '0.0.0'
