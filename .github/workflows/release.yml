@@ -107,12 +107,15 @@ jobs:
       - name: Publish to npm
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        # `bun publish` reads NPM_TOKEN from the environment.
+        # `bun publish` does NOT read NPM_TOKEN from the environment
+        # the way `npm publish` does — it expects auth via ~/.npmrc.
+        # We write the token there before publishing.
         # `--access public` is required for unscoped or fresh-scoped
         # packages on the free tier. `--provenance` attaches an
         # OIDC-signed provenance attestation so npm shows the
         # "built and signed on a cloud builder" badge.
         run: |
+          echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
           cd packages/acpx-ai-provider
           bun publish --access public --provenance
 
