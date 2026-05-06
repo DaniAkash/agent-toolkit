@@ -107,9 +107,11 @@ jobs:
       - name: Publish to npm
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        # `bun publish` does NOT read NPM_TOKEN from the environment
-        # the way `npm publish` does — it expects auth via ~/.npmrc.
-        # We write the token there before publishing.
+        # We use the `npm` CLI (preinstalled on ubuntu-latest) for the
+        # publish step — `bun publish`'s auth handling on Bun 1.3.x
+        # ignored both NPM_TOKEN env and ~/.npmrc in CI runs (issue
+        # surfaced on the v0.0.1 release attempts). Everything else
+        # in the workflow stays Bun.
         # `--access public` is required for unscoped or fresh-scoped
         # packages on the free tier. `--provenance` attaches an
         # OIDC-signed provenance attestation so npm shows the
@@ -117,7 +119,7 @@ jobs:
         run: |
           echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
           cd packages/acpx-ai-provider
-          bun publish --access public --provenance
+          npm publish --access public --provenance
 
       - name: Create draft GitHub Release
         uses: softprops/action-gh-release@v2
