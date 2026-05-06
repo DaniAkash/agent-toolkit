@@ -141,7 +141,7 @@ Coverage targets that aren't strictly enforced but worth aiming for:
 - Run all five local checks before pushing. CI surfaces *every*
   failure in one run (each step uses `if: !cancelled()`), so a single
   push can fix everything if you missed a check locally.
-- Use [Conventional Comments](https://conventionalcommits.org/) for code-review comments.
+- Use [Conventional Comments](https://conventionalcomments.org/) for code-review comments.
 
 ## Inspirations and references
 
