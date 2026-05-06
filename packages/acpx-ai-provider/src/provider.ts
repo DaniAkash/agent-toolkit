@@ -157,6 +157,7 @@ export class AcpxProvider {
         DEFAULT_NON_INTERACTIVE) as AcpRuntimeOptions['nonInteractivePermissions'],
       timeoutMs: this.settings.turnTimeoutMs,
       mcpServers: this.settings.mcpServers as AcpRuntimeOptions['mcpServers'],
+      onPermissionRequest: this.settings.onPermissionRequest,
     }
   }
 }
