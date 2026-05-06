@@ -1,0 +1,130 @@
+# Tag-triggered npm release + draft GitHub Release.
+#
+# How to cut a release:
+#   1. Bump version in packages/acpx-ai-provider/package.json
+#   2. Commit ("chore(release): vX.Y.Z") — `chore(release)` is filtered
+#      out of cliff.toml so the bump commit doesn't pollute the next
+#      changelog.
+#   3. git tag vX.Y.Z && git push origin main --tags
+#   4. Wait for the workflow to finish, then publish the draft from the
+#      Releases page.
+#
+# Required repo secrets (Settings → Secrets and variables → Actions):
+#   NPM_TOKEN — automation token for npmjs.com with publish access
+#
+# Required repo settings:
+#   Settings → Actions → General → Workflow permissions → Read and
+#   write permissions (so id-token: write below works for npm
+#   provenance).
+
+name: Release (npm publish + draft GitHub release)
+
+on:
+  push:
+    tags:
+      # Only semver-style tags trigger releases — `v0.1.0`, `v1.2.3-rc.1`,
+      # etc. Loose patterns like `v*` would also match `vnext`,
+      # `vendor-fix`, or typo'd tags and silently kick off a publish.
+      - 'v[0-9]*'
+
+permissions:
+  contents: write
+  id-token: write   # required for npm provenance attestations
+
+jobs:
+  release:
+    name: Verify, publish, and draft release notes
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history is required so git-cliff (and `git describe`)
+          # can walk back to the previous tag and compute the changelog
+          # range.
+          fetch-depth: 0
+
+      - name: Install Bun
+        # Reads the version from `.bun-version` — bumping Bun is a
+        # one-line change to that file, reviewed like any other source
+        # change.
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # Re-run the full check suite before publishing. A green tag must
+      # mean a green workspace — never trust the PR-time CI alone since
+      # post-merge changes can shift state.
+      - name: Lint
+        run: bun run lint
+      - name: Typecheck
+        run: bun run typecheck
+      - name: Fallow
+        run: bun run fallow
+      - name: Tests
+        run: bun test
+      - name: Build
+        run: bun run build
+
+      - name: Determine previous tag (for changelog range)
+        id: previous_tag
+        run: |
+          # `git describe --tags --abbrev=0 --match 'v[0-9]*' <tag>^`
+          # returns the most recent release-style tag *before* <tag>. The
+          # `--match` filter ensures only semver-style `v…` tags count, so
+          # any non-release tags that ever land on the branch can't
+          # hijack the changelog range. For the very first release this
+          # errors (no ancestor release tag exists) — we treat that as
+          # the "first release" case and short-circuit changelog
+          # generation.
+          set +e
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 --match 'v[0-9]*' "${GITHUB_REF_NAME}^" 2>/dev/null)
+          set -e
+          if [ -z "$PREVIOUS_TAG" ]; then
+            echo "first_release=true" >> "$GITHUB_OUTPUT"
+            echo "No previous tag found — this is the first release."
+          else
+            echo "first_release=false" >> "$GITHUB_OUTPUT"
+            echo "previous_tag=$PREVIOUS_TAG" >> "$GITHUB_OUTPUT"
+            echo "Previous tag: $PREVIOUS_TAG"
+          fi
+
+      - name: Generate changelog (subsequent releases only)
+        if: steps.previous_tag.outputs.first_release == 'false'
+        id: changelog
+        # git-cliff parses conventional-commit messages between the
+        # previous tag and the new tag, groups them by type per
+        # cliff.toml, and exposes the rendered markdown as
+        # `steps.changelog.outputs.content`.
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --strip header ${{ steps.previous_tag.outputs.previous_tag }}..${{ github.ref_name }}
+
+      - name: Publish to npm
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        # `bun publish` reads NPM_TOKEN from the environment.
+        # `--access public` is required for unscoped or fresh-scoped
+        # packages on the free tier. `--provenance` attaches an
+        # OIDC-signed provenance attestation so npm shows the
+        # "built and signed on a cloud builder" badge.
+        run: |
+          cd packages/acpx-ai-provider
+          bun publish --access public --provenance
+
+      - name: Create draft GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          # DRAFT — never auto-publish. Review the body in the GitHub
+          # UI and click Publish when ready.
+          draft: true
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          # First release → literal "first release" body. Otherwise →
+          # the git-cliff-rendered changelog. The `||` fallback fires
+          # when the changelog step was skipped (its output is empty).
+          body: ${{ steps.changelog.outputs.content || 'first release' }}

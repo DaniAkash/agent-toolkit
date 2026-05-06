@@ -1,0 +1,68 @@
+# PR CI, gated behind manual approval.
+#
+# One-time setup (otherwise the `approve` gate is a no-op):
+#   Repo Settings → Environments → New environment → name `ci-approval`
+#   → enable "Required reviewers" → add yourself → save.
+
+name: CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  approve:
+    name: Wait for manual approval
+    runs-on: ubuntu-latest
+    environment: ci-approval
+    timeout-minutes: 60
+    steps:
+      - name: Approved
+        run: echo "CI approved by ${{ github.actor }}"
+
+  # `if: ${{ !cancelled() }}` on every step below is deliberate: one CI
+  # run surfaces every failure in the diff (lint + typecheck + fallow +
+  # tests + build), so the next push can fix all of them at once instead
+  # of one-per-cycle.
+  checks:
+    name: Lint + typecheck + fallow + tests + build
+    needs: approve
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        # No version specified — reads `.bun-version` from the repo root.
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Biome (lint + format)
+        if: ${{ !cancelled() }}
+        run: bun run lint
+
+      - name: tsc --noEmit (across all packages)
+        if: ${{ !cancelled() }}
+        run: bun run typecheck
+
+      - name: Fallow (boundaries + dead code)
+        if: ${{ !cancelled() }}
+        run: bun run fallow
+
+      - name: bun test
+        if: ${{ !cancelled() }}
+        run: bun test
+
+      - name: bunup build
+        if: ${{ !cancelled() }}
+        run: bun run build
