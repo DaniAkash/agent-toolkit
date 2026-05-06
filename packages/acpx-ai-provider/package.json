@@ -1,10 +1,10 @@
 {
   "name": "acpx-ai-provider",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Vercel AI SDK provider on top of acpx/runtime — bring any ACP agent (Claude, Codex, Gemini, Copilot, Cursor…) to AI SDK with one install.",
   "license": "MIT",
   "author": "Dani Akash",
-  "homepage": "https://github.com/DaniAkash/acpx#readme",
+  "homepage": "https://github.com/DaniAkash/acpx/tree/main/packages/acpx-ai-provider#readme",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/DaniAkash/acpx.git",
@@ -34,9 +34,11 @@
     },
     "./package.json": "./package.json"
   },
+  "sideEffects": false,
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "bunup",
@@ -59,6 +61,7 @@
     "zod": "^4.4.3"
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
   }
 }
