@@ -70,17 +70,8 @@ acpx/
 
 ### Branches and commits
 
-- Branch from `main`. Use [Conventional Branch](https://conventional-branch.github.io/)
-  names — `feat/foo`, `fix/bar`, `chore/baz`, `docs/qux`, `test/zap`.
-- Use [Conventional Commits](https://www.conventionalcommits.org/) for
-  every commit message. The release workflow groups commits into
-  release notes by their type, so non-conforming commits are silently
-  excluded from the changelog.
-- **Never include AI attribution** (e.g. `Co-Authored-By:
-  Claude/GPT/etc.`, "Generated with Claude Code", any badge or
-  footer) in commit messages, PR descriptions, or code comments.
-- **Don't reference local-only paths** (`~/workbench`, `plans/...`,
-  `memory/...`) in anything visible on GitHub.
+- Branch from `main`. Use [Conventional Branch](https://conventional-branch.github.io/) names.
+- Use [Conventional Commits](https://www.conventionalcommits.org/) for commit messages.
 
 ### Running checks
 
@@ -150,11 +141,7 @@ Coverage targets that aren't strictly enforced but worth aiming for:
 - Run all five local checks before pushing. CI surfaces *every*
   failure in one run (each step uses `if: !cancelled()`), so a single
   push can fix everything if you missed a check locally.
-- Use Conventional Comments for code-review comments:
-  `<label> [decorations]: <subject>`. Labels: `praise`, `nitpick`,
-  `suggestion`, `issue`, `todo`, `question`, `thought`, `chore`,
-  `note`. `(blocking)` / `(non-blocking)` decorations signal merge
-  intent. See <https://conventionalcomments.org/>.
+- Use [Conventional Comments](https://conventionalcommits.org/) for code-review comments.
 
 ## Inspirations and references
 
