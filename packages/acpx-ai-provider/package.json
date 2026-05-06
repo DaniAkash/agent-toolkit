@@ -42,6 +42,7 @@
     "build": "bunup",
     "dev": "bunup --watch",
     "test": "bun test",
+    "test:smoke": "SMOKE_AGENTS=all bun test test/e2e",
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
@@ -54,7 +55,8 @@
     "acpx": "^0.6.1",
     "ai": "^6.0.175",
     "bunup": "^0.16.31",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "zod": "^4.4.3"
   },
   "publishConfig": {
     "access": "public"
