@@ -5,29 +5,313 @@
 
 [![npm](https://img.shields.io/npm/v/acpx-ai-provider.svg)](https://www.npmjs.com/package/acpx-ai-provider)
 
-## Status
-
-Early scaffolding. Implementation in progress.
+> [!WARNING]
+> **Alpha software.** Both this package and its underlying runtime
+> ([`acpx`](https://www.npmjs.com/package/acpx)) are pre-1.0. Public
+> APIs may change in any minor release. Pin a version in production
+> and read the [Known limitations](#known-limitations) section before
+> picking it up — most of the rough edges flow through from
+> `acpx/runtime`, which is itself still stabilizing its event shape.
 
 ## Why
 
-The existing [`acp-ai-provider`](https://github.com/mcpc-tech/mcpc/tree/main/packages/acp-ai-provider) bridges Vercel AI SDK to the Agent Client Protocol via the bare `@agentclientprotocol/sdk`. That works, but consumers still have to install each agent's CLI separately and write their own `{ command, args }` spawn config.
+The existing [`acp-ai-provider`](https://github.com/mcpc-tech/mcpc/tree/main/packages/acp-ai-provider)
+bridges Vercel AI SDK to the Agent Client Protocol via the bare
+`@agentclientprotocol/sdk`. That works, but consumers still have to
+install each agent's CLI and write their own `{ command, args }`
+spawn config.
 
 `acpx-ai-provider` sits one level higher — on top of `acpx/runtime` — so:
 
-- Zero extra installs. `acpx` resolves and `npx`-spawns built-in agents (Claude, Codex, Gemini, Copilot, Cursor, Pi, etc.) on first use.
-- No stdio plumbing, no init handshake, no auth retry loops, no permission dialog wiring. The runtime owns all of that.
-- The provider is a thin translation layer between AI SDK's `LanguageModelV2` and `AcpRuntime`'s normalized event stream.
+- **Zero extra installs.** `acpx` resolves and `npx`-spawns built-in
+  agents (Claude, Codex, Gemini, Copilot, Cursor, Pi, etc.) on first
+  use.
+- **No stdio plumbing, no init handshake, no auth retry loop, no
+  permission dialog wiring** — the runtime owns all of that.
+- The provider is a thin translation layer between AI SDK's
+  `LanguageModelV2` and `AcpRuntime`'s normalized event stream.
 
 ## Install
 
 ```bash
 bun add acpx-ai-provider acpx ai
+# or
+npm i acpx-ai-provider acpx ai
 ```
 
-## Usage
+`acpx` and `ai` are peer dependencies. Use `ai` ≥ 6, `acpx` ≥ 0.6.
 
-_Coming soon._
+## Quickstart
+
+```ts
+import { createAcpxProvider } from 'acpx-ai-provider'
+import { generateText } from 'ai'
+
+const provider = createAcpxProvider({
+  agent: 'claude',
+  cwd: process.cwd(),
+})
+
+const { text } = await generateText({
+  model: provider.languageModel(),
+  prompt: 'Summarize this repo in 3 bullets.',
+})
+
+console.log(text)
+```
+
+That's the full setup. `acpx` will `npx`-fetch the Claude Code ACP
+adapter on first run; subsequent runs are warm.
+
+### Streaming
+
+```ts
+import { createAcpxProvider } from 'acpx-ai-provider'
+import { streamText } from 'ai'
+
+const provider = createAcpxProvider({ agent: 'claude' })
+
+const { textStream } = streamText({
+  model: provider.languageModel(),
+  prompt: 'Write a haiku about TypeScript.',
+})
+
+for await (const chunk of textStream) process.stdout.write(chunk)
+```
+
+## Configuration
+
+```ts
+createAcpxProvider({
+  agent: 'claude',                 // any acpx built-in id, or a custom override
+  cwd: '/path/to/repo',            // working dir for the agent (default: process.cwd())
+  sessionKey: 'my-session',        // logical name (default: `${agent}::${cwd}`)
+  sessionMode: 'persistent',       // 'persistent' (default) reuses across turns; 'oneshot' disposes
+  permissionMode: 'approve-reads', // 'approve-all' | 'approve-reads' | 'deny-all'
+  nonInteractivePermissions: 'deny',
+  resumeSessionId: 'sid-xyz',      // resume a prior session
+  turnTimeoutMs: 60_000,
+  stateDir: '~/.acpx',             // session store location
+  mcpServers: [/* … */],
+  agentRegistryOverrides: {
+    'my-agent': 'node ./bin/my-agent.js --acp',
+  },
+  // advanced: inject a pre-built runtime (testing, multi-provider sharing)
+  runtime: customRuntime,
+})
+```
+
+Built-in agents `acpx` ships:
+`pi`, `openclaw`, `codex`, `claude`, `gemini`, `cursor`, `copilot`,
+`droid`, `iflow`, `kilocode`, `kimi`, `kiro`, `opencode`, `qoder`, `qwen`,
+`trae`. Behavior varies — see [Known limitations](#known-limitations).
+
+## Authentication
+
+`acpx/runtime` reads credentials from the environment or
+`~/.acpx/config.json`. There is **no programmatic credential injection**
+in this provider, and **no lazy-retry on auth failure** — if a credential
+is missing, the first call surfaces an `AcpxAuthRequiredError`.
+
+```bash
+# Set whichever env var the agent needs:
+export ACPX_AUTH_OPENAI_API_KEY=sk-…
+export ACPX_AUTH_ANTHROPIC_API_KEY=sk-ant-…
+```
+
+For agents that require an external CLI auth (e.g. GitHub Copilot),
+authenticate the CLI before constructing the provider:
+
+```bash
+gh auth login
+```
+
+## Persistent sessions
+
+By default the provider keeps a session alive across calls so the agent
+preserves context. Each `languageModel()` instance for the same
+`sessionKey` shares the underlying ACP session.
+
+```ts
+const provider = createAcpxProvider({ agent: 'claude' })
+const model = provider.languageModel()
+
+await generateText({ model, prompt: 'Hi, my name is Alice.' })
+await generateText({ model, prompt: "What's my name?" }) // remembers
+
+await provider.close() // tear down when done
+```
+
+Pre-warm a session without sending a prompt:
+
+```ts
+await provider.prepare()
+```
+
+Run a single isolated turn:
+
+```ts
+createAcpxProvider({ agent: 'claude', sessionMode: 'oneshot' })
+```
+
+## Tools — via MCP servers
+
+Tools are defined through MCP (Model Context Protocol) servers passed
+into `mcpServers`. The agent discovers and calls them; results flow back
+through the provider's stream as `tool-call` / `tool-result` parts.
+
+```ts
+const provider = createAcpxProvider({
+  agent: 'claude',
+  mcpServers: [
+    {
+      type: 'stdio',
+      name: 'filesystem',
+      command: 'npx',
+      args: ['-y', '@modelcontextprotocol/server-filesystem', '/tmp'],
+    },
+  ],
+})
+```
+
+> **Note**: host-side AI SDK tools (the `acpTools()` /
+> TCP-callback story from `acp-ai-provider`) are **not** supported in
+> v0.1. See [Known limitations](#known-limitations).
+
+## Structured output (JSON)
+
+`generateObject` / `streamObject` work via JSON mode. The provider
+prepends a structured-output instruction to the prompt and strips
+markdown fences (` ```json … ``` `) from the output stream so AI SDK's
+parser sees clean JSON.
+
+```ts
+import { generateObject } from 'ai'
+import { z } from 'zod'
+
+const { object } = await generateObject({
+  model: provider.languageModel(),
+  schema: z.object({
+    name: z.string(),
+    ingredients: z.array(z.string()),
+  }),
+  prompt: 'Give me a recipe for chocolate chip cookies.',
+})
+```
+
+Works with `streamObject` too.
+
+## Lifecycle controls
+
+```ts
+await provider.cancel('user pressed stop')   // cancel the in-flight turn
+await provider.setMode('plan')               // switch session mode (if agent supports it)
+await provider.setConfigOption('model', 'opus') // adjust an agent config option
+const report = await provider.doctor()       // diagnostic info from the runtime
+await provider.close('done')                 // dispose all sessions
+```
+
+`setMode`, `setConfigOption`, and `doctor` no-op when the underlying
+agent doesn't implement them. Inspect
+`provider.runtime.getCapabilities()` to see what's supported.
+
+## Known limitations
+
+This is alpha software. Most rough edges flow through from
+`acpx/runtime`, which is itself pre-1.0.
+
+### Inherited from `acpx/runtime`
+
+- **Tool input and output share one text field.** `tool-call.input`
+  and `tool-result.result` are the same string. The runtime collapses
+  both into one `text` field; the underlying ACP protocol has them
+  separately, but the runtime's normalizer drops the distinction.
+- **Tool input is a raw string, not parsed JSON.** `JSON.parse` it
+  yourself when the agent emits valid JSON; expect failures otherwise.
+- **No input/output token split.** Only `cachedInputTokens` flows
+  through to AI SDK. `inputTokens`, `outputTokens`, and `totalTokens`
+  are `undefined`. Per-token cost calculation won't work.
+- **No streaming usage updates.** Only the most recent
+  `usage_update` from the runtime survives onto the `finish` part.
+- **Permissions are mode-based, not callback-based.** No per-call
+  user prompt — pick `approve-all`, `approve-reads`, or `deny-all` up
+  front.
+- **Auth is env-var / config-file driven, no lazy retry.** Missing
+  credentials throw at first use.
+- **`npx` cold start on first agent use.** Built-in agents
+  auto-download via `npx`. First call after a clean install can take
+  10+ seconds.
+- **Sessions persist on the filesystem at `~/.acpx/sessions/`.** Not
+  multi-process-safe by default. Override `stateDir` if needed.
+- **Mid-turn `AbortSignal` honoring varies by agent.** We forward the
+  signal to `runtime.startTurn`, but how quickly the agent stops
+  varies. `provider.cancel()` is the strongest signal.
+- **Optional control methods may no-op.** `setMode`,
+  `setConfigOption`, `doctor`, `getStatus` aren't implemented by every
+  agent.
+
+### AI SDK integration
+
+- **`LanguageModelV2` compatibility-mode warning.** AI SDK v6 prints a
+  warning on first use ("specificationVersion is used in a
+  compatibility mode"). Harmless. Will go away when we move to V3.
+- **No host-side AI SDK tools.** v0.1 only supports tools the agent
+  learns about via MCP servers. AI SDK `tool({ execute })` callbacks
+  passed to `streamText` won't be invoked from this provider — the
+  agent doesn't know about them.
+- **`tool-call.providerExecuted` is always `true`.** Every tool call
+  is marked as already-executed by the agent.
+- **Multi-step / `stopWhen`.** AI SDK's loop works at the SDK level,
+  but each step is a fresh `runtime.startTurn`. Use the default
+  `sessionMode: 'persistent'` so the agent keeps its own context
+  across steps.
+- **`generateObject` / `streamObject`** work via JSON mode. Agents
+  that aren't JSON-strict may emit malformed JSON; the fence-stripping
+  transform handles markdown wrappers, not bad JSON.
+- **`request.body` and `response.headers` are synthetic.**
+  `request.body` is `{ agent, sessionKey }`; `response.headers` is
+  always `{}`. We have no HTTP layer.
+
+### Per-agent quirks
+
+Behavior varies by built-in agent. Recommended starting matrix:
+
+| Agent | Notes |
+|---|---|
+| `claude` | Best-tested path. Clean text + tools. |
+| `codex` | JSON output benefits most from the fence cleanup. |
+| `pi` | Cheapest for smoke tests. |
+| `gemini` | Requires `--experimental-acp` (registry already passes it). Capability surface still evolving. |
+| `copilot` | Requires authenticated GitHub Copilot CLI. Run `gh auth login` first. |
+
+### Out of scope for v0.1
+
+These are deliberate non-goals, not bugs:
+
+- Host-side AI SDK tools.
+- Mid-stream model switching from inside a single `streamText` call.
+- Provider-defined dynamic tool routing.
+- Live token-cost calculation.
+- Per-`languageModel()` agent registry.
+
+## Errors
+
+```ts
+import {
+  AcpxError,
+  AcpxAgentNotFoundError,
+  AcpxAuthRequiredError,
+  AcpxTurnTimeoutError,
+} from 'acpx-ai-provider'
+```
+
+Catch `AcpxError` for the broad case; the three subclasses cover the
+common diagnosable causes. Anything else falls through to the base
+class with the runtime's `code` preserved.
+
+## Repository
+
+Source, issues, and roadmap: <https://github.com/DaniAkash/acpx>.
 
 ## License
 
