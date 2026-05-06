@@ -106,6 +106,50 @@ Built-in agents `acpx` ships:
 `droid`, `iflow`, `kilocode`, `kimi`, `kiro`, `opencode`, `qoder`, `qwen`,
 `trae`. Behavior varies — see [Known limitations](#known-limitations).
 
+## Custom agents
+
+The built-in registry is convenience for popular agents. **Any
+binary or script that speaks ACP over stdio works** — register it
+through `agentRegistryOverrides`:
+
+```ts
+const provider = createAcpxProvider({
+  agent: 'my-acp-server',
+  agentRegistryOverrides: {
+    'my-acp-server': './bin/my-acp-server --stdio',
+    // anything that produces an ACP-over-stdio process is fine:
+    //   'my-acp-server': 'node ./script.js --acp',
+    //   'my-acp-server': 'npx @my-org/acp-adapter@1.2.3',
+  },
+})
+```
+
+For your agent to drop in cleanly it must:
+
+- Speak the [ACP](https://agentclientprotocol.com) JSON-RPC handshake
+  over **stdio** (no HTTP / SSE / WebSocket transports — the runtime
+  is stdio-only)
+- Handle `initialize`, `session/new` (and optionally `session/load`
+  for persistent sessions), and `session/prompt`
+- Emit `session/update` events with the standard tool-call status
+  transitions (`pending` → `in_progress` → `completed` / `failed`)
+- Return one of the documented stop reasons — `end_turn` /
+  `stop_sequence` / `max_tokens` / `tool_calls` / `tool_use`. Anything
+  else maps to AI SDK `finishReason: 'unknown'`.
+
+What you **don't** get for custom agents:
+
+- No `npx` auto-download. The command runs as-is — make sure the
+  binary is on PATH or use an absolute path
+- No smoke-test matrix coverage. Real-world stability is on you
+- Credential management is yours — the agent reads its own env vars
+  or config files
+
+If your agent is a publicly-distributed ACP adapter, the better path
+is a PR to [`acpx`](https://github.com/openclaw/acpx) adding it to
+the built-in registry — that gets it `npx`-auto-download for everyone
+else too.
+
 ## Authentication
 
 `acpx/runtime` reads credentials from the environment or
