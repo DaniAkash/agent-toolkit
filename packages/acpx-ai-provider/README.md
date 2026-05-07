@@ -198,6 +198,57 @@ Run a single isolated turn:
 createAcpxProvider({ agent: 'claude', sessionMode: 'oneshot' })
 ```
 
+## Reasoning and plan steps
+
+Most ACP agents stream their chain-of-thought as the turn progresses.
+The provider surfaces these as AI SDK reasoning parts, so consumers
+can render them with the same code they already use for any other
+reasoning-capable model:
+
+```ts
+import { streamText } from 'ai'
+
+const result = streamText({
+  model: provider.languageModel(),
+  prompt: 'Refactor user.ts to use Result<T, E>',
+})
+
+for await (const part of result.fullStream) {
+  if (part.type === 'reasoning-delta') {
+    ui.appendThinking(part.delta) // streaming "💭…" bubble
+  } else if (part.type === 'text-delta') {
+    ui.appendAnswer(part.delta)
+  }
+}
+```
+
+When the agent emits a **plan** ("I will: 1. read file 2. fix bug
+3. test"), the provider surfaces it through the same channel as a
+self-contained reasoning block prefixed with `[Plan]`:
+
+```
+reasoning-start (id-1)
+reasoning-delta (id-1, "[Plan] 1. read file 2. fix bug 3. test")
+reasoning-end   (id-1)
+```
+
+Plan blocks have their own block ids and don't disturb any
+in-progress thought block — the agent can keep streaming reasoning
+into one id while plan announcements come and go on others.
+
+Agents that don't emit reasoning (e.g. Gemini CLI in some
+configurations) simply produce no `reasoning-*` parts; consumer
+code with a `reasoning-delta` branch never fires, no special-case
+needed.
+
+For Codex specifically, set the `reasoning_effort` config option to
+control how verbose the chain-of-thought is:
+
+```ts
+const provider = createAcpxProvider({ agent: 'codex' })
+await provider.setConfigOption('reasoning_effort', 'high') // 'minimal' | 'low' | 'medium' | 'high'
+```
+
 ## Tools — via MCP servers
 
 Tools are defined through MCP (Model Context Protocol) servers passed
