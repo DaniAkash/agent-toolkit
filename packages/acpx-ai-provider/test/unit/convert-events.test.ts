@@ -407,6 +407,98 @@ describe('status — usage_update', () => {
   })
 })
 
+describe('status — plan', () => {
+  test('emits a self-contained reasoning block with [Plan] prefix', () => {
+    const t = newTranslator()
+    const parts = feed(t, [
+      status({ tag: 'plan', text: '1. read file 2. fix bug 3. test' }),
+    ])
+    expect(parts).toEqual([
+      { type: 'reasoning-start', id: 'id-1' },
+      {
+        type: 'reasoning-delta',
+        id: 'id-1',
+        delta: '[Plan] 1. read file 2. fix bug 3. test',
+      },
+      { type: 'reasoning-end', id: 'id-1' },
+    ])
+  })
+
+  test('plan event with empty text emits nothing', () => {
+    const t = newTranslator()
+    const parts = feed(t, [status({ tag: 'plan', text: '' })])
+    expect(parts).toEqual([])
+  })
+
+  test('plan event with whitespace-only text emits nothing', () => {
+    const t = newTranslator()
+    const parts = feed(t, [status({ tag: 'plan', text: '   \n\t  ' })])
+    expect(parts).toEqual([])
+  })
+
+  test('plan text is trimmed before being embedded in the reasoning delta', () => {
+    const t = newTranslator()
+    const parts = feed(t, [status({ tag: 'plan', text: '  do the thing  ' })])
+    const delta = parts.find((p) => p.type === 'reasoning-delta')
+    expect(delta).toMatchObject({ delta: '[Plan] do the thing' })
+  })
+
+  test('plan during an open thought block does not disturb that block', () => {
+    const t = newTranslator()
+    const parts = feed(t, [
+      text('thinking…', 'thought'),
+      status({ tag: 'plan', text: 'I will look up X' }),
+      text(' more thinking', 'thought'),
+    ])
+    const types = parts.map((p) => p.type)
+    // the thought block stays open across the plan: reasoning-start
+    // for the thought (id-1), thought delta, then a SEPARATE reasoning
+    // triplet for the plan (id-2), then more thought-deltas on id-1.
+    expect(types).toEqual([
+      'reasoning-start',
+      'reasoning-delta',
+      'reasoning-start',
+      'reasoning-delta',
+      'reasoning-end',
+      'reasoning-delta',
+    ])
+    const ids = parts.flatMap((p) => ('id' in p ? [p.id] : []))
+    expect(new Set(ids).size).toBe(2)
+  })
+
+  test('multiple plan events each emit their own block', () => {
+    const t = newTranslator()
+    const parts = feed(t, [
+      status({ tag: 'plan', text: 'first plan' }),
+      status({ tag: 'plan', text: 'revised plan' }),
+    ])
+    const startIds = parts
+      .filter((p) => p.type === 'reasoning-start')
+      .map((p) => p.id)
+    expect(startIds).toHaveLength(2)
+    expect(new Set(startIds).size).toBe(2)
+    const deltas = parts
+      .filter((p) => p.type === 'reasoning-delta')
+      .map((p) => p.delta)
+    expect(deltas).toEqual(['[Plan] first plan', '[Plan] revised plan'])
+  })
+
+  test('plan does not advance currentBlock state, so a follow-up text opens its own text block', () => {
+    const t = newTranslator()
+    const parts = feed(t, [
+      status({ tag: 'plan', text: 'I will…' }),
+      text('hello'),
+    ])
+    expect(parts.map((p) => p.type)).toEqual([
+      'reasoning-start',
+      'reasoning-delta',
+      'reasoning-end',
+      'text-start',
+      'text-delta',
+    ])
+  })
+})
+
 describe('error events', () => {
   test('produces an error part with an AcpxError instance', () => {
     const t = newTranslator()

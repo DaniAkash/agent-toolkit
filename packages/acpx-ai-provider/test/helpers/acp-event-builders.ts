@@ -61,6 +61,10 @@ export const acpEvent = {
     return acpEvent.status({ tag: 'usage_update', used, size })
   },
 
+  plan(text: string): AcpRuntimeEvent {
+    return acpEvent.status({ tag: 'plan', text })
+  },
+
   done(stopReason?: string): AcpRuntimeEvent {
     return { type: 'done', stopReason }
   },
