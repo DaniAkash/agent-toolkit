@@ -3,6 +3,8 @@ import type {
   AcpRuntimeDoctorReport,
   AcpRuntimeEvent,
   AcpRuntimeHandle,
+  AcpRuntimeSessionModels,
+  AcpRuntimeStatus,
   AcpRuntimeTurnResult,
   AcpRuntimeTurnResultError,
 } from 'acpx/runtime'
@@ -58,6 +60,8 @@ export type {
   AcpRuntimeDoctorReport,
   AcpRuntimeEvent,
   AcpRuntimeHandle,
+  AcpRuntimeSessionModels,
+  AcpRuntimeStatus,
   AcpRuntimeTurnResult,
   AcpRuntimeTurnResultError,
 }

@@ -30,6 +30,8 @@ export type {
   AcpRuntimeDoctorReport,
   AcpRuntimeEvent,
   AcpRuntimeHandle,
+  AcpRuntimeSessionModels,
+  AcpRuntimeStatus,
   AcpRuntimeTurnResult,
   AcpRuntimeTurnResultError,
   AcpxLanguageModelOptions,
