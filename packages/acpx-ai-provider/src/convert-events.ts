@@ -249,16 +249,20 @@ export class EventTranslator {
       if (event.size !== undefined) this.accumulatedSize = event.size
       return []
     }
-    if (event.tag === 'plan' && event.text.length > 0) {
+    if (event.tag === 'plan') {
       // Emit plan as a self-contained reasoning block with its own id.
       // Doesn't disturb the currently-open text/reasoning block — AI SDK
       // allows multiple reasoning ids to coexist as long as each is
       // properly start/end-paired. The `[Plan]` prefix lets consumers
       // distinguish plan announcements from the agent's chain-of-thought.
+      // Trim because whitespace-only plan updates carry no signal — same
+      // intent as the empty-string case.
+      const trimmed = event.text.trim()
+      if (trimmed.length === 0) return []
       const id = this.generateId()
       return [
         { type: 'reasoning-start', id },
-        { type: 'reasoning-delta', id, delta: `[Plan] ${event.text}` },
+        { type: 'reasoning-delta', id, delta: `[Plan] ${trimmed}` },
         { type: 'reasoning-end', id },
       ]
     }

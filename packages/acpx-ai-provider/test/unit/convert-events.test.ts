@@ -430,6 +430,19 @@ describe('status — plan', () => {
     expect(parts).toEqual([])
   })
 
+  test('plan event with whitespace-only text emits nothing', () => {
+    const t = newTranslator()
+    const parts = feed(t, [status({ tag: 'plan', text: '   \n\t  ' })])
+    expect(parts).toEqual([])
+  })
+
+  test('plan text is trimmed before being embedded in the reasoning delta', () => {
+    const t = newTranslator()
+    const parts = feed(t, [status({ tag: 'plan', text: '  do the thing  ' })])
+    const delta = parts.find((p) => p.type === 'reasoning-delta')
+    expect(delta).toMatchObject({ delta: '[Plan] do the thing' })
+  })
+
   test('plan during an open thought block does not disturb that block', () => {
     const t = newTranslator()
     const parts = feed(t, [

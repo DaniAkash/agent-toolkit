@@ -263,10 +263,7 @@ What's confirmed today:
 
 The CLI alias `thought_level` is **Codex-only** — `acpx codex set
 thought_level high` translates to `reasoning_effort = high` before
-dispatch. Other agents take `reasoning_effort` verbatim. (The
-underlying OpenAI / Anthropic APIs may also accept `'minimal'` —
-agent adapters might pass it through; safe set above is what
-acpx's own test fixture documents.)
+dispatch. Other agents take `reasoning_effort` verbatim.
 
 ### Discovering an agent's config keys
 
@@ -296,11 +293,10 @@ config-option vocabulary is per-agent. Three ways to discover:
 - **Switching models doesn't reset effort.** A subsequent
   `setConfigOption('model', …)` keeps the previously-set
   reasoning effort; reset explicitly if you want defaults.
-- **"Not yet documented" doesn't mean unsupported.** Gemini /
-  Copilot / Cursor adapters may accept reasoning parameters under
-  different keys their public docs don't yet list. Use the
-  discovery path above; an unrecognized key surfaces as an error
-  on the next turn.
+- **For agents not in the table, use the discovery section
+  above.** Unrecognized config keys surface as an error on the
+  next turn, so trial-and-error against an agent's actual
+  capability list is safe.
 
 ## Tools — via MCP servers
 
