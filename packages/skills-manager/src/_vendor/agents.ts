@@ -1,5 +1,8 @@
 // Vendored from vercel-labs/skills@1.5.6 src/agents.ts. See THIRD_PARTY_NOTICES.md
 // for upstream attribution. Imports updated for our package layout.
+//
+// Local edit: explicit return + parameter types on getOpenClawGlobalSkillsDir
+// below — bunup's TS9007/TS9011 require them. Behavior unchanged.
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -15,9 +18,9 @@ const claudeHome =
 const vibeHome = process.env.VIBE_HOME?.trim() || join(home, '.vibe')
 
 export function getOpenClawGlobalSkillsDir(
-  homeDir = home,
+  homeDir: string = home,
   pathExists: (path: string) => boolean = existsSync,
-) {
+): string {
   if (pathExists(join(homeDir, '.openclaw'))) {
     return join(homeDir, '.openclaw/skills')
   }

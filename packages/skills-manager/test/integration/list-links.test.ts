@@ -61,6 +61,33 @@ describe('listLinks()', () => {
     expect(links[0]?.broken).toBe(true)
   })
 
+  test('reports broken:true when SKILL.md inside the bundle is gone', async () => {
+    await writeSkillSource(join(tmp.workspaceDir, 'a'), { name: 'a' })
+    const { mgr } = mgrWithDirs()
+    await mgr.link({ skillName: 'a', agent: 'claude-code' })
+
+    // Symlink still points correctly, but the bundle has lost its SKILL.md.
+    await rm(join(tmp.workspaceDir, 'a/SKILL.md'), { force: true })
+
+    const links = await mgr.listLinks()
+    expect(links).toHaveLength(1)
+    expect(links[0]?.broken).toBe(true)
+  })
+
+  test('returns user-facing name alongside lookup-key skillName', async () => {
+    const src = join(tmp.root, 'src')
+    await writeSkillSource(src, { name: 'My Cool Skill', description: 'd' })
+    const { mgr } = mgrWithDirs()
+    await mgr.add({ source: src })
+    // sanitizeName('My Cool Skill') → 'my-cool-skill'
+    await mgr.link({ skillName: 'My Cool Skill', agent: 'claude-code' })
+
+    const links = await mgr.listLinks()
+    expect(links).toHaveLength(1)
+    expect(links[0]?.skillName).toBe('my-cool-skill') // lookup key
+    expect(links[0]?.name).toBe('My Cool Skill') // display
+  })
+
   test('opt-in scanUnmanaged surfaces hand-rolled symlinks-into-workspace', async () => {
     await writeSkillSource(join(tmp.workspaceDir, 'a'), { name: 'a' })
     const { mgr, claudeDir } = mgrWithDirs()

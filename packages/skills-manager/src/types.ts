@@ -18,7 +18,7 @@ export interface AgentInfo {
 export type SystemPromptOption = string | { append: string }
 
 export type SkillSource =
-  | { kind: 'github'; ownerRepo: string; ref?: string; subPath?: string }
+  | { kind: 'github'; ownerRepo: string; ref?: string }
   | { kind: 'gitUrl'; url: string; ref?: string }
   | { kind: 'local'; path: string }
 
@@ -116,7 +116,18 @@ export interface ListLinksOptions {
 }
 
 export interface SkillLink {
+  /**
+   * Sanitized workspace directory name — the lookup key for `unlink()`,
+   * `removeWithLinks()`, etc. Round-trips: `unlink({ skillName })` will
+   * re-sanitize, so passing this value back works.
+   */
   skillName: string
+  /**
+   * Frontmatter `name` recorded at `add()` / `link()` time. Display
+   * value. For unmanaged links, falls back to the on-disk directory
+   * name since no manifest entry exists.
+   */
+  name: string
   agent: AgentId
   /** Path of the symlink itself, inside the agent's skills directory. */
   linkPath: string

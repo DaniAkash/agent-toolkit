@@ -8,7 +8,15 @@ import {
   symlink,
 } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { dirname, isAbsolute, join, normalize, resolve } from 'node:path'
+import {
+  dirname,
+  isAbsolute,
+  join,
+  normalize,
+  relative,
+  resolve,
+  sep,
+} from 'node:path'
 import {
   ensureWorkspaceDir,
   fetchSourceIntoWorkspace,
@@ -101,28 +109,48 @@ export function createSkillsManager(
       : normalize(join(dirname(linkPath), target))
   }
 
+  // Windows-safe containment check. `path.relative` returns "" when the
+  // target IS the workspace, or a relative path that doesn't start with
+  // ".." when it's a descendant. Anything else (absolute path, "..", etc.)
+  // means the target sits outside the workspace.
   function declaresIntoWorkspace(absoluteTarget: string): boolean {
-    return (
-      absoluteTarget === workspaceDir ||
-      absoluteTarget.startsWith(`${workspaceDir}/`)
-    )
+    const rel = relative(workspaceDir, absoluteTarget)
+    if (rel === '') return true
+    if (rel.startsWith('..')) return false
+    return !isAbsolute(rel) && !rel.startsWith(`..${sep}`)
   }
 
   function isReservedManifestEntry(name: string): boolean {
     return name === MANIFEST_FILE || name.startsWith(MANIFEST_TMP_PREFIX)
   }
 
-  function newEntryFromAdded(
-    added: AddSkillResult['added'][number],
-    sourceLike: ManifestSkillEntry['source'],
+  /**
+   * Build a manifest entry for a skill that already exists on disk but
+   * isn't recorded (e.g. `link()` called before `add()`). We read SKILL.md
+   * so the synthesized entry carries a real name/description instead of
+   * placeholders.
+   */
+  async function synthesizeEntry(
+    skillName: string,
+    skillDir: string,
     now: string,
-  ): ManifestSkillEntry {
+  ): Promise<ManifestSkillEntry> {
+    const meta = await readSkillMd(skillDir)
     return {
-      name: added.name,
-      description: added.description,
-      source: sourceLike,
+      name: meta?.name || skillName,
+      description: meta?.description || '',
+      source: { kind: 'local', path: skillDir },
       addedAt: now,
       links: {},
+    }
+  }
+
+  async function fileExists(path: string): Promise<boolean> {
+    try {
+      await lstat(path)
+      return true
+    } catch {
+      return false
     }
   }
 
@@ -185,35 +213,33 @@ export function createSkillsManager(
         throw new SkillNotFoundError(`Skill not in workspace: ${skillName}`)
       }
 
-      const declared = await declaredTarget(linkPath)
-      if (declared === null) {
-        let foreign = false
-        try {
-          const s = await lstat(linkPath)
-          foreign = !s.isSymbolicLink()
-        } catch {
-          /* absent */
-        }
-        if (foreign) {
-          throw new ForeignPathError(
-            `Refusing to overwrite non-symlink at ${linkPath}`,
-          )
-        }
-      } else if (declared === skillDir) {
-        return await enqueueWrite(async () => {
+      // All filesystem mutations + manifest write run inside the queue so
+      // concurrent link() calls on the same instance can't race on
+      // symlink() / rm() (e.g. EEXIST).
+      return await enqueueWrite(async () => {
+        const declared = await declaredTarget(linkPath)
+        if (declared === null) {
+          let foreign = false
+          try {
+            const s = await lstat(linkPath)
+            foreign = !s.isSymbolicLink()
+          } catch {
+            /* absent */
+          }
+          if (foreign) {
+            throw new ForeignPathError(
+              `Refusing to overwrite non-symlink at ${linkPath}`,
+            )
+          }
+        } else if (declared === skillDir) {
           const manifest = await readManifest()
           const entry = manifest.skills[dirName]
           if (entry?.links[agent]) {
             return { skillName, agent, linkPath, created: false }
           }
           const now = new Date().toISOString()
-          const baseEntry: ManifestSkillEntry =
-            entry ??
-            newEntryFromAdded(
-              { name: skillName, workspacePath: skillDir, description: '' },
-              { kind: 'local', path: skillDir },
-              now,
-            )
+          const baseEntry =
+            entry ?? (await synthesizeEntry(skillName, skillDir, now))
           baseEntry.links[agent] = {
             linkPath,
             workspacePath: skillDir,
@@ -222,29 +248,23 @@ export function createSkillsManager(
           manifest.skills[dirName] = baseEntry
           await saveManifest(workspaceDir, manifest)
           return { skillName, agent, linkPath, created: false }
-        })
-      } else if (declaresIntoWorkspace(declared)) {
-        // Stale link pointing at a different workspace dir — replace.
-        await rm(linkPath, { force: true })
-      } else {
-        throw new ForeignPathError(
-          `Symlink at ${linkPath} points outside workspace`,
-        )
-      }
+        } else if (declaresIntoWorkspace(declared)) {
+          // Stale link pointing at a different workspace dir — replace.
+          await rm(linkPath, { force: true })
+        } else {
+          throw new ForeignPathError(
+            `Symlink at ${linkPath} points outside workspace`,
+          )
+        }
 
-      await mkdir(dirname(linkPath), { recursive: true })
-      await symlink(skillDir, linkPath, 'dir')
+        await mkdir(dirname(linkPath), { recursive: true })
+        await symlink(skillDir, linkPath, 'dir')
 
-      return await enqueueWrite(async () => {
         const manifest = await readManifest()
         const now = new Date().toISOString()
         const entry =
           manifest.skills[dirName] ??
-          newEntryFromAdded(
-            { name: skillName, workspacePath: skillDir, description: '' },
-            { kind: 'local', path: skillDir },
-            now,
-          )
+          (await synthesizeEntry(skillName, skillDir, now))
         entry.links[agent] = {
           linkPath,
           workspacePath: skillDir,
@@ -324,8 +344,10 @@ export function createSkillsManager(
     async remove(removeOpts) {
       const dirName = sanitizeName(removeOpts.skillName)
       const dir = join(workspaceDir, dirName)
-      await rm(dir, { recursive: true, force: true })
+      // Inside the queue so concurrent remove()/add() calls don't race
+      // on the same workspace dir.
       await enqueueWrite(async () => {
+        await rm(dir, { recursive: true, force: true })
         const manifest = await readManifest()
         delete manifest.skills[dirName]
         await saveManifest(workspaceDir, manifest)
@@ -413,10 +435,18 @@ export function createSkillsManager(
         >) {
           if (agentFilter && !agentFilter.has(agent)) continue
           seen.add(link.linkPath)
+          // Healthy iff the symlink still points where we recorded AND
+          // the underlying bundle's SKILL.md is still on disk.
           const declared = await declaredTarget(link.linkPath)
-          const healthy = declared !== null && declared === link.workspacePath
+          const symlinkMatches =
+            declared !== null && declared === link.workspacePath
+          const bundlePresent = await fileExists(
+            join(link.workspacePath, 'SKILL.md'),
+          )
+          const healthy = symlinkMatches && bundlePresent
           out.push({
             skillName: dirName,
+            name: entry.name,
             agent,
             linkPath: link.linkPath,
             workspacePath: link.workspacePath,
@@ -446,6 +476,7 @@ export function createSkillsManager(
           if (skillFilter && !skillFilter.has(entryName)) continue
           out.push({
             skillName: entryName,
+            name: entryName,
             agent,
             linkPath,
             workspacePath: declared,
@@ -479,16 +510,19 @@ export function createSkillsManager(
           const priorEntry = prior.skills[name]
           if (priorEntry) {
             preserved.push(name)
+            // `??` (not `||`) — if the user intentionally blanked the
+            // frontmatter description, an empty string should win over the
+            // cached prior value.
             next.skills[name] = {
               ...priorEntry,
-              name: meta.name || priorEntry.name,
-              description: meta.description || priorEntry.description,
+              name: meta.name === '' ? priorEntry.name : meta.name,
+              description: meta.description,
               links: {},
             }
           } else {
             adopted.push(name)
             next.skills[name] = {
-              name: meta.name || name,
+              name: meta.name === '' ? name : meta.name,
               description: meta.description,
               source: { kind: 'local', path: workspacePath },
               addedAt: new Date().toISOString(),

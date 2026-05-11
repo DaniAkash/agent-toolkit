@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
 import {
   cp,
+  lstat,
   mkdir,
   mkdtemp,
   readdir,
@@ -144,8 +145,16 @@ async function discoverSkills(root: string): Promise<DiscoveredSkill[]> {
     const skillMd = join(dir, 'SKILL.md')
     let isSkillDir = false
     try {
-      const s = await stat(skillMd)
-      isSkillDir = s.isFile()
+      // `lstat` first — a SKILL.md symlinked outside the source tree is a
+      // CWE-22 / RCE-adjacent risk (a malicious remote repo could point
+      // SKILL.md at `/etc/passwd` or similar). Reject symlinked SKILL.md
+      // outright; we don't read or copy them. Sibling dirs are still walked
+      // below so legitimate adjacent skills aren't lost.
+      const ls = await lstat(skillMd)
+      if (!ls.isSymbolicLink()) {
+        const s = await stat(skillMd)
+        isSkillDir = s.isFile()
+      }
     } catch {
       isSkillDir = false
     }

@@ -7,12 +7,13 @@ export interface TmpWorkspace {
   root: string
   /** `${root}/workspace` — pass as workspaceDir. */
   workspaceDir: string
-  /** `${root}/home` — what we pin $HOME to for agent-dir resolution. */
+  /**
+   * `${root}/home` — pass into `agentSkillsDirs` overrides when a test
+   * needs to redirect an agent's skills dir. Never modifies real $HOME.
+   */
   home: string
   cleanup(): Promise<void>
 }
-
-const HOME_KEYS = ['HOME', 'USERPROFILE'] as const
 
 export async function makeTmpWorkspace(): Promise<TmpWorkspace> {
   const root = await mkdtemp(join(tmpdir(), 'skills-mgr-'))
@@ -20,20 +21,11 @@ export async function makeTmpWorkspace(): Promise<TmpWorkspace> {
   const home = join(root, 'home')
   await mkdir(workspaceDir, { recursive: true })
   await mkdir(home, { recursive: true })
-  const prior = new Map<string, string | undefined>()
-  for (const key of HOME_KEYS) {
-    prior.set(key, process.env[key])
-    process.env[key] = home
-  }
   return {
     root,
     workspaceDir,
     home,
     async cleanup() {
-      for (const [key, val] of prior) {
-        if (val === undefined) delete process.env[key]
-        else process.env[key] = val
-      }
       await rm(root, { recursive: true, force: true })
     },
   }

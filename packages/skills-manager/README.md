@@ -52,23 +52,24 @@ import { createSkillsManager } from 'skills-manager'
 const mgr = createSkillsManager({ workspaceDir: '/path/to/your/store' })
 
 // 1. Pull a skill into the workspace.
-const { added } = await mgr.add({ source: 'vercel-labs/skills/blob/main/skills/git-commits' })
-//                                       ^ owner/repo, full git URL, .well-known URL, or local path
+const { added } = await mgr.add({ source: 'vercel-labs/skills' })
+//                                       ^ owner/repo, full git URL, or an existing local path
 
-// 2. Wire it to specific agents.
-await mgr.link({ skillName: added[0].name, agent: 'claude-code' })
-await mgr.link({ skillName: added[0].name, agent: 'codex' })
+// 2. Wire it to specific agents. Use the lookup key returned by add().
+const skillName = added[0].name
+await mgr.link({ skillName, agent: 'claude-code' })
+await mgr.link({ skillName, agent: 'codex' })
 
 // 3. Discover what's installed.
 const skills = await mgr.listSkills()
 //   [{ name, description, workspacePath, source, addedAt, broken?, unmanaged? }, …]
 
 const links = await mgr.listLinks()
-//   [{ skillName, agent, linkPath, workspacePath, broken?, unmanaged? }, …]
+//   [{ skillName, name, agent, linkPath, workspacePath, broken?, unmanaged? }, …]
 
 // 4. Tear down.
-await mgr.unlink({ skillName: added[0].name, agent: 'codex' })
-await mgr.removeWithLinks({ skillName: added[0].name })
+await mgr.unlink({ skillName, agent: 'codex' })
+await mgr.removeWithLinks({ skillName })
 ```
 
 ## API
