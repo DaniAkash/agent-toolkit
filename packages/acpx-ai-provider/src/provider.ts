@@ -84,6 +84,7 @@ export class AcpxProvider {
         mode,
         cwd: this.settings.cwd,
         resumeSessionId: this.settings.resumeSessionId,
+        sessionOptions: this.settings.sessionOptions,
       })
       cached = { handle, agent }
       this.handles.set(sessionKey, cached)

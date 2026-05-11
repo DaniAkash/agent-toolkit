@@ -40,6 +40,8 @@ export type {
   AcpxPermissionMode,
   AcpxProviderSettings,
   AcpxSessionMode,
+  SessionAgentOptions,
+  SystemPromptOption,
 } from './types.ts'
 
 export const VERSION = '0.0.0'

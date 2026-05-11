@@ -198,6 +198,43 @@ Run a single isolated turn:
 createAcpxProvider({ agent: 'claude', sessionMode: 'oneshot' })
 ```
 
+### System prompts and per-session agent options
+
+Pass `sessionOptions` to set the agent's `systemPrompt` (and optionally
+`model`, `allowedTools`, `maxTurns`) on a fresh session. The values are
+forwarded to ACP's `session/new` `_meta` and applied before the first
+turn.
+
+```ts
+const provider = createAcpxProvider({
+  agent: 'claude',
+  sessionOptions: {
+    systemPrompt: 'You are an expert Rust reviewer. Be terse.',
+    // model: 'claude-opus-4-7',
+    // allowedTools: ['read', 'edit'],
+    // maxTurns: 5,
+  },
+})
+```
+
+Use `{ append: '…' }` to append to the agent's default prompt instead of
+replacing it:
+
+```ts
+sessionOptions: {
+  systemPrompt: { append: 'When you finish, also propose tests.' },
+}
+```
+
+System prompts are fixed at `session/new` time. To switch prompts for the
+same workspace, use a distinct `sessionKey` (or close the current session
+first); changing `sessionOptions` and re-using the same key is a no-op
+for reused records by design.
+
+Not every agent honors every option — Codex / Gemini ignore Claude-specific
+fields like `model`, and so on. Unrecognized options are dropped silently
+at the ACP layer.
+
 ## Reasoning and plan steps
 
 Most ACP agents stream their chain-of-thought as the turn progresses.
