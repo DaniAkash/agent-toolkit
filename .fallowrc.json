@@ -12,7 +12,15 @@
     "private-type-leaks": "warn",
     "unused-class-members": "off"
   },
+  "publicPackages": ["acpx-ai-provider", "skills-manager"],
   "overrides": [
+    {
+      "files": ["**/_vendor/**"],
+      "rules": {
+        "unused-exports": "off",
+        "private-type-leaks": "off"
+      }
+    },
     {
       "files": ["**/*.test.ts", "**/*.spec.ts", "**/test/**", "**/*.config.ts"],
       "rules": {
@@ -34,6 +42,18 @@
       {
         "name": "acpx-ai-provider-tests",
         "patterns": ["packages/acpx-ai-provider/test/**"]
+      },
+      {
+        "name": "skills-manager-public",
+        "patterns": ["packages/skills-manager/src/index.ts"]
+      },
+      {
+        "name": "skills-manager-internal",
+        "patterns": ["packages/skills-manager/src/**"]
+      },
+      {
+        "name": "skills-manager-tests",
+        "patterns": ["packages/skills-manager/test/**"]
       }
     ],
     "rules": [
@@ -48,6 +68,18 @@
       {
         "from": "acpx-ai-provider-tests",
         "allow": ["acpx-ai-provider-public", "acpx-ai-provider-internal"]
+      },
+      {
+        "from": "skills-manager-internal",
+        "allow": ["skills-manager-internal", "skills-manager-public"]
+      },
+      {
+        "from": "skills-manager-public",
+        "allow": ["skills-manager-internal"]
+      },
+      {
+        "from": "skills-manager-tests",
+        "allow": ["skills-manager-public", "skills-manager-internal"]
       }
     ]
   },

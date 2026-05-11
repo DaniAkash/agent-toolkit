@@ -1,0 +1,61 @@
+{
+  "name": "skills-manager",
+  "version": "0.1.0",
+  "description": "Programmatic skill workspace + agent-link manager for ACP coding agents. Wraps vercel-labs/skills for use as a library.",
+  "license": "MIT",
+  "author": "Dani Akash",
+  "homepage": "https://github.com/DaniAkash/acpx/tree/main/packages/skills-manager#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DaniAkash/acpx.git",
+    "directory": "packages/skills-manager"
+  },
+  "bugs": "https://github.com/DaniAkash/acpx/issues",
+  "keywords": [
+    "acp",
+    "agent-client-protocol",
+    "agent-skills",
+    "skills",
+    "skill-installer",
+    "claude-code",
+    "codex",
+    "gemini",
+    "opencode",
+    "cursor"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "bunup",
+    "dev": "bunup --watch",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "xdg-basedir": "^5.1.0",
+    "yaml": "^2.8.3"
+  },
+  "devDependencies": {
+    "bunup": "^0.16.31",
+    "typescript": "^6.0.3"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}
