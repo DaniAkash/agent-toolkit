@@ -313,10 +313,21 @@ const provider = createAcpxProvider({
       name: 'filesystem',
       command: 'npx',
       args: ['-y', '@modelcontextprotocol/server-filesystem', '/tmp'],
+      env: { LOG_LEVEL: 'info' },          // stdio servers — env as a record
+    },
+    {
+      type: 'http',
+      name: 'remote',
+      url: 'https://example.com/mcp',
+      headers: { Authorization: 'Bearer …' }, // http/sse servers — headers as a record
     },
   ],
 })
 ```
+
+`env` and `headers` are accepted as plain `Record<string, string>` for
+ergonomics; the provider converts them to the ACP wire format
+(`Array<{ name, value }>`) before handing the config to the runtime.
 
 > **Note**: host-side AI SDK tools (the `acpTools()` /
 > TCP-callback story from `acp-ai-provider`) are **not** supported in
