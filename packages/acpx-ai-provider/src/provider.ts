@@ -93,8 +93,10 @@ export class AcpxProvider {
     return { handle: cached.handle, sessionKey, mode, isFresh }
   }
 
-  markSessionKeyUsed(sessionKey: string): void {
+  markSessionKeyUsed(sessionKey: string): boolean {
+    const wasFresh = !this.usedKeys.has(sessionKey)
     this.usedKeys.add(sessionKey)
+    return wasFresh
   }
 
   resolveSessionKey(opts: AcpxLanguageModelOptions): string {

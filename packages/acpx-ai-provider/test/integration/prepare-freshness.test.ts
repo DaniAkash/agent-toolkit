@@ -39,6 +39,52 @@ describe('streamText — prepare() does not consume session freshness', () => {
     expect(turnText).toContain('What did you just tell me?')
   })
 
+  test('concurrent doStream calls on the same session: exactly one runs in fresh mode', async () => {
+    const runtime = new MockAcpRuntime({
+      turnScripts: [
+        {
+          events: [acpEvent.text('a')],
+          result: acpResult.completed('end_turn'),
+        },
+        {
+          events: [acpEvent.text('b')],
+          result: acpResult.completed('end_turn'),
+        },
+      ],
+    })
+    const provider = createAcpxProvider({
+      agent: 'claude',
+      sessionKey: 'concurrent-1',
+      runtime,
+    })
+
+    const messages = [
+      { role: 'user' as const, content: 'seed-user-1' },
+      { role: 'assistant' as const, content: 'seed-assistant-1' },
+      { role: 'user' as const, content: 'seed-user-2' },
+    ]
+
+    const first = streamText({
+      model: provider.languageModel(),
+      messages,
+      stopWhen: stepCountIs(1),
+    })
+    const second = streamText({
+      model: provider.languageModel(),
+      messages,
+      stopWhen: stepCountIs(1),
+    })
+    await Promise.all([first.text, second.text])
+
+    const texts = runtime.startTurnCalls.map((call) => call.text)
+    expect(texts).toHaveLength(2)
+
+    const seededCount = texts.filter((t) =>
+      t.includes('seed-assistant-1'),
+    ).length
+    expect(seededCount).toBe(1)
+  })
+
   test('second turn on the same session sends only the latest user message', async () => {
     const runtime = new MockAcpRuntime({
       turnScripts: [
