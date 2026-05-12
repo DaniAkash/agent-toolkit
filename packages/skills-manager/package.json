@@ -1,6 +1,6 @@
 {
   "name": "skills-manager",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "description": "Programmatic skill workspace + agent-link manager for ACP coding agents. Wraps vercel-labs/skills for use as a library.",
   "license": "MIT",
   "author": "Dani Akash",
@@ -41,8 +41,7 @@
     "dist",
     "README.md",
     "LICENSE",
-    "THIRD_PARTY_NOTICES.md",
-    "CHANGELOG.md"
+    "THIRD_PARTY_NOTICES.md"
   ],
   "scripts": {
     "build": "bunup",

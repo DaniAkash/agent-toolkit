@@ -1,5 +1,10 @@
 # skills-manager
 
+> [!WARNING]
+> **Alpha software.** This package is in active development. The public
+> API may change between minor versions without notice until `1.0.0`.
+> Pin exact versions; expect rough edges.
+
 Programmatic workspace + agent-link manager for [Anthropic-style
 SKILL.md](https://github.com/vercel-labs/skills) bundles.
 
@@ -12,7 +17,42 @@ out to a CLI.
 
 > **Library, not a CLI.** If you just want to install skills on your own
 > machine, use the [`skills`](https://github.com/vercel-labs/skills) CLI
-> directly. This package is a programmatic API for embedders.
+> directly (`skills.sh`). This package is a programmatic API for
+> embedders.
+
+## How this relates to `skills.sh` (vercel-labs/skills)
+
+`skills-manager` builds on top of the data model and filesystem layout
+defined by the official [`skills`](https://github.com/vercel-labs/skills)
+CLI (`skills.sh`). Specifically, this package **vendors** a small set of
+internals from upstream — the 53-agent catalog (`agents.ts`), the
+`SKILL.md` frontmatter parser (`frontmatter.ts`), the `sanitizeName`
+helper, and the `AgentType` / `AgentConfig` types — into
+[`src/_vendor/`](./src/_vendor) under their original MIT license.
+
+Why vendor instead of depending on `skills` as a package: the
+npm-published `skills` package is **CLI-only** — its `package.json` has
+no `exports` / `main` / `types` fields, so none of the upstream
+primitives are importable as a library. Vendoring is the only viable
+path to a programmatic API today.
+
+What this means in practice:
+
+- **Same agent catalog as `skills.sh`** — every agent the CLI supports
+  is supported here, with identical default install paths. When upstream
+  adds an agent, we can pull the catalog forward with a deliberate
+  vendor refresh.
+- **Compatible on-disk layout** — bundles installed by `skills-manager`
+  and bundles installed by the `skills.sh` CLI can coexist in the same
+  workspace. `listSkills({ scanUnmanaged: true })` will surface
+  CLI-installed bundles; `rescan({ mode: 'merge' })` adopts them into
+  the manifest.
+- **MIT attribution preserved** — see
+  [`THIRD_PARTY_NOTICES.md`](./THIRD_PARTY_NOTICES.md).
+
+If `vercel-labs/skills` ever publishes a programmatic API, we'll
+revisit; until then this package owns the integration surface for
+embedders.
 
 ## Mental model
 
@@ -219,17 +259,6 @@ file locking is a documented v2 follow-up.
 `vercel-labs/skills` we use don't call telemetry today, but the guard
 covers us if a future vendored update introduces one. Opt back in with
 `process.env.DO_NOT_TRACK = '0'` before importing.
-
-## Relationship to vercel-labs/skills
-
-`skills-manager` wraps the data + filesystem layout from
-[`vercel-labs/skills`](https://github.com/vercel-labs/skills). The agents
-catalog, frontmatter parser, and `sanitizeName` helper are vendored from
-upstream (MIT-licensed); see
-[`THIRD_PARTY_NOTICES.md`](./THIRD_PARTY_NOTICES.md) for attribution.
-
-If you want the CLI experience, use upstream directly. If you want a
-library, that's this package.
 
 ## License
 
