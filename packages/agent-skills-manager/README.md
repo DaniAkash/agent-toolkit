@@ -1,12 +1,14 @@
 # agent-skills-manager
 
+> Programmatic workspace + agent-link manager for skills that follow
+> the [agentskills.io specification](https://agentskills.io/specification).
+
+[![npm](https://img.shields.io/npm/v/agent-skills-manager.svg)](https://www.npmjs.com/package/agent-skills-manager)
+
 > [!WARNING]
 > **Alpha software.** This package is in active development. The public
 > API may change between minor versions without notice until `1.0.0`.
 > Pin exact versions; expect rough edges.
-
-Programmatic workspace + agent-link manager for [Anthropic-style
-SKILL.md](https://github.com/vercel-labs/skills) bundles.
 
 `agent-skills-manager` is built around seven primitives — `add`, `link`,
 `unlink`, `remove`, `listSkills`, `listLinks`, `rescan` — backed by a
