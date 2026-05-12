@@ -1,13 +1,22 @@
 # Tag-triggered npm release + draft GitHub Release.
 #
+# This repo is a multi-package monorepo. Each package releases under its
+# own tag-prefix, so a single tag never tries to publish two packages.
+#
 # How to cut a release:
-#   1. Bump version in packages/acpx-ai-provider/package.json
-#   2. Commit ("chore(release): vX.Y.Z") — `chore(release)` is filtered
-#      out of cliff.toml so the bump commit doesn't pollute the next
-#      changelog.
-#   3. git tag vX.Y.Z && git push origin main --tags
+#   1. Bump version in packages/<pkg>/package.json
+#   2. Commit ("chore(release): <pkg> X.Y.Z") — `chore(release)` is
+#      filtered out of cliff.toml so the bump commit doesn't pollute the
+#      next changelog.
+#   3. git tag <pkg>-vX.Y.Z && git push origin main --tags
+#         e.g. acpx-ai-provider-v0.0.3
+#              skills-manager-v0.1.0
 #   4. Wait for the workflow to finish, then publish the draft from the
 #      Releases page.
+#
+# Historical tags `v0.0.1` and `v0.0.2` (acpx-ai-provider only) remain
+# as immutable history; they no longer trigger this workflow. The
+# tag-prefix scheme was adopted 2026-05-11 when skills-manager landed.
 #
 # Required repo secrets (Settings → Secrets and variables → Actions):
 #   NPM_TOKEN — automation token for npmjs.com with publish access
@@ -22,10 +31,8 @@ name: Release (npm publish + draft GitHub release)
 on:
   push:
     tags:
-      # Only semver-style tags trigger releases — `v0.1.0`, `v1.2.3-rc.1`,
-      # etc. Loose patterns like `v*` would also match `vnext`,
-      # `vendor-fix`, or typo'd tags and silently kick off a publish.
-      - 'v[0-9]*'
+      - 'acpx-ai-provider-v[0-9]*'
+      - 'skills-manager-v[0-9]*'
 
 permissions:
   contents: write
@@ -45,6 +52,31 @@ jobs:
           # can walk back to the previous tag and compute the changelog
           # range.
           fetch-depth: 0
+
+      - name: Resolve package from tag prefix
+        id: pkg
+        # The tag dictates which package this release is for. We refuse
+        # to proceed on an unrecognized prefix so a typo (e.g.
+        # `skill-manager-v0.1.0`) fails loudly instead of publishing the
+        # wrong dir.
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          case "$TAG" in
+            acpx-ai-provider-v*)
+              echo "name=acpx-ai-provider" >> "$GITHUB_OUTPUT"
+              echo "dir=packages/acpx-ai-provider" >> "$GITHUB_OUTPUT"
+              echo "match=acpx-ai-provider-v[0-9]*" >> "$GITHUB_OUTPUT"
+              ;;
+            skills-manager-v*)
+              echo "name=skills-manager" >> "$GITHUB_OUTPUT"
+              echo "dir=packages/skills-manager" >> "$GITHUB_OUTPUT"
+              echo "match=skills-manager-v[0-9]*" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "Unknown tag prefix: $TAG" >&2
+              exit 1
+              ;;
+          esac
 
       - name: Install Bun
         # Reads the version from `.bun-version` — bumping Bun is a
@@ -84,20 +116,17 @@ jobs:
       - name: Determine previous tag (for changelog range)
         id: previous_tag
         run: |
-          # `git describe --tags --abbrev=0 --match 'v[0-9]*' <tag>^`
-          # returns the most recent release-style tag *before* <tag>. The
-          # `--match` filter ensures only semver-style `v…` tags count, so
-          # any non-release tags that ever land on the branch can't
-          # hijack the changelog range. For the very first release this
-          # errors (no ancestor release tag exists) — we treat that as
-          # the "first release" case and short-circuit changelog
-          # generation.
+          # We only care about prior releases of the SAME package, so the
+          # match pattern is the per-package tag prefix from the resolve
+          # step. For the very first release of a package this errors
+          # (no prior tag matches) — treat as the "first release" case
+          # and short-circuit changelog generation.
           set +e
-          PREVIOUS_TAG=$(git describe --tags --abbrev=0 --match 'v[0-9]*' "${GITHUB_REF_NAME}^" 2>/dev/null)
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 --match "${{ steps.pkg.outputs.match }}" "${GITHUB_REF_NAME}^" 2>/dev/null)
           set -e
           if [ -z "$PREVIOUS_TAG" ]; then
             echo "first_release=true" >> "$GITHUB_OUTPUT"
-            echo "No previous tag found — this is the first release."
+            echo "No previous tag found — this is the first release of ${{ steps.pkg.outputs.name }}."
           else
             echo "first_release=false" >> "$GITHUB_OUTPUT"
             echo "previous_tag=$PREVIOUS_TAG" >> "$GITHUB_OUTPUT"
@@ -127,7 +156,7 @@ jobs:
         # OIDC-signed provenance attestation so npm shows the
         # "built and signed on a cloud builder" badge.
         run: |
-          cd packages/acpx-ai-provider
+          cd "${{ steps.pkg.outputs.dir }}"
           npm publish --access public --provenance
 
       - name: Create draft GitHub Release

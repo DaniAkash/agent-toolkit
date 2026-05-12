@@ -79,6 +79,52 @@
           }
         }
       }
+    },
+    {
+      "includes": ["**/_vendor/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noProcessEnv": "off"
+          },
+          "nursery": {
+            "noExcessiveLinesPerFile": "off"
+          },
+          "complexity": {
+            "noExcessiveCognitiveComplexity": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["**/_internal/telemetry-guard.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noProcessEnv": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "**/skills-manager/src/manager.ts",
+        "**/skills-manager/src/_internal/fetch-source.ts",
+        "**/skills-manager/src/source.ts"
+      ],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noExcessiveCognitiveComplexity": {
+              "level": "error",
+              "options": { "maxAllowedComplexity": 50 }
+            }
+          },
+          "nursery": {
+            "noExcessiveLinesPerFile": "off"
+          }
+        }
+      }
     }
   ],
   "assist": {
