@@ -1,7 +1,7 @@
 # agent-skills-manager
 
-> Programmatic workspace + agent-link manager for [Anthropic-style
-> `SKILL.md`](https://github.com/vercel-labs/skills) bundles.
+> Programmatic workspace + agent-link manager for skills that follow
+> the [agentskills.io specification](https://agentskills.io/specification).
 
 [![npm](https://img.shields.io/npm/v/agent-skills-manager.svg)](https://www.npmjs.com/package/agent-skills-manager)
 
