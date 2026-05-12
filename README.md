@@ -9,6 +9,7 @@ This is a Bun-managed monorepo. Packages live under [`packages/`](./packages).
 | Package | Description |
 |---|---|
 | [`acpx-ai-provider`](./packages/acpx-ai-provider) | Vercel AI SDK provider on top of `acpx/runtime`. One install, any ACP agent (Claude, Codex, Gemini, Copilot, Cursor, Pi, …). |
+| [`agent-skills-manager`](./packages/agent-skills-manager) | Programmatic workspace + agent-link manager for [Anthropic-style `SKILL.md`](https://github.com/vercel-labs/skills) bundles. Manifest-driven `add` / `link` / `unlink` / `listSkills` / `listLinks` / `rescan` primitives. |
 
 ## Development
 
