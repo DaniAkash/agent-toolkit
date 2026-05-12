@@ -1,4 +1,4 @@
-# skills-manager
+# agent-skills-manager
 
 > [!WARNING]
 > **Alpha software.** This package is in active development. The public
@@ -8,7 +8,7 @@
 Programmatic workspace + agent-link manager for [Anthropic-style
 SKILL.md](https://github.com/vercel-labs/skills) bundles.
 
-`skills-manager` is built around seven primitives — `add`, `link`,
+`agent-skills-manager` is built around seven primitives — `add`, `link`,
 `unlink`, `remove`, `listSkills`, `listLinks`, `rescan` — backed by a
 caller-supplied workspace directory and a versioned manifest stored
 inside it. It targets hosts (IDE plugins, desktop apps, internal tools)
@@ -22,7 +22,7 @@ out to a CLI.
 
 ## How this relates to `skills.sh` (vercel-labs/skills)
 
-`skills-manager` builds on top of the data model and filesystem layout
+`agent-skills-manager` builds on top of the data model and filesystem layout
 defined by the official [`skills`](https://github.com/vercel-labs/skills)
 CLI (`skills.sh`). Specifically, this package **vendors** a small set of
 internals from upstream — the 53-agent catalog (`agents.ts`), the
@@ -42,7 +42,7 @@ What this means in practice:
   is supported here, with identical default install paths. When upstream
   adds an agent, we can pull the catalog forward with a deliberate
   vendor refresh.
-- **Compatible on-disk layout** — bundles installed by `skills-manager`
+- **Compatible on-disk layout** — bundles installed by `agent-skills-manager`
   and bundles installed by the `skills.sh` CLI can coexist in the same
   workspace. `listSkills({ scanUnmanaged: true })` will surface
   CLI-installed bundles; `rescan({ mode: 'merge' })` adopts them into
@@ -79,15 +79,15 @@ true }` flag and adopted into the manifest via `rescan({ mode: 'merge'
 ## Install
 
 ```bash
-bun add skills-manager
+bun add agent-skills-manager
 # or
-npm install skills-manager
+npm install agent-skills-manager
 ```
 
 ## Quickstart
 
 ```ts
-import { createSkillsManager } from 'skills-manager'
+import { createSkillsManager } from 'agent-skills-manager'
 
 const mgr = createSkillsManager({ workspaceDir: '/path/to/your/store' })
 
@@ -205,7 +205,7 @@ deployment, adopting unmanaged entries the user created manually.
 ### Discovery helpers
 
 ```ts
-import { listSupportedAgents, detectInstalledAgents, isAgentSupported, resolveAgentSkillsDir } from 'skills-manager'
+import { listSupportedAgents, detectInstalledAgents, isAgentSupported, resolveAgentSkillsDir } from 'agent-skills-manager'
 
 listSupportedAgents()         // → AgentInfo[]
 await detectInstalledAgents() // → AgentId[] (subset that's actually installed)

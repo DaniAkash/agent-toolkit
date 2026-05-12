@@ -1,5 +1,5 @@
 // Vendored from vercel-labs/skills@1.5.6 src/types.ts. See THIRD_PARTY_NOTICES.md
-// for upstream attribution. Trimmed to the subset skills-manager actually uses.
+// for upstream attribution. Trimmed to the subset agent-skills-manager actually uses.
 
 export type AgentType =
   | 'aider-desk'

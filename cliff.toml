@@ -30,10 +30,10 @@ filter_commits = true
 
 # Tag pattern for git-cliff to recognize releases. This is a monorepo,
 # so each package tags under its own prefix
-# (`acpx-ai-provider-v…`, `skills-manager-v…`). Old single-package
+# (`acpx-ai-provider-v…`, `agent-skills-manager-v…`). Old single-package
 # `v0.0.1` / `v0.0.2` tags also still match — they remain historically
 # valid even though new releases no longer use that scheme.
-tag_pattern = "^(acpx-ai-provider-|skills-manager-|)v[0-9].*"
+tag_pattern = "^(acpx-ai-provider-|agent-skills-manager-|)v[0-9].*"
 
 # How each conventional-commit prefix maps to a section in the changelog.
 # Order matters — first match wins.

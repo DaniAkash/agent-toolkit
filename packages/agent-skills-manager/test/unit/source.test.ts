@@ -58,8 +58,8 @@ describe('parseSourceInput', () => {
     const here = process.cwd()
     // Use the package's own `src/` — always exists when tests run.
     const inputs = [
-      './packages/skills-manager/src',
-      'packages/skills-manager/src',
+      './packages/agent-skills-manager/src',
+      'packages/agent-skills-manager/src',
       './src',
     ]
     const tried = inputs

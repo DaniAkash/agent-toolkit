@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-`skills-manager` includes code derived from the following third-party projects.
+`agent-skills-manager` includes code derived from the following third-party projects.
 
 ## skills (vercel-labs/skills)
 
