@@ -10,13 +10,13 @@
 #      next changelog.
 #   3. git tag <pkg>-vX.Y.Z && git push origin main --tags
 #         e.g. acpx-ai-provider-v0.0.3
-#              skills-manager-v0.1.0
+#              agent-skills-manager-v0.1.0
 #   4. Wait for the workflow to finish, then publish the draft from the
 #      Releases page.
 #
 # Historical tags `v0.0.1` and `v0.0.2` (acpx-ai-provider only) remain
 # as immutable history; they no longer trigger this workflow. The
-# tag-prefix scheme was adopted 2026-05-11 when skills-manager landed.
+# tag-prefix scheme was adopted 2026-05-11 when agent-skills-manager landed.
 #
 # Required repo secrets (Settings → Secrets and variables → Actions):
 #   NPM_TOKEN — automation token for npmjs.com with publish access
@@ -32,7 +32,7 @@ on:
   push:
     tags:
       - 'acpx-ai-provider-v[0-9]*'
-      - 'skills-manager-v[0-9]*'
+      - 'agent-skills-manager-v[0-9]*'
 
 permissions:
   contents: write
@@ -67,10 +67,10 @@ jobs:
               echo "dir=packages/acpx-ai-provider" >> "$GITHUB_OUTPUT"
               echo "match=acpx-ai-provider-v[0-9]*" >> "$GITHUB_OUTPUT"
               ;;
-            skills-manager-v*)
-              echo "name=skills-manager" >> "$GITHUB_OUTPUT"
-              echo "dir=packages/skills-manager" >> "$GITHUB_OUTPUT"
-              echo "match=skills-manager-v[0-9]*" >> "$GITHUB_OUTPUT"
+            agent-skills-manager-v*)
+              echo "name=agent-skills-manager" >> "$GITHUB_OUTPUT"
+              echo "dir=packages/agent-skills-manager" >> "$GITHUB_OUTPUT"
+              echo "match=agent-skills-manager-v[0-9]*" >> "$GITHUB_OUTPUT"
               ;;
             *)
               echo "Unknown tag prefix: $TAG" >&2

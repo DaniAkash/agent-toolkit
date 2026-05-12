@@ -12,7 +12,7 @@
     "private-type-leaks": "warn",
     "unused-class-members": "off"
   },
-  "publicPackages": ["acpx-ai-provider", "skills-manager"],
+  "publicPackages": ["acpx-ai-provider", "agent-skills-manager"],
   "overrides": [
     {
       "files": ["**/_vendor/**"],
@@ -44,16 +44,16 @@
         "patterns": ["packages/acpx-ai-provider/test/**"]
       },
       {
-        "name": "skills-manager-public",
-        "patterns": ["packages/skills-manager/src/index.ts"]
+        "name": "agent-skills-manager-public",
+        "patterns": ["packages/agent-skills-manager/src/index.ts"]
       },
       {
-        "name": "skills-manager-internal",
-        "patterns": ["packages/skills-manager/src/**"]
+        "name": "agent-skills-manager-internal",
+        "patterns": ["packages/agent-skills-manager/src/**"]
       },
       {
-        "name": "skills-manager-tests",
-        "patterns": ["packages/skills-manager/test/**"]
+        "name": "agent-skills-manager-tests",
+        "patterns": ["packages/agent-skills-manager/test/**"]
       }
     ],
     "rules": [
@@ -70,16 +70,22 @@
         "allow": ["acpx-ai-provider-public", "acpx-ai-provider-internal"]
       },
       {
-        "from": "skills-manager-internal",
-        "allow": ["skills-manager-internal", "skills-manager-public"]
+        "from": "agent-skills-manager-internal",
+        "allow": [
+          "agent-skills-manager-internal",
+          "agent-skills-manager-public"
+        ]
       },
       {
-        "from": "skills-manager-public",
-        "allow": ["skills-manager-internal"]
+        "from": "agent-skills-manager-public",
+        "allow": ["agent-skills-manager-internal"]
       },
       {
-        "from": "skills-manager-tests",
-        "allow": ["skills-manager-public", "skills-manager-internal"]
+        "from": "agent-skills-manager-tests",
+        "allow": [
+          "agent-skills-manager-public",
+          "agent-skills-manager-internal"
+        ]
       }
     ]
   },

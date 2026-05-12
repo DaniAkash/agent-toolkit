@@ -108,9 +108,9 @@
     },
     {
       "includes": [
-        "**/skills-manager/src/manager.ts",
-        "**/skills-manager/src/_internal/fetch-source.ts",
-        "**/skills-manager/src/source.ts"
+        "**/agent-skills-manager/src/manager.ts",
+        "**/agent-skills-manager/src/_internal/fetch-source.ts",
+        "**/agent-skills-manager/src/source.ts"
       ],
       "linter": {
         "rules": {

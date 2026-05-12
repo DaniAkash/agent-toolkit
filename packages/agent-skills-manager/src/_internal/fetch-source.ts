@@ -97,7 +97,7 @@ async function resolveStagingDir(
   if (parsed.kind === 'local') {
     return { path: parsed.path }
   }
-  const tmp = await mkdtemp(join(tmpdir(), 'skills-manager-fetch-'))
+  const tmp = await mkdtemp(join(tmpdir(), 'agent-skills-manager-fetch-'))
   const url =
     parsed.kind === 'github'
       ? `https://github.com/${parsed.ownerRepo}.git`
