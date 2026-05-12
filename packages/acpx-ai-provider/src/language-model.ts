@@ -62,6 +62,7 @@ export class AcpxLanguageModel implements LanguageModelV2 {
   ): Promise<DoStreamResult> {
     const { handle, sessionKey, isFresh } =
       await this.providerInstance.ensureHandle(this.opts)
+    this.providerInstance.markSessionKeyUsed(sessionKey)
 
     const { text, attachments } = convertPrompt({
       prompt: callOptions.prompt,
