@@ -137,6 +137,27 @@ claude / codex / gemini under `test/fixtures/`. They power the unit
 test suite and document the per-agent capability matrix at the time
 of capture.
 
+## End-to-end probes against real agents
+
+An opt-in suite under [`test/e2e/`](./test/e2e/README.md) runs the
+probe against the locally-installed `claude` / `codex` / `gemini`
+CLIs to catch upstream adapter drift the fixture tests can't see.
+Each agent is probed twice — once via `{ agent: <id> }` (acpx
+resolution) and once via `{ command: <hardcoded> }` (the no-acpx
+path) — and the two results are asserted to be structurally
+identical.
+
+```bash
+# Run all three agents
+bun run test:e2e
+
+# Or pick one
+PROBE_E2E=claude bun test test/e2e
+```
+
+Not run in CI. Zero LLM tokens consumed. See the suite's README for
+per-agent setup notes.
+
 ## Relationship to acpx
 
 `acp-probe` is upstream of `acpx` in the data flow: probe → capabilities
