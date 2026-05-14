@@ -108,6 +108,30 @@
     },
     {
       "includes": [
+        "**/acp-probe/src/probe.ts",
+        "**/acp-probe/src/_internal/normalize.ts",
+        "**/acp-probe/src/resolve-command.ts"
+      ],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noExcessiveCognitiveComplexity": {
+              "level": "error",
+              "options": { "maxAllowedComplexity": 50 }
+            }
+          },
+          "nursery": {
+            "noExcessiveLinesPerFile": "off"
+          },
+          "style": {
+            "noProcessEnv": "off",
+            "noNonNullAssertion": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
         "**/agent-skills-manager/src/manager.ts",
         "**/agent-skills-manager/src/_internal/fetch-source.ts",
         "**/agent-skills-manager/src/source.ts"

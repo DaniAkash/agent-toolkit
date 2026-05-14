@@ -1,0 +1,66 @@
+{
+  "name": "acp-probe",
+  "version": "0.0.1",
+  "description": "Probe any ACP-compatible agent for its capabilities (models, modes, configOptions, prompt capabilities, auth methods, MCP transports). No real prompt required; no token cost.",
+  "license": "MIT",
+  "author": "Dani Akash",
+  "homepage": "https://github.com/DaniAkash/acpx/tree/main/packages/acp-probe#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DaniAkash/acpx.git",
+    "directory": "packages/acp-probe"
+  },
+  "bugs": "https://github.com/DaniAkash/acpx/issues",
+  "keywords": [
+    "acp",
+    "agent-client-protocol",
+    "capability-discovery",
+    "agent-probe",
+    "claude-code",
+    "codex",
+    "gemini"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "bunup",
+    "dev": "bunup --watch",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@agentclientprotocol/sdk": "^0.21.0"
+  },
+  "peerDependencies": {
+    "acpx": ">=0.7.0"
+  },
+  "peerDependenciesMeta": {
+    "acpx": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "acpx": "^0.7.0",
+    "bunup": "^0.16.31",
+    "typescript": "^6.0.3"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}
