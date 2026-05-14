@@ -16,11 +16,14 @@
 
 Given an ACP-compatible agent (built-in like `claude` / `codex` /
 `gemini` or any custom adapter you can spawn), `acp-probe` performs
-the ACP `initialize` + `session/new` handshake, optionally pings
-`session/set_config_option` to detect `-32601`, then tears the agent
-down. The result is a typed, schema-stable `AgentProbeResult` you can
-feed into a settings UI, picker, or downstream `AcpRuntimeOptions`
-call.
+the ACP `initialize` + `session/new` handshake, then optionally
+pings `session/set_config_option` to test whether the agent
+implements that method — agents like **gemini-cli** that don't
+implement it respond with the standard JSON-RPC "method not found"
+error, which the probe catches to flip `supportsConfigOption: false`
+in the result. Finally the agent is torn down. The result is a
+typed, schema-stable `AgentProbeResult` you can feed into a settings
+UI, picker, or downstream `AcpRuntimeOptions` call.
 
 **No LLM tokens are consumed.** `session/new` is free; we never call
 `session/prompt`.
@@ -87,7 +90,12 @@ interface AgentProbeResult {
   configOptions: ProbedConfigOption[]
   /** Derived pointer to the configOption with category='thought_level'. */
   reasoning: { configId; values; defaultValue? } | null
-  /** False on agents that return ACP -32601 for session/set_config_option. */
+  /**
+   * True iff the agent implements `session/set_config_option`. False
+   * when the agent responds with JSON-RPC "method not found" to a
+   * no-op set call — that's how gemini-cli (and similar adapters that
+   * skip configOptions support) signal the method is unimplemented.
+   */
   supportsConfigOption: boolean
   error?: ProbeError
   /** Verbatim init + session/new responses for callers that need _meta. */
