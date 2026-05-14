@@ -1,0 +1,56 @@
+{
+  "protocolVersion": 1,
+  "agentCapabilities": {
+    "loadSession": true,
+    "promptCapabilities": {
+      "image": true,
+      "audio": false,
+      "embeddedContext": true
+    },
+    "mcpCapabilities": {
+      "http": true,
+      "sse": false
+    },
+    "sessionCapabilities": {
+      "list": {},
+      "close": {}
+    },
+    "auth": {
+      "logout": {}
+    }
+  },
+  "authMethods": [
+    {
+      "id": "chatgpt",
+      "name": "Login with ChatGPT",
+      "description": "Use your ChatGPT login with Codex CLI (requires a paid ChatGPT subscription)"
+    },
+    {
+      "type": "env_var",
+      "id": "codex-api-key",
+      "name": "Use CODEX_API_KEY",
+      "description": "Requires setting the `CODEX_API_KEY` environment variable.",
+      "vars": [
+        {
+          "name": "CODEX_API_KEY"
+        }
+      ]
+    },
+    {
+      "type": "env_var",
+      "id": "openai-api-key",
+      "name": "Use OPENAI_API_KEY",
+      "description": "Requires setting the `OPENAI_API_KEY` environment variable.",
+      "vars": [
+        {
+          "name": "OPENAI_API_KEY"
+        }
+      ]
+    }
+  ],
+  "agentInfo": {
+    "name": "codex-acp",
+    "title": "Codex",
+    "version": "0.12.0"
+  }
+}

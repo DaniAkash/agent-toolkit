@@ -33,6 +33,7 @@ on:
     tags:
       - 'acpx-ai-provider-v[0-9]*'
       - 'agent-skills-manager-v[0-9]*'
+      - 'acp-probe-v[0-9]*'
 
 permissions:
   contents: write
@@ -71,6 +72,11 @@ jobs:
               echo "name=agent-skills-manager" >> "$GITHUB_OUTPUT"
               echo "dir=packages/agent-skills-manager" >> "$GITHUB_OUTPUT"
               echo "match=agent-skills-manager-v[0-9]*" >> "$GITHUB_OUTPUT"
+              ;;
+            acp-probe-v*)
+              echo "name=acp-probe" >> "$GITHUB_OUTPUT"
+              echo "dir=packages/acp-probe" >> "$GITHUB_OUTPUT"
+              echo "match=acp-probe-v[0-9]*" >> "$GITHUB_OUTPUT"
               ;;
             *)
               echo "Unknown tag prefix: $TAG" >&2
