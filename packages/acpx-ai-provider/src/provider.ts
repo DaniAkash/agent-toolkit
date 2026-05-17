@@ -13,6 +13,7 @@ import {
   createFileSessionStore,
 } from 'acpx/runtime'
 import { AcpxLanguageModel } from './language-model.ts'
+import { toRuntimeMcpServers } from './mcp-servers.ts'
 import type {
   AcpxLanguageModelOptions,
   AcpxProviderSettings,
@@ -90,8 +91,13 @@ export class AcpxProvider {
     }
 
     const isFresh = !this.usedKeys.has(sessionKey)
-    if (isFresh) this.usedKeys.add(sessionKey)
     return { handle: cached.handle, sessionKey, mode, isFresh }
+  }
+
+  markSessionKeyUsed(sessionKey: string): boolean {
+    const wasFresh = !this.usedKeys.has(sessionKey)
+    this.usedKeys.add(sessionKey)
+    return wasFresh
   }
 
   resolveSessionKey(opts: AcpxLanguageModelOptions): string {
@@ -167,7 +173,7 @@ export class AcpxProvider {
       nonInteractivePermissions: (this.settings.nonInteractivePermissions ??
         DEFAULT_NON_INTERACTIVE) as AcpRuntimeOptions['nonInteractivePermissions'],
       timeoutMs: this.settings.turnTimeoutMs,
-      mcpServers: this.settings.mcpServers as AcpRuntimeOptions['mcpServers'],
+      mcpServers: toRuntimeMcpServers(this.settings.mcpServers),
     }
   }
 }

@@ -215,6 +215,36 @@ describe('doStream — usage and finish', () => {
   })
 })
 
+describe('doStream — plan events', () => {
+  test('plan events surface as reasoning blocks alongside the answer', async () => {
+    const runtime = new MockAcpRuntime({
+      turnScripts: [
+        {
+          events: [
+            acpEvent.plan('1. read 2. edit 3. test'),
+            acpEvent.text('done'),
+          ],
+          result: acpResult.completed('end_turn'),
+        },
+      ],
+    })
+    const parts = await streamParts(runtime)
+    expect(parts.map((p) => p.type)).toEqual([
+      'reasoning-start',
+      'reasoning-delta',
+      'reasoning-end',
+      'text-start',
+      'text-delta',
+      'text-end',
+      'finish',
+    ])
+    const planDelta = parts.find((p) => p.type === 'reasoning-delta')
+    expect(planDelta).toMatchObject({
+      delta: '[Plan] 1. read 2. edit 3. test',
+    })
+  })
+})
+
 describe('doStream — error path', () => {
   test('rejecting turn.result emits an error part then finish', async () => {
     const runtime = new MockAcpRuntime({

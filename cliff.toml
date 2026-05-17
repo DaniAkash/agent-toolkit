@@ -28,9 +28,12 @@ conventional_commits = true
 filter_unconventional = true
 filter_commits = true
 
-# Tag pattern for git-cliff to recognize releases. Matches v0.1.0,
-# v1.2.3-rc.1, etc.
-tag_pattern = "v[0-9].*"
+# Tag pattern for git-cliff to recognize releases. This is a monorepo,
+# so each package tags under its own prefix
+# (`acpx-ai-provider-v…`, `agent-skills-manager-v…`). Old single-package
+# `v0.0.1` / `v0.0.2` tags also still match — they remain historically
+# valid even though new releases no longer use that scheme.
+tag_pattern = "^(acpx-ai-provider-|agent-skills-manager-|acp-probe-|)v[0-9].*"
 
 # How each conventional-commit prefix maps to a section in the changelog.
 # Order matters — first match wins.
