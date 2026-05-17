@@ -72,8 +72,7 @@ export class EventTranslator {
       case 'tool_call':
         return this.handleToolCall(event)
       case 'status':
-        this.handleStatus(event)
-        return []
+        return this.handleStatus(event)
       case 'error':
         return this.handleError(event)
       case 'done':
@@ -244,10 +243,30 @@ export class EventTranslator {
 
   private handleStatus(
     event: Extract<AcpRuntimeEvent, { type: 'status' }>,
-  ): void {
-    if (event.tag !== 'usage_update') return
-    if (event.used !== undefined) this.accumulatedTotalTokens = event.used
-    if (event.size !== undefined) this.accumulatedSize = event.size
+  ): LanguageModelV2StreamPart[] {
+    if (event.tag === 'usage_update') {
+      if (event.used !== undefined) this.accumulatedTotalTokens = event.used
+      if (event.size !== undefined) this.accumulatedSize = event.size
+      return []
+    }
+    if (event.tag === 'plan') {
+      // Emit plan as a self-contained reasoning block with its own id.
+      // Doesn't disturb the currently-open text/reasoning block — AI SDK
+      // allows multiple reasoning ids to coexist as long as each is
+      // properly start/end-paired. The `[Plan]` prefix lets consumers
+      // distinguish plan announcements from the agent's chain-of-thought.
+      // Trim because whitespace-only plan updates carry no signal — same
+      // intent as the empty-string case.
+      const trimmed = event.text.trim()
+      if (trimmed.length === 0) return []
+      const id = this.generateId()
+      return [
+        { type: 'reasoning-start', id },
+        { type: 'reasoning-delta', id, delta: `[Plan] ${trimmed}` },
+        { type: 'reasoning-end', id },
+      ]
+    }
+    return []
   }
 
   private handleError(

@@ -12,7 +12,15 @@
     "private-type-leaks": "warn",
     "unused-class-members": "off"
   },
+  "publicPackages": ["acpx-ai-provider", "agent-skills-manager", "acp-probe"],
   "overrides": [
+    {
+      "files": ["**/_vendor/**"],
+      "rules": {
+        "unused-exports": "off",
+        "private-type-leaks": "off"
+      }
+    },
     {
       "files": ["**/*.test.ts", "**/*.spec.ts", "**/test/**", "**/*.config.ts"],
       "rules": {
@@ -34,6 +42,30 @@
       {
         "name": "acpx-ai-provider-tests",
         "patterns": ["packages/acpx-ai-provider/test/**"]
+      },
+      {
+        "name": "agent-skills-manager-public",
+        "patterns": ["packages/agent-skills-manager/src/index.ts"]
+      },
+      {
+        "name": "agent-skills-manager-internal",
+        "patterns": ["packages/agent-skills-manager/src/**"]
+      },
+      {
+        "name": "agent-skills-manager-tests",
+        "patterns": ["packages/agent-skills-manager/test/**"]
+      },
+      {
+        "name": "acp-probe-public",
+        "patterns": ["packages/acp-probe/src/index.ts"]
+      },
+      {
+        "name": "acp-probe-internal",
+        "patterns": ["packages/acp-probe/src/**"]
+      },
+      {
+        "name": "acp-probe-tests",
+        "patterns": ["packages/acp-probe/test/**"]
       }
     ],
     "rules": [
@@ -48,6 +80,36 @@
       {
         "from": "acpx-ai-provider-tests",
         "allow": ["acpx-ai-provider-public", "acpx-ai-provider-internal"]
+      },
+      {
+        "from": "agent-skills-manager-internal",
+        "allow": [
+          "agent-skills-manager-internal",
+          "agent-skills-manager-public"
+        ]
+      },
+      {
+        "from": "agent-skills-manager-public",
+        "allow": ["agent-skills-manager-internal"]
+      },
+      {
+        "from": "agent-skills-manager-tests",
+        "allow": [
+          "agent-skills-manager-public",
+          "agent-skills-manager-internal"
+        ]
+      },
+      {
+        "from": "acp-probe-internal",
+        "allow": ["acp-probe-internal", "acp-probe-public"]
+      },
+      {
+        "from": "acp-probe-public",
+        "allow": ["acp-probe-internal"]
+      },
+      {
+        "from": "acp-probe-tests",
+        "allow": ["acp-probe-public", "acp-probe-internal"]
       }
     ]
   },

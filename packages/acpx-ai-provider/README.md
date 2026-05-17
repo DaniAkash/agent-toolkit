@@ -198,6 +198,106 @@ Run a single isolated turn:
 createAcpxProvider({ agent: 'claude', sessionMode: 'oneshot' })
 ```
 
+## Reasoning and plan steps
+
+Most ACP agents stream their chain-of-thought as the turn progresses.
+The provider surfaces these as AI SDK reasoning parts, so consumers
+can render them with the same code they already use for any other
+reasoning-capable model:
+
+```ts
+import { streamText } from 'ai'
+
+const result = streamText({
+  model: provider.languageModel(),
+  prompt: 'Refactor user.ts to use Result<T, E>',
+})
+
+for await (const part of result.fullStream) {
+  if (part.type === 'reasoning-delta') {
+    ui.appendThinking(part.delta) // streaming "💭…" bubble
+  } else if (part.type === 'text-delta') {
+    ui.appendAnswer(part.delta)
+  }
+}
+```
+
+When the agent emits a **plan** ("I will: 1. read file 2. fix bug
+3. test"), the provider surfaces it through the same channel as a
+self-contained reasoning block prefixed with `[Plan]`:
+
+```
+reasoning-start (id-1)
+reasoning-delta (id-1, "[Plan] 1. read file 2. fix bug 3. test")
+reasoning-end   (id-1)
+```
+
+Plan blocks have their own block ids and don't disturb any
+in-progress thought block — the agent can keep streaming reasoning
+into one id while plan announcements come and go on others.
+
+Agents that don't emit reasoning (e.g. Gemini CLI in some
+configurations) simply produce no `reasoning-*` parts; consumer
+code with a `reasoning-delta` branch never fires, no special-case
+needed.
+
+### Controlling reasoning effort
+
+Most thinking-capable agents accept a `reasoning_effort` config
+option that trades latency for depth — higher effort means more
+chain-of-thought tokens before the agent answers. Set it before
+the next turn:
+
+```ts
+const provider = createAcpxProvider({ agent: 'claude' })
+await provider.setConfigOption('reasoning_effort', 'high')
+```
+
+What's confirmed today:
+
+| Agent | Config key | Values | Default |
+|---|---|---|---|
+| `claude` | `reasoning_effort` | `low` / `medium` / `high` / `xhigh` | `medium` |
+| `codex` | `reasoning_effort` (CLI alias `thought_level`) | `low` / `medium` / `high` / `xhigh` | `medium` |
+| `gemini`, `copilot`, `cursor`, others | not yet documented | — | — |
+
+The CLI alias `thought_level` is **Codex-only** — `acpx codex set
+thought_level high` translates to `reasoning_effort = high` before
+dispatch. Other agents take `reasoning_effort` verbatim.
+
+### Discovering an agent's config keys
+
+For agents not in the table — or new ones added to `acpx` — the
+config-option vocabulary is per-agent. Three ways to discover:
+
+1. **Runtime capabilities.** Ask the agent which keys it advertises:
+
+   ```ts
+   const handle = await provider.prepare()
+   const caps = await provider.runtime.getCapabilities?.({ handle })
+   console.log(caps?.configOptionKeys)
+   ```
+
+2. **`acpx` CLI.** Install acpx globally and inspect the agent's
+   command tree (`acpx <agent>`).
+
+3. **The adapter's source.** Every published ACP adapter has a
+   `session/set_config_option` handler that lists the keys it
+   accepts.
+
+### Caveats
+
+- **Effort changes apply to the next turn**, not the in-progress
+  one. Calling `setConfigOption` mid-stream takes effect on the
+  next `streamText` / `generateText` call.
+- **Switching models doesn't reset effort.** A subsequent
+  `setConfigOption('model', …)` keeps the previously-set
+  reasoning effort; reset explicitly if you want defaults.
+- **For agents not in the table, use the discovery section
+  above.** Unrecognized config keys surface as an error on the
+  next turn, so trial-and-error against an agent's actual
+  capability list is safe.
+
 ## Tools — via MCP servers
 
 Tools are defined through MCP (Model Context Protocol) servers passed
@@ -213,10 +313,21 @@ const provider = createAcpxProvider({
       name: 'filesystem',
       command: 'npx',
       args: ['-y', '@modelcontextprotocol/server-filesystem', '/tmp'],
+      env: { LOG_LEVEL: 'info' },          // stdio servers — env as a record
+    },
+    {
+      type: 'http',
+      name: 'remote',
+      url: 'https://example.com/mcp',
+      headers: { Authorization: 'Bearer …' }, // http/sse servers — headers as a record
     },
   ],
 })
 ```
+
+`env` and `headers` are accepted as plain `Record<string, string>` for
+ergonomics; the provider converts them to the ACP wire format
+(`Array<{ name, value }>`) before handing the config to the runtime.
 
 > **Note**: host-side AI SDK tools (the `acpTools()` /
 > TCP-callback story from `acp-ai-provider`) are **not** supported in
