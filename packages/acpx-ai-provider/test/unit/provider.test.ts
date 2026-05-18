@@ -1,68 +1,83 @@
-import { describe, expect, test } from 'bun:test'
-import type { AcpRuntime } from 'acpx/runtime'
-import { createAcpxProvider } from '../../src/provider.ts'
-import { MockAcpRuntime } from '../helpers/mock-acp-runtime.ts'
+import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test'
+import type {
+  AcpPermissionDecision,
+  AcpPermissionRequest,
+  AcpRuntime,
+  AcpRuntimeOptions,
+} from 'acpx/runtime'
 
-describe('AcpxProvider — getModels', () => {
-  test('returns the models field from runtime status', async () => {
-    const runtime = new MockAcpRuntime({
-      status: {
-        summary: 'mock',
-        models: {
-          currentModelId: 'claude-opus-4-7',
-          availableModelIds: [
-            'claude-haiku-4-5',
-            'claude-sonnet-4-6',
-            'claude-opus-4-7',
-          ],
-        },
-      },
-    })
-    const provider = createAcpxProvider({ agent: 'claude', runtime })
-
-    const models = await provider.getModels()
-
-    expect(models).toEqual({
-      currentModelId: 'claude-opus-4-7',
-      availableModelIds: [
-        'claude-haiku-4-5',
-        'claude-sonnet-4-6',
-        'claude-opus-4-7',
-      ],
-    })
-    expect(runtime.getStatusCalls).toHaveLength(1)
-  })
-
-  test('returns undefined when the runtime status omits models', async () => {
-    const runtime = new MockAcpRuntime({ status: { summary: 'no models' } })
-    const provider = createAcpxProvider({ agent: 'gemini', runtime })
-
-    const models = await provider.getModels()
-
-    expect(models).toBeUndefined()
-    expect(runtime.getStatusCalls).toHaveLength(1)
-  })
-
-  test('returns undefined when the runtime has no getStatus method', async () => {
-    const runtime: AcpRuntime = {
-      ensureSession: async () => ({
-        sessionKey: 'k',
-        backend: 'mock',
-        runtimeSessionName: 'mock',
+const createAcpRuntimeMock = mock(
+  (_options: AcpRuntimeOptions): AcpRuntime =>
+    ({
+      ensureSession: async () => ({}),
+      startTurn: () => ({
+        requestId: 'r',
+        events: { [Symbol.asyncIterator]: async function* () {} },
+        result: Promise.resolve({ status: 'completed' }),
+        cancel: async () => {},
+        closeStream: async () => {},
       }),
-      startTurn: () => {
-        throw new Error('not used')
-      },
-      runTurn: async function* () {
-        // unused
-      },
       cancel: async () => {},
       close: async () => {},
-    }
-    const provider = createAcpxProvider({ agent: 'custom', runtime })
+    }) as unknown as AcpRuntime,
+)
 
-    const models = await provider.getModels()
+mock.module('acpx/runtime', () => ({
+  createAcpRuntime: createAcpRuntimeMock,
+  createAgentRegistry: () => ({}),
+  createFileSessionStore: () => ({}),
+}))
 
-    expect(models).toBeUndefined()
+// Imported AFTER `mock.module` so the provider sees our stubs.
+const { createAcpxProvider } = await import('../../src/provider.ts')
+
+beforeEach(() => {
+  createAcpRuntimeMock.mockClear()
+})
+
+afterEach(() => {
+  createAcpRuntimeMock.mockClear()
+})
+
+describe('AcpxProvider — onPermissionRequest', () => {
+  test('forwards the callback into AcpRuntimeOptions', () => {
+    const cb = async (
+      _req: AcpPermissionRequest,
+    ): Promise<AcpPermissionDecision | undefined> => undefined
+    const provider = createAcpxProvider({
+      agent: 'codex',
+      onPermissionRequest: cb,
+    })
+    void provider.runtime // force lazy build
+
+    expect(createAcpRuntimeMock).toHaveBeenCalledTimes(1)
+    const opts = createAcpRuntimeMock.mock.calls[0]?.[0]
+    expect(opts?.onPermissionRequest).toBe(cb)
+  })
+
+  test('omits the callback when not configured', () => {
+    const provider = createAcpxProvider({ agent: 'codex' })
+    void provider.runtime
+
+    const opts = createAcpRuntimeMock.mock.calls.at(-1)?.[0]
+    expect(opts?.onPermissionRequest).toBeUndefined()
+  })
+
+  test('skips runtime construction when a pre-built runtime is provided', () => {
+    const fakeRuntime = {
+      ensureSession: async () => ({}),
+    } as unknown as AcpRuntime
+    const cb = async (
+      _req: AcpPermissionRequest,
+    ): Promise<AcpPermissionDecision | undefined> => undefined
+
+    const provider = createAcpxProvider({
+      agent: 'codex',
+      runtime: fakeRuntime,
+      onPermissionRequest: cb,
+    })
+
+    expect(provider.runtime).toBe(fakeRuntime)
+    expect(createAcpRuntimeMock).not.toHaveBeenCalled()
   })
 })

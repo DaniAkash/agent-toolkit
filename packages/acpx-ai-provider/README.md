@@ -198,6 +198,44 @@ Run a single isolated turn:
 createAcpxProvider({ agent: 'claude', sessionMode: 'oneshot' })
 ```
 
+### System prompts and per-session agent options
+
+Pass `sessionOptions` to set the agent's `systemPrompt` (and optionally
+`model`, `allowedTools`, `maxTurns`) on a fresh session. The values are
+forwarded to ACP's `session/new` `_meta` and applied before the first
+turn.
+
+```ts
+const provider = createAcpxProvider({
+  agent: 'claude',
+  sessionOptions: {
+    systemPrompt: 'You are an expert Rust reviewer. Be terse.',
+    // model: 'claude-opus-4-7',
+    // allowedTools: ['read', 'edit'],
+    // maxTurns: 5,
+  },
+})
+```
+
+Use `{ append: '…' }` to append to the agent's default prompt instead of
+replacing it:
+
+```ts
+sessionOptions: {
+  systemPrompt: { append: 'When you finish, also propose tests.' },
+}
+```
+
+System prompts are fixed at `session/new` time. To switch prompts for the
+same workspace, use a distinct `sessionKey`. Changing `sessionOptions`
+and re-using the same key is a no-op for reused records by design — and
+note that `provider.close()` does not clear the persistent record either,
+so it won't force a fresh `session/new` on its own.
+
+Not every agent honors every option — Codex / Gemini ignore Claude-specific
+fields like `model`, and so on. Unrecognized options are dropped silently
+at the ACP layer.
+
 ## Reasoning and plan steps
 
 Most ACP agents stream their chain-of-thought as the turn progresses.
@@ -333,6 +371,62 @@ ergonomics; the provider converts them to the ACP wire format
 > TCP-callback story from `acp-ai-provider`) are **not** supported in
 > v0.1. See [Known limitations](#known-limitations).
 
+## Per-call permissions
+
+By default, every permission request the agent issues (write a file,
+run a shell command, delete, etc.) is resolved by the up-front
+`permissionMode` setting. To intercept individual requests with your
+own UI, pass an `onPermissionRequest` callback:
+
+```ts
+const provider = createAcpxProvider({
+  agent: 'codex',
+  cwd: '/path/to/repo',
+  permissionMode: 'approve-reads', // fallback for unhandled cases
+  onPermissionRequest: async (req, { signal }) => {
+    // The agent is paused mid-turn waiting for your decision.
+    // Honor `signal` so a turn cancel doesn't leave it hanging.
+    const decision = await myUi.prompt({
+      title: req.raw.toolCall.title,
+      kind: req.inferredKind, // 'edit' | 'shell' | 'delete' | …
+      args: req.raw.toolCall.input,
+    })
+    return decision
+    // Returning `undefined` falls through to the mode-based resolver.
+  },
+})
+```
+
+The callback receives:
+
+| Field | Meaning |
+|---|---|
+| `req.sessionId` | ACP session id (handy for multi-session hosts) |
+| `req.raw` | Full original `RequestPermissionRequest` from the ACP SDK |
+| `req.inferredKind` | One of `'read' \| 'search' \| 'edit' \| 'delete' \| 'move' \| 'execute' \| 'fetch' \| 'think' \| 'other'` — best-effort classification from the tool's title |
+| `ctx.signal` | Aborts when the turn is cancelled or the session closes |
+
+Return one of:
+
+- `{ outcome: 'allow_once' }` — approve this single call
+- `{ outcome: 'allow_always' }` — approve this kind for the rest of the turn
+- `{ outcome: 'reject_once' }` — deny this call; agent continues with the rest of its task
+- `{ outcome: 'reject_always' }` — deny and remember for the rest of the turn
+- `{ outcome: 'cancel' }` — agent treats the call as cancelled (often ends the turn)
+- `undefined` — fall through to the mode-based resolver
+
+**Important caveats:**
+
+- The callback is invoked **only** when the provider builds its own
+  runtime. If you pass a pre-built `runtime` via the `runtime`
+  setting, set `onPermissionRequest` on that runtime instead.
+- Throwing inside the callback falls through to mode-based logic and
+  is logged by the runtime. Don't let UI errors take the whole turn
+  down.
+- The agent is **paused** until your promise resolves. There's no
+  timeout enforced by the provider — wire your own (or rely on the
+  agent's internal timeout, typically 5–10 minutes).
+
 ## Listing models
 
 Some agents (Claude Code, Codex) advertise the models they can drive
@@ -419,9 +513,11 @@ This is alpha software. Most rough edges flow through from
   are `undefined`. Per-token cost calculation won't work.
 - **No streaming usage updates.** Only the most recent
   `usage_update` from the runtime survives onto the `finish` part.
-- **Permissions are mode-based, not callback-based.** No per-call
-  user prompt — pick `approve-all`, `approve-reads`, or `deny-all` up
-  front.
+- **Permission policy is mode-based by default.** When you don't
+  provide an `onPermissionRequest` callback, requests fall through to
+  `permissionMode` + `nonInteractivePermissions` — same as before.
+  Hosts wanting per-call gating should set the callback (see
+  [Per-call permissions](#per-call-permissions)).
 - **Auth is env-var / config-file driven, no lazy retry.** Missing
   credentials throw at first use.
 - **`npx` cold start on first agent use.** Built-in agents

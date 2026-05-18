@@ -26,6 +26,8 @@ export { AcpxLanguageModel } from './language-model.ts'
 export type { EnsureHandleResult } from './provider.ts'
 export { AcpxProvider, createAcpxProvider } from './provider.ts'
 export type {
+  AcpPermissionDecision,
+  AcpPermissionRequest,
   AcpRuntime,
   AcpRuntimeDoctorReport,
   AcpRuntimeEvent,
@@ -42,6 +44,8 @@ export type {
   AcpxPermissionMode,
   AcpxProviderSettings,
   AcpxSessionMode,
+  SessionAgentOptions,
+  SystemPromptOption,
 } from './types.ts'
 
 export const VERSION = '0.0.0'
