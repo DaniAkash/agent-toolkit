@@ -333,6 +333,62 @@ ergonomics; the provider converts them to the ACP wire format
 > TCP-callback story from `acp-ai-provider`) are **not** supported in
 > v0.1. See [Known limitations](#known-limitations).
 
+## Per-call permissions
+
+By default, every permission request the agent issues (write a file,
+run a shell command, delete, etc.) is resolved by the up-front
+`permissionMode` setting. To intercept individual requests with your
+own UI, pass an `onPermissionRequest` callback:
+
+```ts
+const provider = createAcpxProvider({
+  agent: 'codex',
+  cwd: '/path/to/repo',
+  permissionMode: 'approve-reads', // fallback for unhandled cases
+  onPermissionRequest: async (req, { signal }) => {
+    // The agent is paused mid-turn waiting for your decision.
+    // Honor `signal` so a turn cancel doesn't leave it hanging.
+    const decision = await myUi.prompt({
+      title: req.raw.toolCall.title,
+      kind: req.inferredKind, // 'edit' | 'shell' | 'delete' | …
+      args: req.raw.toolCall.input,
+    })
+    return decision
+    // Returning `undefined` falls through to the mode-based resolver.
+  },
+})
+```
+
+The callback receives:
+
+| Field | Meaning |
+|---|---|
+| `req.sessionId` | ACP session id (handy for multi-session hosts) |
+| `req.raw` | Full original `RequestPermissionRequest` from the ACP SDK |
+| `req.inferredKind` | One of `'read' \| 'search' \| 'edit' \| 'delete' \| 'move' \| 'execute' \| 'fetch' \| 'think' \| 'other'` — best-effort classification from the tool's title |
+| `ctx.signal` | Aborts when the turn is cancelled or the session closes |
+
+Return one of:
+
+- `{ outcome: 'allow_once' }` — approve this single call
+- `{ outcome: 'allow_always' }` — approve this kind for the rest of the turn
+- `{ outcome: 'reject_once' }` — deny this call; agent continues with the rest of its task
+- `{ outcome: 'reject_always' }` — deny and remember for the rest of the turn
+- `{ outcome: 'cancel' }` — agent treats the call as cancelled (often ends the turn)
+- `undefined` — fall through to the mode-based resolver
+
+**Important caveats:**
+
+- The callback is invoked **only** when the provider builds its own
+  runtime. If you pass a pre-built `runtime` via the `runtime`
+  setting, set `onPermissionRequest` on that runtime instead.
+- Throwing inside the callback falls through to mode-based logic and
+  is logged by the runtime. Don't let UI errors take the whole turn
+  down.
+- The agent is **paused** until your promise resolves. There's no
+  timeout enforced by the provider — wire your own (or rely on the
+  agent's internal timeout, typically 5–10 minutes).
+
 ## Structured output (JSON)
 
 `generateObject` / `streamObject` work via JSON mode. The provider
@@ -388,9 +444,11 @@ This is alpha software. Most rough edges flow through from
   are `undefined`. Per-token cost calculation won't work.
 - **No streaming usage updates.** Only the most recent
   `usage_update` from the runtime survives onto the `finish` part.
-- **Permissions are mode-based, not callback-based.** No per-call
-  user prompt — pick `approve-all`, `approve-reads`, or `deny-all` up
-  front.
+- **Permission policy is mode-based by default.** When you don't
+  provide an `onPermissionRequest` callback, requests fall through to
+  `permissionMode` + `nonInteractivePermissions` — same as before.
+  Hosts wanting per-call gating should set the callback (see
+  [Per-call permissions](#per-call-permissions)).
 - **Auth is env-var / config-file driven, no lazy retry.** Missing
   credentials throw at first use.
 - **`npx` cold start on first agent use.** Built-in agents
