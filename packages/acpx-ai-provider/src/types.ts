@@ -7,6 +7,8 @@ import type {
   AcpRuntimeHandle,
   AcpRuntimeTurnResult,
   AcpRuntimeTurnResultError,
+  SessionAgentOptions,
+  SystemPromptOption,
 } from 'acpx/runtime'
 
 export type AcpxPermissionMode = 'approve-all' | 'approve-reads' | 'deny-all'
@@ -62,6 +64,16 @@ export interface AcpxProviderSettings {
   resumeSessionId?: string
   turnTimeoutMs?: number
   runtime?: AcpRuntime
+  /**
+   * Per-session agent options forwarded to `AcpRuntime.ensureSession`.
+   * Applied when a fresh ACP session is created; ignored when an existing
+   * persistent session is reused (system prompts are fixed at newSession
+   * time). To apply a different `systemPrompt` for the same workspace,
+   * use a distinct `sessionKey`. Calling `close()` does not help here —
+   * it keeps the persistent record, so the next `ensureSession` reloads
+   * it and re-applies the original options.
+   */
+  sessionOptions?: SessionAgentOptions
   _internal?: {
     generateId?: () => string
     now?: () => Date
@@ -83,4 +95,6 @@ export type {
   AcpRuntimeHandle,
   AcpRuntimeTurnResult,
   AcpRuntimeTurnResultError,
+  SessionAgentOptions,
+  SystemPromptOption,
 }

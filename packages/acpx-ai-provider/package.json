@@ -54,7 +54,7 @@
   "devDependencies": {
     "@ai-sdk/provider": "^3.0.10",
     "@ai-sdk/provider-utils": "^4.0.26",
-    "acpx": ">=0.8.0",
+    "acpx": "^0.8.0",
     "ai": "^6.0.175",
     "bunup": "^0.16.31",
     "typescript": "^6.0.3",
