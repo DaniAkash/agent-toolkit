@@ -227,9 +227,10 @@ sessionOptions: {
 ```
 
 System prompts are fixed at `session/new` time. To switch prompts for the
-same workspace, use a distinct `sessionKey` (or close the current session
-first); changing `sessionOptions` and re-using the same key is a no-op
-for reused records by design.
+same workspace, use a distinct `sessionKey`. Changing `sessionOptions`
+and re-using the same key is a no-op for reused records by design — and
+note that `provider.close()` does not clear the persistent record either,
+so it won't force a fresh `session/new` on its own.
 
 Not every agent honors every option — Codex / Gemini ignore Claude-specific
 fields like `model`, and so on. Unrecognized options are dropped silently

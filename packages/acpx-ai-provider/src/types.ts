@@ -48,7 +48,9 @@ export interface AcpxProviderSettings {
    * Applied when a fresh ACP session is created; ignored when an existing
    * persistent session is reused (system prompts are fixed at newSession
    * time). To apply a different `systemPrompt` for the same workspace,
-   * use a distinct `sessionKey` or close the prior session first.
+   * use a distinct `sessionKey`. Calling `close()` does not help here —
+   * it keeps the persistent record, so the next `ensureSession` reloads
+   * it and re-applies the original options.
    */
   sessionOptions?: SessionAgentOptions
   _internal?: {
