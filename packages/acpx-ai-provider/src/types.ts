@@ -1,4 +1,6 @@
 import type {
+  AcpPermissionDecision,
+  AcpPermissionRequest,
   AcpRuntime,
   AcpRuntimeDoctorReport,
   AcpRuntimeEvent,
@@ -37,6 +39,25 @@ export interface AcpxProviderSettings {
   sessionMode?: AcpxSessionMode
   permissionMode?: AcpxPermissionMode
   nonInteractivePermissions?: AcpxNonInteractivePermissions
+  /**
+   * Async callback invoked when the agent issues a per-call permission
+   * request (e.g. write, shell, delete). Return a decision to gate the
+   * call with host UI. Return `undefined` to fall through to the
+   * existing `permissionMode` + `nonInteractivePermissions` logic.
+   *
+   * The callback is invoked while the agent is paused mid-turn waiting
+   * for the JSON-RPC response — resolve quickly or honor the abort
+   * signal so the agent doesn't hang.
+   *
+   * Note: this option is *only* honored when `runtime` is left
+   * undefined (so the provider builds its own runtime). When the host
+   * passes a pre-built `runtime`, the callback must be set on that
+   * runtime directly.
+   */
+  onPermissionRequest?: (
+    req: AcpPermissionRequest,
+    ctx: { signal: AbortSignal },
+  ) => Promise<AcpPermissionDecision | undefined>
   mcpServers?: AcpxMcpServerConfig[]
   agentRegistryOverrides?: Record<string, string>
   stateDir?: string
@@ -66,6 +87,8 @@ export interface AcpxLanguageModelOptions {
 }
 
 export type {
+  AcpPermissionDecision,
+  AcpPermissionRequest,
   AcpRuntime,
   AcpRuntimeDoctorReport,
   AcpRuntimeEvent,
