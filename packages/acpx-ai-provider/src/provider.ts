@@ -5,6 +5,7 @@ import type {
   AcpRuntimeDoctorReport,
   AcpRuntimeHandle,
   AcpRuntimeOptions,
+  AcpRuntimeSessionModels,
 } from 'acpx/runtime'
 import {
   createAcpRuntime,
@@ -140,6 +141,16 @@ export class AcpxProvider {
     for (const [, { handle }] of this.handles) {
       await setOptImpl.call(this.runtime, { handle, key, value })
     }
+  }
+
+  async getModels(
+    opts: AcpxLanguageModelOptions = {},
+  ): Promise<AcpRuntimeSessionModels | undefined> {
+    const getStatusImpl = this.runtime.getStatus
+    if (!getStatusImpl) return undefined
+    const { handle } = await this.ensureHandle(opts)
+    const status = await getStatusImpl.call(this.runtime, { handle })
+    return status.models
   }
 
   async doctor(): Promise<AcpRuntimeDoctorReport> {

@@ -427,6 +427,37 @@ Return one of:
   timeout enforced by the provider — wire your own (or rely on the
   agent's internal timeout, typically 5–10 minutes).
 
+## Listing models
+
+Some agents (Claude Code, Codex) advertise the models they can drive
+when the session opens. Use `getModels()` to read both the available
+list and the currently selected id:
+
+```ts
+const models = await provider.getModels()
+if (models) {
+  console.log(models.availableModelIds) // ['claude-haiku-4-5', …]
+  console.log(models.currentModelId) // 'claude-opus-4-7'
+}
+```
+
+Returns `undefined` when:
+
+- The agent didn't advertise any models (e.g. Gemini CLI, custom
+  adapters that omit `NewSessionResponse.models`).
+- The underlying runtime doesn't implement `getStatus`.
+
+`getModels()` lazily spawns the ACP session if it isn't already
+open — same as `prepare()`. For multi-session providers, pass the
+same `{ sessionKey, agent }` you'd pass to `languageModel()`:
+
+```ts
+const models = await provider.getModels({ sessionKey: 'codex::/repo' })
+```
+
+To **change** the model, use `setConfigOption('model', id)` from
+[Lifecycle controls](#lifecycle-controls).
+
 ## Structured output (JSON)
 
 `generateObject` / `streamObject` work via JSON mode. The provider
