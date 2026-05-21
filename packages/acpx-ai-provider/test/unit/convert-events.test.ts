@@ -626,3 +626,34 @@ describe('finish() — stop reason mapping', () => {
     expect(part.usage).toEqual(usage)
   })
 })
+
+describe('EventTranslator — errorPartIfFailed', () => {
+  test('returns [] for completed results', () => {
+    const t = newTranslator()
+    expect(
+      t.errorPartIfFailed({ status: 'completed', stopReason: 'end_turn' }),
+    ).toEqual([])
+  })
+
+  test('returns [] for cancelled results', () => {
+    const t = newTranslator()
+    expect(t.errorPartIfFailed({ status: 'cancelled' })).toEqual([])
+  })
+
+  test('returns one error part with mapped AcpxError for failed results', () => {
+    const t = newTranslator()
+    const acpError = { message: 'boom', code: 'rate_limit' }
+    const parts = t.errorPartIfFailed({ status: 'failed', error: acpError })
+    expect(parts).toHaveLength(1)
+    const part = parts[0] as Extract<
+      LanguageModelV2StreamPart,
+      { type: 'error' }
+    >
+    expect(part.type).toBe('error')
+    expect(part.error).toBeInstanceOf(AcpxError)
+    const error = part.error as AcpxError
+    expect(error.code).toBe('rate_limit')
+    expect(error.message).toBe('boom')
+    expect(error.cause).toBe(acpError)
+  })
+})

@@ -119,6 +119,8 @@ function createTranslatingStream(
         }
         const result = await turn.result
         for (const part of translator.flush()) controller.enqueue(part)
+        for (const part of translator.errorPartIfFailed(result))
+          controller.enqueue(part)
         controller.enqueue(translator.finish({ result }))
       } catch (err) {
         controller.enqueue({

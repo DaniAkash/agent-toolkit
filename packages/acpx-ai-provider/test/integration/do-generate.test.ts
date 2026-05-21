@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import type { LanguageModelV2CallOptions } from '@ai-sdk/provider'
+import { AcpxError } from '../../src/errors.ts'
 import { createAcpxProvider } from '../../src/index.ts'
 import { acpEvent, acpResult } from '../helpers/acp-event-builders.ts'
 import { MockAcpRuntime } from '../helpers/mock-acp-runtime.ts'
@@ -107,7 +108,7 @@ describe('doGenerate', () => {
     )
   })
 
-  test('failed result attaches providerMetadata', async () => {
+  test('failed result throws an AcpxError carrying the agent error data', async () => {
     const runtime = new MockAcpRuntime({
       turnScripts: [
         {
@@ -117,10 +118,12 @@ describe('doGenerate', () => {
       ],
     })
     const provider = createAcpxProvider({ agent: 'claude', runtime })
-    const result = await provider.languageModel().doGenerate(baseCall)
-    expect(result.finishReason).toBe('error')
-    expect(result.providerMetadata).toEqual({
-      acpx: { errorCode: 'rate', errorMessage: 'boom' },
+    const promise = provider.languageModel().doGenerate(baseCall)
+
+    await expect(promise).rejects.toBeInstanceOf(AcpxError)
+    await expect(promise).rejects.toMatchObject({
+      code: 'rate',
+      message: 'boom',
     })
   })
 })

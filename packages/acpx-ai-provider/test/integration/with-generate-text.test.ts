@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { generateText, stepCountIs } from 'ai'
+import { AcpxError } from '../../src/errors.ts'
 import { createAcpxProvider } from '../../src/index.ts'
 import { acpEvent, acpResult } from '../helpers/acp-event-builders.ts'
 import { MockAcpRuntime } from '../helpers/mock-acp-runtime.ts'
@@ -97,7 +98,7 @@ describe('generateText — tool-call', () => {
 })
 
 describe('generateText — failure', () => {
-  test('failed turn surfaces as finishReason "error"', async () => {
+  test('failed turn throws an AcpxError carrying the agent error data', async () => {
     const runtime = new MockAcpRuntime({
       turnScripts: [
         {
@@ -108,11 +109,15 @@ describe('generateText — failure', () => {
     })
     const provider = createAcpxProvider({ agent: 'claude', runtime })
 
-    const { finishReason } = await generateText({
+    const promise = generateText({
       model: provider.languageModel(),
       prompt: 'hi',
       stopWhen: stepCountIs(1),
     })
-    expect(finishReason).toBe('error')
+    await expect(promise).rejects.toBeInstanceOf(AcpxError)
+    await expect(promise).rejects.toMatchObject({
+      code: 'rate',
+      message: 'boom',
+    })
   })
 })
