@@ -3,6 +3,7 @@ import type {
   LanguageModelV2CallOptions,
   LanguageModelV2StreamPart,
 } from '@ai-sdk/provider'
+import { AcpxError } from '../../src/errors.ts'
 import { createAcpxProvider } from '../../src/index.ts'
 import { acpEvent, acpResult } from '../helpers/acp-event-builders.ts'
 import { MockAcpRuntime } from '../helpers/mock-acp-runtime.ts'
@@ -198,7 +199,7 @@ describe('doStream — usage and finish', () => {
     })
   })
 
-  test('failed turn result yields an error finish reason', async () => {
+  test('failed turn result yields an error part before the finish part', async () => {
     const runtime = new MockAcpRuntime({
       turnScripts: [
         {
@@ -208,10 +209,35 @@ describe('doStream — usage and finish', () => {
       ],
     })
     const parts = await streamParts(runtime)
-    expect(parts.at(-1)).toMatchObject({
-      type: 'finish',
-      finishReason: 'error',
+
+    // The new leading error part — the whole point of issue #32: a
+    // consumer iterating fullStream now gets diagnostic data instead
+    // of a silent finishReason: 'error'.
+    const errorIdx = parts.findIndex((p) => p.type === 'error')
+    expect(errorIdx).toBeGreaterThanOrEqual(0)
+    const errorPart = parts[errorIdx] as Extract<
+      LanguageModelV2StreamPart,
+      { type: 'error' }
+    >
+    expect(errorPart.error).toBeInstanceOf(AcpxError)
+    expect((errorPart.error as AcpxError).message).toBe('boom')
+    expect((errorPart.error as AcpxError).code).toBe('rate')
+
+    // Finish still comes last with the existing shape — providerMetadata
+    // kept verbatim for back-compat with consumers that already read it.
+    const finish = parts.at(-1) as Extract<
+      LanguageModelV2StreamPart,
+      { type: 'finish' }
+    >
+    expect(finish.type).toBe('finish')
+    expect(finish.finishReason).toBe('error')
+    expect(finish.providerMetadata?.acpx).toEqual({
+      errorCode: 'rate',
+      errorMessage: 'boom',
     })
+
+    // Order invariant: error precedes finish.
+    expect(errorIdx).toBeLessThan(parts.length - 1)
   })
 })
 

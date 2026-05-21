@@ -113,6 +113,11 @@ export class EventTranslator {
     return part
   }
 
+  errorPartIfFailed(result: AcpRuntimeTurnResult): LanguageModelV2StreamPart[] {
+    if (result.status !== 'failed') return []
+    return [{ type: 'error', error: fromRuntimeError(result.error) }]
+  }
+
   private accumulatedUsage(): LanguageModelV2Usage {
     if (
       this.accumulatedTotalTokens === undefined &&
