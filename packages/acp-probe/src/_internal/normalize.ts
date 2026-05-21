@@ -8,6 +8,7 @@ import type {
   AgentInfo,
   AuthMethod,
   McpCapabilities,
+  ModelConfigInfo,
   ProbedConfigOption,
   ProbedConfigOptionValue,
   ProbedMode,
@@ -196,6 +197,20 @@ export function deriveReasoning(
     values: opt.options.map((v) => v.value),
     ...(typeof opt.currentValue === 'string'
       ? { defaultValue: opt.currentValue }
+      : {}),
+  }
+}
+
+export function deriveModelConfig(
+  configOptions: ProbedConfigOption[],
+): ModelConfigInfo | null {
+  const opt = configOptions.find((o) => o.id === 'model' && o.type === 'select')
+  if (!opt?.options) return null
+  return {
+    configId: 'model',
+    values: opt.options.map((v) => v.value),
+    ...(typeof opt.currentValue === 'string'
+      ? { currentValue: opt.currentValue }
       : {}),
   }
 }

@@ -10,6 +10,7 @@ import {
   type RequestPermissionResponse,
 } from '@agentclientprotocol/sdk'
 import {
+  deriveModelConfig,
   deriveReasoning,
   normalizeAgentInfo,
   normalizeAuthMethods,
@@ -62,6 +63,7 @@ export async function probeAgent(
     modes: [],
     configOptions: [],
     reasoning: null,
+    modelConfig: null,
     supportsConfigOption: false,
     raw: { initialize: null, newSession: null },
   })
@@ -270,6 +272,7 @@ export async function probeAgent(
   const models = normalizeModels(newSession)
   const modes = normalizeModes(newSession)
   const reasoning = deriveReasoning(configOptions)
+  const modelConfig = deriveModelConfig(configOptions)
 
   return {
     agent: {
@@ -287,6 +290,7 @@ export async function probeAgent(
     modes,
     configOptions,
     reasoning,
+    modelConfig,
     supportsConfigOption,
     raw: { initialize, newSession },
   }

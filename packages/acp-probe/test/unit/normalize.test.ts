@@ -6,6 +6,7 @@ import type {
   NewSessionResponse,
 } from '@agentclientprotocol/sdk'
 import {
+  deriveModelConfig,
   deriveReasoning,
   normalizeAgentInfo,
   normalizeAuthMethods,
@@ -82,6 +83,12 @@ describe('normalize — claude (claude-agent-acp 0.31.4)', () => {
       values: ['low', 'medium', 'high', 'xhigh', 'max'],
       defaultValue: 'high',
     })
+
+    expect(deriveModelConfig(options)).toEqual({
+      configId: 'model',
+      values: ['default', 'sonnet', 'haiku'],
+      currentValue: 'default',
+    })
   })
 })
 
@@ -108,6 +115,29 @@ describe('normalize — codex (codex-acp 0.12.0)', () => {
       defaultValue: expect.any(String),
     })
   })
+
+  test('deriveModelConfig surfaces the 6 bare model ids — disjoint from availableModels', async () => {
+    const sess = await loadNewSession('codex')
+    const options = normalizeConfigOptions(sess)
+
+    const modelConfig = deriveModelConfig(options)
+    expect(modelConfig).toEqual({
+      configId: 'model',
+      values: [
+        'gpt-5.5',
+        'gpt-5.4',
+        'gpt-5.4-mini',
+        'gpt-5.3-codex',
+        'gpt-5.3-codex-spark',
+        'gpt-5.2',
+      ],
+      currentValue: 'gpt-5.5',
+    })
+
+    // None of the settable ids carry the `<model>/<effort>` suffix that
+    // pollutes availableModels[]; this is the whole point of the field.
+    expect(modelConfig?.values.every((v) => !v.includes('/'))).toBe(true)
+  })
 })
 
 describe('normalize — gemini (gemini-cli 0.42.0)', () => {
@@ -122,6 +152,7 @@ describe('normalize — gemini (gemini-cli 0.42.0)', () => {
 
     expect(normalizeConfigOptions(sess)).toEqual([])
     expect(deriveReasoning(normalizeConfigOptions(sess))).toBeNull()
+    expect(deriveModelConfig(normalizeConfigOptions(sess))).toBeNull()
     expect(normalizeAuthMethods(init).map((m) => m.id)).toContain(
       'oauth-personal',
     )

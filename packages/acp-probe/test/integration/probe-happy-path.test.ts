@@ -44,6 +44,11 @@ describe('probeAgent — happy path against fake-agent driven by fixtures', () =
       values: ['low', 'medium', 'high', 'xhigh', 'max'],
       defaultValue: 'high',
     })
+    expect(result.modelConfig).toEqual({
+      configId: 'model',
+      values: ['default', 'sonnet', 'haiku'],
+      currentValue: 'default',
+    })
     expect(result.supportsConfigOption).toBe(true)
     expect(result.agent.argv.length).toBeGreaterThan(0)
     expect(result.agent.durationMs).toBeGreaterThanOrEqual(0)
@@ -55,6 +60,15 @@ describe('probeAgent — happy path against fake-agent driven by fixtures', () =
     expect(result.error).toBeUndefined()
     expect(result.models.length).toBe(24)
     expect(result.reasoning?.configId).toBe('reasoning_effort')
+    expect(result.modelConfig?.values).toEqual([
+      'gpt-5.5',
+      'gpt-5.4',
+      'gpt-5.4-mini',
+      'gpt-5.3-codex',
+      'gpt-5.3-codex-spark',
+      'gpt-5.2',
+    ])
+    expect(result.modelConfig?.currentValue).toBe('gpt-5.5')
     expect(result.authMethods.length).toBe(3)
   })
 
@@ -69,6 +83,7 @@ describe('probeAgent — happy path against fake-agent driven by fixtures', () =
     expect(result.capabilities.promptCapabilities.audio).toBe(true)
     expect(result.configOptions).toEqual([])
     expect(result.reasoning).toBeNull()
+    expect(result.modelConfig).toBeNull()
     expect(result.supportsConfigOption).toBe(false)
   })
 })
