@@ -93,6 +93,15 @@ export interface ReasoningInfo {
   defaultValue?: string
 }
 
+export interface ModelConfigInfo {
+  /** Always `'model'` — surfaced for symmetry with `ReasoningInfo`. */
+  configId: string
+  /** Ids that `setConfigOption(configId, X)` will accept on this agent. */
+  values: string[]
+  /** Currently-selected value at probe time, if the agent advertised one. */
+  currentValue?: string
+}
+
 export type ProbeErrorCode =
   | 'spawn_failed'
   | 'initialize_timeout'
@@ -151,6 +160,18 @@ export interface AgentProbeResult {
   agentInfo: AgentInfo | null
   capabilities: AgentCapabilities
   authMethods: AuthMethod[]
+  /**
+   * The agent's declarative `session/new.models.availableModels[]`.
+   *
+   * Best for display / browsing. **These ids are NOT guaranteed to be
+   * valid `setConfigOption('model', X)` inputs** — codex-acp, for
+   * example, advertises compound `<model>/<effort>` ids here that
+   * `setConfigOption` rejects (silently — the next prompt finishes with
+   * `finishReason: "error"` and no error frame).
+   *
+   * For the setable list, read `modelConfig.values` (or the full
+   * picker metadata via `configOptions.find(o => o.id === 'model')`).
+   */
   models: ProbedModel[]
   modes: ProbedMode[]
   configOptions: ProbedConfigOption[]
@@ -159,6 +180,13 @@ export interface AgentProbeResult {
    * `null` when the agent doesn't expose a reasoning surface (e.g. gemini).
    */
   reasoning: ReasoningInfo | null
+  /**
+   * Derived pointer to the `configOptions[id=model]` select if present.
+   * Its `values` are the ids `setConfigOption('model', X)` will accept.
+   * `null` when the agent doesn't expose a setable model picker (e.g.
+   * gemini, where `setConfigOption` returns `-32601 method not found`).
+   */
+  modelConfig: ModelConfigInfo | null
   /**
    * True iff `session/set_config_option` is responsive. False on agents
    * like gemini that return ACP `-32601` ("method not found").

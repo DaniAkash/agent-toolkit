@@ -77,6 +77,9 @@ const EXPECTATIONS: Record<ProbeAgent, (r: AgentProbeResult) => void> = {
     expect(r.reasoning?.configId).toBe('effort')
     expect(r.reasoning?.values).toContain('low')
     expect(r.reasoning?.values).toContain('high')
+    expect(r.modelConfig?.configId).toBe('model')
+    expect(r.modelConfig?.values.length ?? 0).toBeGreaterThan(0)
+    expect(typeof r.modelConfig?.currentValue).toBe('string')
     expect(r.supportsConfigOption).toBe(true)
   },
   codex(r) {
@@ -89,6 +92,12 @@ const EXPECTATIONS: Record<ProbeAgent, (r: AgentProbeResult) => void> = {
     expect(r.configOptions.length).toBeGreaterThan(0)
     expect(r.reasoning?.configId).toBe('reasoning_effort')
     expect(r.reasoning?.values).toContain('low')
+    expect(r.modelConfig?.configId).toBe('model')
+    expect(r.modelConfig?.values.length ?? 0).toBeGreaterThan(0)
+    // The whole point of issue #31 — codex's setable ids are the bare
+    // model names, never the compound `<model>/<effort>` ids that
+    // pollute availableModels[].
+    expect(r.modelConfig?.values.every((v) => !v.includes('/'))).toBe(true)
     expect(r.supportsConfigOption).toBe(true)
   },
   gemini(r) {
@@ -99,9 +108,11 @@ const EXPECTATIONS: Record<ProbeAgent, (r: AgentProbeResult) => void> = {
     expect(r.capabilities.promptCapabilities.audio).toBe(true)
     expect(r.models.length).toBeGreaterThan(0)
     expect(r.modes.length).toBeGreaterThan(0)
-    // No configOptions → no reasoning surface, set_config_option absent.
+    // No configOptions → no reasoning surface, no setable model picker,
+    // set_config_option absent.
     expect(r.configOptions).toEqual([])
     expect(r.reasoning).toBeNull()
+    expect(r.modelConfig).toBeNull()
     expect(r.supportsConfigOption).toBe(false)
     expect(r.authMethods.length).toBeGreaterThan(0)
   },
@@ -166,6 +177,7 @@ for (const agent of AGENTS) {
           viaCommand.configOptions.map((o) => o.id),
         )
         expect(viaAcpx.reasoning).toEqual(viaCommand.reasoning)
+        expect(viaAcpx.modelConfig).toEqual(viaCommand.modelConfig)
         expect(viaAcpx.supportsConfigOption).toBe(
           viaCommand.supportsConfigOption,
         )

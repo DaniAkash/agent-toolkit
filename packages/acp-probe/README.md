@@ -85,11 +85,22 @@ interface AgentProbeResult {
     experimental?: { auth; nes; providers; positionEncoding }
   }
   authMethods: AuthMethod[]
+  /**
+   * Declarative `session/new.models.availableModels[]`. Best for display
+   * — **may contain ids that `setConfigOption('model', X)` will not
+   * accept**. See "Picking the right model list" below.
+   */
   models: Array<{ id; name?; description? }>
   modes: Array<{ id; name?; description? }>
   configOptions: ProbedConfigOption[]
   /** Derived pointer to the configOption with category='thought_level'. */
   reasoning: { configId; values; defaultValue? } | null
+  /**
+   * Derived pointer to `configOptions[id=model]`. `values` are the ids
+   * that `setConfigOption('model', X)` will accept. `null` when the
+   * agent doesn't expose a setable model picker (e.g. gemini).
+   */
+  modelConfig: { configId; values; currentValue? } | null
   /**
    * True iff the agent implements `session/set_config_option`. False
    * when the agent responds with JSON-RPC "method not found" to a
@@ -102,6 +113,81 @@ interface AgentProbeResult {
   raw: { initialize; newSession }
 }
 ```
+
+## Picking the right model list
+
+The probe surfaces two model-related lists from ACP because the two
+protocol surfaces don't always agree:
+
+- **`result.models`** — the agent's declarative `availableModels[]` from
+  `session/new`. Best for display / browsing / showing the user "what
+  this agent can do". **May contain ids the agent will not accept as
+  `setConfigOption('model', X)` inputs** — codex-acp, for example,
+  advertises compound `<model>/<effort>` ids here that `setConfigOption`
+  rejects (silently — the next prompt finishes with `finishReason:
+  "error"` and no error frame).
+- **`result.modelConfig.values`** — the string ids that the agent's
+  `configOptions[id=model]` select will accept. `null` for agents that
+  don't expose `configOptions[model]` at all (e.g. gemini, where
+  `setConfigOption` itself returns `-32601 method not found`).
+- **`result.configOptions.find(o => o.id === 'model')`** — the full typed
+  picker option (names, descriptions, `currentValue`) for the setable
+  values. Use this when you want to render a rich picker UI on top of
+  the setable list.
+
+### Display-only browser
+
+```ts
+import { probeAgent } from 'acp-probe'
+
+const result = await probeAgent({ command: 'npx @zed-industries/codex-acp@^0.12.0' })
+
+for (const m of result.models) {
+  console.log(`${m.id}${m.name ? ` — ${m.name}` : ''}`)
+}
+```
+
+### Mutable picker that drives `setConfigOption`
+
+```ts
+import { probeAgent } from 'acp-probe'
+
+const result = await probeAgent({ command: 'npx @zed-industries/codex-acp@^0.12.0' })
+
+if (!result.modelConfig) {
+  console.log('This agent does not expose a model picker — skip the UI.')
+} else {
+  const { values, currentValue } = result.modelConfig
+  for (const id of values) {
+    console.log(id === currentValue ? `* ${id}` : `  ${id}`)
+  }
+}
+```
+
+### Rich mutable picker (values + names + descriptions)
+
+```ts
+import { probeAgent } from 'acp-probe'
+
+const result = await probeAgent({ command: 'npx @zed-industries/codex-acp@^0.12.0' })
+
+const modelOption = result.configOptions.find((o) => o.id === 'model')
+if (modelOption?.type === 'select') {
+  for (const opt of modelOption.options ?? []) {
+    const tag = opt.value === modelOption.currentValue ? ' (current)' : ''
+    console.log(`${opt.value} — ${opt.name}${tag}`)
+    if (opt.description) console.log(`  ${opt.description}`)
+  }
+}
+```
+
+### Quick reference
+
+| Use case | Field to read | Empty when |
+|---|---|---|
+| Display all advertised models | `result.models` | agent omitted `models` from `session/new` |
+| Drive `setConfigOption('model', X)` | `result.modelConfig.values` | agent has no `configOptions[id=model]` |
+| Rich picker UI (names + descriptions) | `result.configOptions.find(o => o.id === 'model')` | same as above |
 
 ## Errors
 

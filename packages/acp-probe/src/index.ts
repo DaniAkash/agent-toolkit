@@ -9,6 +9,7 @@ export type {
   AgentProbeResult,
   AuthMethod,
   McpCapabilities,
+  ModelConfigInfo,
   ProbedConfigOption,
   ProbedConfigOptionValue,
   ProbedMode,
