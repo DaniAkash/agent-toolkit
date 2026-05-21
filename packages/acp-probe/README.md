@@ -98,7 +98,7 @@ interface AgentProbeResult {
   /**
    * Derived pointer to `configOptions[id=model]`. `values` are the ids
    * that `setConfigOption('model', X)` will accept. `null` when the
-   * agent doesn't expose a setable model picker (e.g. gemini).
+   * agent doesn't expose a settable model picker (e.g. gemini).
    */
   modelConfig: { configId; values; currentValue? } | null
   /**
@@ -131,9 +131,9 @@ protocol surfaces don't always agree:
   don't expose `configOptions[model]` at all (e.g. gemini, where
   `setConfigOption` itself returns `-32601 method not found`).
 - **`result.configOptions.find(o => o.id === 'model')`** — the full typed
-  picker option (names, descriptions, `currentValue`) for the setable
+  picker option (names, descriptions, `currentValue`) for the settable
   values. Use this when you want to render a rich picker UI on top of
-  the setable list.
+  the settable list.
 
 ### Display-only browser
 

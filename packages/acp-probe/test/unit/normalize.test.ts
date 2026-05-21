@@ -134,7 +134,7 @@ describe('normalize — codex (codex-acp 0.12.0)', () => {
       currentValue: 'gpt-5.5',
     })
 
-    // None of the setable ids carry the `<model>/<effort>` suffix that
+    // None of the settable ids carry the `<model>/<effort>` suffix that
     // pollutes availableModels[]; this is the whole point of the field.
     expect(modelConfig?.values.every((v) => !v.includes('/'))).toBe(true)
   })

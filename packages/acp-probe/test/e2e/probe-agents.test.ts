@@ -94,7 +94,7 @@ const EXPECTATIONS: Record<ProbeAgent, (r: AgentProbeResult) => void> = {
     expect(r.reasoning?.values).toContain('low')
     expect(r.modelConfig?.configId).toBe('model')
     expect(r.modelConfig?.values.length ?? 0).toBeGreaterThan(0)
-    // The whole point of issue #31 — codex's setable ids are the bare
+    // The whole point of issue #31 — codex's settable ids are the bare
     // model names, never the compound `<model>/<effort>` ids that
     // pollute availableModels[].
     expect(r.modelConfig?.values.every((v) => !v.includes('/'))).toBe(true)
@@ -108,7 +108,7 @@ const EXPECTATIONS: Record<ProbeAgent, (r: AgentProbeResult) => void> = {
     expect(r.capabilities.promptCapabilities.audio).toBe(true)
     expect(r.models.length).toBeGreaterThan(0)
     expect(r.modes.length).toBeGreaterThan(0)
-    // No configOptions → no reasoning surface, no setable model picker,
+    // No configOptions → no reasoning surface, no settable model picker,
     // set_config_option absent.
     expect(r.configOptions).toEqual([])
     expect(r.reasoning).toBeNull()

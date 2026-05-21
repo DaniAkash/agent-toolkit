@@ -95,8 +95,8 @@ export interface ReasoningInfo {
 
 export interface ModelConfigInfo {
   /** Always `'model'` — surfaced for symmetry with `ReasoningInfo`. */
-  configId: string
-  /** Ids that `setConfigOption(configId, X)` will accept on this agent. */
+  configId: 'model'
+  /** Ids that `setConfigOption('model', X)` will accept on this agent. */
   values: string[]
   /** Currently-selected value at probe time, if the agent advertised one. */
   currentValue?: string
@@ -169,7 +169,7 @@ export interface AgentProbeResult {
    * `setConfigOption` rejects (silently — the next prompt finishes with
    * `finishReason: "error"` and no error frame).
    *
-   * For the setable list, read `modelConfig.values` (or the full
+   * For the settable list, read `modelConfig.values` (or the full
    * picker metadata via `configOptions.find(o => o.id === 'model')`).
    */
   models: ProbedModel[]
@@ -183,7 +183,7 @@ export interface AgentProbeResult {
   /**
    * Derived pointer to the `configOptions[id=model]` select if present.
    * Its `values` are the ids `setConfigOption('model', X)` will accept.
-   * `null` when the agent doesn't expose a setable model picker (e.g.
+   * `null` when the agent doesn't expose a settable model picker (e.g.
    * gemini, where `setConfigOption` returns `-32601 method not found`).
    */
   modelConfig: ModelConfigInfo | null

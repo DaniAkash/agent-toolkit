@@ -207,7 +207,7 @@ export function deriveModelConfig(
   const opt = configOptions.find((o) => o.id === 'model' && o.type === 'select')
   if (!opt?.options) return null
   return {
-    configId: opt.id,
+    configId: 'model',
     values: opt.options.map((v) => v.value),
     ...(typeof opt.currentValue === 'string'
       ? { currentValue: opt.currentValue }
