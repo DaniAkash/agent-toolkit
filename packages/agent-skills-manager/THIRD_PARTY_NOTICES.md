@@ -5,7 +5,7 @@
 ## skills (vercel-labs/skills)
 
 - Source: https://github.com/vercel-labs/skills
-- Version: 1.5.6
+- Version: 1.5.7
 - License: MIT
 - Files derived from this project (located under `src/_vendor/`):
   - `agents.ts` — copied verbatim with import-path adjustments
