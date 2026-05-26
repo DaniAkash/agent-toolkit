@@ -149,6 +149,16 @@
           }
         }
       }
+    },
+    {
+      "includes": ["**/acpx-ai-provider/src/convert-events.ts"],
+      "linter": {
+        "rules": {
+          "nursery": {
+            "noExcessiveLinesPerFile": "off"
+          }
+        }
+      }
     }
   ],
   "assist": {
