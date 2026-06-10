@@ -142,7 +142,7 @@ describe('flush()', () => {
   test('closes any open tool-input block', () => {
     const t = newTranslator()
     feed(t, [tool({ toolCallId: 't1', title: 'greet', text: 'a' })])
-    expect(t.flush()).toEqual([{ type: 'tool-input-end', id: 'id-1' }])
+    expect(t.flush()).toEqual([{ type: 'tool-input-end', id: 't1' }])
   })
 })
 
@@ -158,8 +158,8 @@ describe('tool_call — pending and in_progress', () => {
       }),
     ])
     expect(parts).toEqual([
-      { type: 'tool-input-start', id: 'id-1', toolName: 'greet' },
-      { type: 'tool-input-delta', id: 'id-1', delta: '{"x":1}' },
+      { type: 'tool-input-start', id: 't1', toolName: 'greet' },
+      { type: 'tool-input-delta', id: 't1', delta: '{"x":1}' },
     ])
   })
 
@@ -169,7 +169,7 @@ describe('tool_call — pending and in_progress', () => {
     const start = parts.find((p) => p.type === 'tool-input-start')
     expect(start).toEqual({
       type: 'tool-input-start',
-      id: 'id-1',
+      id: 't1',
       toolName: 'tool',
     })
   })
@@ -300,6 +300,45 @@ describe('tool_call — completed and failed', () => {
       result: '{"name":"world"}',
     })
     expect((result as { isError?: boolean }).isError).toBeUndefined()
+  })
+
+  test('uses the runtime toolCallId for every tool lifecycle id', () => {
+    const t = newTranslator()
+    const parts = feed(t, [
+      tool({
+        toolCallId: 'call_123',
+        title: 'mcp.browseros.navigate',
+        text: '{"url":"https://example.com"}',
+        status: 'completed',
+      }),
+    ])
+
+    expect(parts).toEqual([
+      {
+        type: 'tool-input-start',
+        id: 'call_123',
+        toolName: 'mcp.browseros.navigate',
+      },
+      {
+        type: 'tool-input-delta',
+        id: 'call_123',
+        delta: '{"url":"https://example.com"}',
+      },
+      { type: 'tool-input-end', id: 'call_123' },
+      {
+        type: 'tool-call',
+        toolCallId: 'call_123',
+        toolName: 'mcp.browseros.navigate',
+        input: '{"url":"https://example.com"}',
+        providerExecuted: true,
+      },
+      {
+        type: 'tool-result',
+        toolCallId: 'call_123',
+        toolName: 'mcp.browseros.navigate',
+        result: '{"url":"https://example.com"}',
+      },
+    ])
   })
 
   test('failed emits the same parts but with isError on tool-result', () => {
