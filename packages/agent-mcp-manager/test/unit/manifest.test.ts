@@ -1,10 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 
 import {
   emptyManifest,
   readManifest,
   writeManifest,
 } from '../../src/_internal/manifest.ts'
+import { McpManagerError } from '../../src/errors.ts'
 import {
   makeTmpWorkspace,
   type TmpWorkspace,
@@ -45,5 +48,38 @@ describe('manifest', () => {
     }
     await writeManifest(ws.workspaceDir, manifest)
     expect(await readManifest(ws.workspaceDir)).toEqual(manifest)
+  })
+
+  test('readManifest throws on malformed JSON instead of returning empty', async () => {
+    await writeFile(
+      join(ws.workspaceDir, 'manifest.json'),
+      '{ not json',
+      'utf8',
+    )
+    await expect(readManifest(ws.workspaceDir)).rejects.toBeInstanceOf(
+      McpManagerError,
+    )
+  })
+
+  test('readManifest throws on unsupported version', async () => {
+    await writeFile(
+      join(ws.workspaceDir, 'manifest.json'),
+      JSON.stringify({ version: 99, servers: {} }),
+      'utf8',
+    )
+    await expect(readManifest(ws.workspaceDir)).rejects.toBeInstanceOf(
+      McpManagerError,
+    )
+  })
+
+  test('readManifest throws when servers is missing', async () => {
+    await writeFile(
+      join(ws.workspaceDir, 'manifest.json'),
+      JSON.stringify({ version: 1 }),
+      'utf8',
+    )
+    await expect(readManifest(ws.workspaceDir)).rejects.toBeInstanceOf(
+      McpManagerError,
+    )
   })
 })

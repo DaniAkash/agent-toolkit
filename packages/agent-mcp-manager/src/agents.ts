@@ -23,7 +23,7 @@ export function listSupportedAgents(): AgentId[] {
 }
 
 export function isAgentSupported(agent: string): agent is AgentId {
-  return agent in CATALOG_BY_ID
+  return Object.hasOwn(CATALOG_BY_ID, agent)
 }
 
 export function getCatalogEntry(agent: AgentId): CatalogEntry {

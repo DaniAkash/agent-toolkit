@@ -258,78 +258,111 @@ export function createMcpManager(options: McpManagerOptions = {}): McpManager {
     overrides: options.agentConfigPaths ?? {},
   }
 
+  // Serialise every state-mutating op so concurrent callers (e.g. fanning
+  // out `link` across all detected agents) can't race on read→modify→write
+  // of either the workspace manifest or an agent config file.
+  let writeQueue: Promise<unknown> = Promise.resolve()
+  const enqueueWrite = <T>(fn: () => Promise<T>): Promise<T> => {
+    const next = writeQueue.then(fn, fn)
+    writeQueue = next.then(
+      () => undefined,
+      () => undefined,
+    )
+    return next
+  }
+
   return {
-    async add(opts: AddServerOptions): Promise<AddServerResult> {
+    add(opts: AddServerOptions): Promise<AddServerResult> {
       const name = validateName(opts.name)
       validateSpec(opts.spec)
-      const manifest = await readManifest(ctx.workspaceDir)
-      const existing = manifest.servers[name]
-      const next: ManifestServerEntry = {
-        name,
-        spec: opts.spec,
-        addedAt: existing?.addedAt ?? new Date().toISOString(),
-        links: existing?.links ?? {},
-      }
-      const updated: ServerManifest = {
-        ...manifest,
-        servers: { ...manifest.servers, [name]: next },
-      }
-      await writeManifest(ctx.workspaceDir, updated)
-      return { name, created: !existing }
+      return enqueueWrite(async () => {
+        const manifest = await readManifest(ctx.workspaceDir)
+        const existing = manifest.servers[name]
+        const next: ManifestServerEntry = {
+          name,
+          spec: opts.spec,
+          addedAt: existing?.addedAt ?? new Date().toISOString(),
+          links: existing?.links ?? {},
+        }
+        const updated: ServerManifest = {
+          ...manifest,
+          servers: { ...manifest.servers, [name]: next },
+        }
+        await writeManifest(ctx.workspaceDir, updated)
+        return { name, created: !existing }
+      })
     },
 
-    async link(opts: LinkServerOptions): Promise<LinkServerResult> {
+    link(opts: LinkServerOptions): Promise<LinkServerResult> {
       const name = validateName(opts.serverName)
       assertSupported(opts.agent)
       const entry = getCatalogEntry(opts.agent)
       const emitter = getEmitter(entry)
-      const configPath = await resolvePath(ctx, opts.agent, opts.configPath)
+      return enqueueWrite(async () => {
+        const configPath = await resolvePath(ctx, opts.agent, opts.configPath)
+        const manifest = await readManifest(ctx.workspaceDir)
+        const server = manifest.servers[name]
+        if (!server) throw new ServerNotFoundError(name)
 
-      const manifest = await readManifest(ctx.workspaceDir)
-      const server = manifest.servers[name]
-      if (!server) throw new ServerNotFoundError(name)
+        const raw = await readFileOrEmpty(configPath)
+        const existing = server.links[opts.agent]
+        const alreadyOnDisk = raw.trim()
+          ? emitter.read(raw).includes(name)
+          : false
 
-      const raw = await readFileOrEmpty(configPath)
-      const existing = server.links[opts.agent]
-      const alreadyOnDisk = raw.trim()
-        ? emitter.read(raw).includes(name)
-        : false
-      if (existing && existing.configPath === configPath && alreadyOnDisk) {
+        // Idempotent: same agent, same path, entry already present.
+        if (existing && existing.configPath === configPath && alreadyOnDisk) {
+          return {
+            serverName: name,
+            agent: opts.agent,
+            configPath,
+            created: false,
+          }
+        }
+
+        // Refuse to clobber an entry the manifest didn't write: the
+        // caller (or the user) put something under this name without us.
+        if (alreadyOnDisk && !existing) {
+          throw new ForeignEntryError(name, opts.agent, configPath)
+        }
+
+        const updated = emitter.add(raw, name, server.spec)
+        if (updated !== raw) await atomicWriteFile(configPath, updated)
+
+        const nextManifest: ServerManifest = {
+          ...manifest,
+          servers: {
+            ...manifest.servers,
+            [name]: {
+              ...server,
+              links: {
+                ...server.links,
+                [opts.agent]: {
+                  configPath,
+                  createdAt: new Date().toISOString(),
+                },
+              },
+            },
+          },
+        }
+        await writeManifest(ctx.workspaceDir, nextManifest)
         return {
           serverName: name,
           agent: opts.agent,
           configPath,
-          created: false,
+          created: true,
         }
-      }
-
-      const updated = emitter.add(raw, name, server.spec)
-      if (updated !== raw) await atomicWriteFile(configPath, updated)
-
-      const nextManifest: ServerManifest = {
-        ...manifest,
-        servers: {
-          ...manifest.servers,
-          [name]: {
-            ...server,
-            links: {
-              ...server.links,
-              [opts.agent]: {
-                configPath,
-                createdAt: new Date().toISOString(),
-              },
-            },
-          },
-        },
-      }
-      await writeManifest(ctx.workspaceDir, nextManifest)
-      return { serverName: name, agent: opts.agent, configPath, created: true }
+      })
     },
 
-    unlink: (opts) => unlinkImpl(ctx, opts),
+    unlink: (opts) => enqueueWrite(() => unlinkImpl(ctx, opts)),
 
     async remove(opts: RemoveServerOptions): Promise<void> {
       const name = validateName(opts.serverName)
+      // Per-agent unlinks each take the queue; the final manifest write
+      // also goes through the queue. So 'remove' as a whole isn't atomic
+      // against an interleaved 'add', but each individual mutation is —
+      // matching skills-manager's posture.
       const manifest = await readManifest(ctx.workspaceDir)
       const server = manifest.servers[name]
       if (!server) throw new ServerNotFoundError(name)
@@ -337,7 +370,9 @@ export function createMcpManager(options: McpManagerOptions = {}): McpManager {
       if (opts.unlinkFirst !== false) {
         for (const agent of Object.keys(server.links) as AgentId[]) {
           try {
-            await unlinkImpl(ctx, { serverName: name, agent })
+            await enqueueWrite(() =>
+              unlinkImpl(ctx, { serverName: name, agent }),
+            )
           } catch (err) {
             if (err instanceof ForeignEntryError) continue
             throw err
@@ -345,10 +380,12 @@ export function createMcpManager(options: McpManagerOptions = {}): McpManager {
         }
       }
 
-      const fresh = await readManifest(ctx.workspaceDir)
-      await writeManifest(ctx.workspaceDir, {
-        ...fresh,
-        servers: withoutServer(fresh.servers, name),
+      await enqueueWrite(async () => {
+        const fresh = await readManifest(ctx.workspaceDir)
+        await writeManifest(ctx.workspaceDir, {
+          ...fresh,
+          servers: withoutServer(fresh.servers, name),
+        })
       })
     },
 

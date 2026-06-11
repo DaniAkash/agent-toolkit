@@ -1,6 +1,7 @@
 import * as fsp from 'node:fs/promises'
 import * as path from 'node:path'
 
+import { McpManagerError } from '../errors.ts'
 import type { ServerManifest } from '../types.ts'
 
 const EMPTY_MANIFEST: ServerManifest = { version: 1, servers: {} }
@@ -13,6 +14,12 @@ export function manifestPath(workspaceDir: string): string {
   return path.join(workspaceDir, 'manifest.json')
 }
 
+/**
+ * Read the manifest. Returns an empty manifest only when the file is
+ * absent or empty — malformed JSON, wrong shape, or wrong version
+ * throws so callers can recover instead of silently overwriting their
+ * existing state.
+ */
 export async function readManifest(
   workspaceDir: string,
 ): Promise<ServerManifest> {
@@ -28,17 +35,25 @@ export async function readManifest(
   let parsed: unknown
   try {
     parsed = JSON.parse(raw)
-  } catch {
-    return emptyManifest()
+  } catch (err) {
+    throw new McpManagerError(
+      `Manifest at ${file} is not valid JSON. Inspect and repair or delete to start fresh.`,
+      { cause: err },
+    )
   }
-  if (
-    !parsed ||
-    typeof parsed !== 'object' ||
-    (parsed as ServerManifest).version !== 1 ||
-    typeof (parsed as ServerManifest).servers !== 'object' ||
-    (parsed as ServerManifest).servers === null
-  ) {
-    return emptyManifest()
+  if (!parsed || typeof parsed !== 'object') {
+    throw new McpManagerError(`Manifest at ${file} is not an object.`)
+  }
+  const candidate = parsed as Partial<ServerManifest>
+  if (candidate.version !== 1) {
+    throw new McpManagerError(
+      `Manifest at ${file} has unsupported version ${String(candidate.version)}; expected 1.`,
+    )
+  }
+  if (typeof candidate.servers !== 'object' || candidate.servers === null) {
+    throw new McpManagerError(
+      `Manifest at ${file} is missing a valid \`servers\` object.`,
+    )
   }
   return parsed as ServerManifest
 }

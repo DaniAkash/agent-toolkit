@@ -83,6 +83,60 @@ describe('createMcpManager — happy path', () => {
     ).rejects.toBeInstanceOf(ServerNotFoundError)
   })
 
+  test('link refuses to clobber a foreign on-disk entry', async () => {
+    const cursor = configFor(ws, 'cursor')
+    await Bun.write(
+      cursor,
+      JSON.stringify(
+        { mcpServers: { github: { command: 'user-owned' } } },
+        null,
+        2,
+      ),
+    )
+    const mgr = createMcpManager({
+      workspaceDir: ws.workspaceDir,
+      agentConfigPaths: { cursor },
+    })
+    await mgr.add({
+      name: 'github',
+      spec: { transport: 'stdio', command: 'managed-by-us' },
+    })
+    await expect(
+      mgr.link({ serverName: 'github', agent: 'cursor' }),
+    ).rejects.toBeInstanceOf(ForeignEntryError)
+    // Verify we didn't touch the user's entry.
+    const after = JSON.parse(await readFile(cursor, 'utf8'))
+    expect(after.mcpServers.github).toEqual({ command: 'user-owned' })
+  })
+
+  test('concurrent fan-out link calls all succeed without losing entries', async () => {
+    const cursor = configFor(ws, 'cursor')
+    const claude = configFor(ws, 'claude-code')
+    const mgr = createMcpManager({
+      workspaceDir: ws.workspaceDir,
+      agentConfigPaths: { cursor, 'claude-code': claude },
+    })
+    await mgr.add({ name: 'a', spec: { transport: 'stdio', command: 'a' } })
+    await mgr.add({ name: 'b', spec: { transport: 'stdio', command: 'b' } })
+    await mgr.add({ name: 'c', spec: { transport: 'stdio', command: 'c' } })
+    // Fire all six links in parallel — without the write queue,
+    // read→modify→write on the manifest would race and drop entries.
+    await Promise.all([
+      mgr.link({ serverName: 'a', agent: 'cursor' }),
+      mgr.link({ serverName: 'b', agent: 'cursor' }),
+      mgr.link({ serverName: 'c', agent: 'cursor' }),
+      mgr.link({ serverName: 'a', agent: 'claude-code' }),
+      mgr.link({ serverName: 'b', agent: 'claude-code' }),
+      mgr.link({ serverName: 'c', agent: 'claude-code' }),
+    ])
+    const links = await mgr.listLinks()
+    expect(links).toHaveLength(6)
+    const cursorRaw = JSON.parse(await readFile(cursor, 'utf8'))
+    expect(Object.keys(cursorRaw.mcpServers).sort()).toEqual(['a', 'b', 'c'])
+    const claudeRaw = JSON.parse(await readFile(claude, 'utf8'))
+    expect(Object.keys(claudeRaw.mcpServers).sort()).toEqual(['a', 'b', 'c'])
+  })
+
   test('unlink on an entry we never wrote raises ForeignEntryError', async () => {
     const cursor = configFor(ws, 'cursor')
     await Bun.write(
@@ -123,22 +177,21 @@ describe('createMcpManager — happy path', () => {
 
   test('listLinks({ scanUnmanaged }) surfaces on-disk entries we did not write', async () => {
     const cursor = configFor(ws, 'cursor')
-    await Bun.write(
-      cursor,
-      JSON.stringify({
-        mcpServers: { tracked: { command: 't' }, untracked: { command: 'u' } },
-      }),
-    )
     const mgr = createMcpManager({
       workspaceDir: ws.workspaceDir,
       agentConfigPaths: { cursor },
     })
+    // Legitimate flow: add then link writes `tracked` and records it.
     await mgr.add({
       name: 'tracked',
       spec: { transport: 'stdio', command: 't' },
     })
-    // Pretend we linked it (manifest has a recorded link for cursor)
     await mgr.link({ serverName: 'tracked', agent: 'cursor' })
+
+    // Simulate the user adding a sibling entry by hand.
+    const current = JSON.parse(await readFile(cursor, 'utf8'))
+    current.mcpServers.untracked = { command: 'u' }
+    await Bun.write(cursor, JSON.stringify(current, null, 2))
 
     const links = await mgr.listLinks({
       scanUnmanaged: true,

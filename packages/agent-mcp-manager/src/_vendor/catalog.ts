@@ -180,10 +180,12 @@ export const CATALOG: readonly CatalogEntry[] = [
   },
 ]
 
+// Null-prototype map: defense-in-depth so that `hasOwn` / `in` lookups
+// can't accidentally hit inherited Object.prototype keys.
 export const CATALOG_BY_ID: Record<AgentId, CatalogEntry> = CATALOG.reduce(
   (acc, entry) => {
     acc[entry.id] = entry
     return acc
   },
-  {} as Record<AgentId, CatalogEntry>,
+  Object.create(null) as Record<AgentId, CatalogEntry>,
 )

@@ -25,6 +25,15 @@ describe('agents catalog', () => {
     expect(isAgentSupported('totally-made-up')).toBe(false)
   })
 
+  test('isAgentSupported rejects Object.prototype keys', () => {
+    // The catalog used to use `in`, which leaked inherited keys like
+    // `toString` / `hasOwnProperty` and let the type guard pass for them.
+    expect(isAgentSupported('toString')).toBe(false)
+    expect(isAgentSupported('hasOwnProperty')).toBe(false)
+    expect(isAgentSupported('__proto__')).toBe(false)
+    expect(isAgentSupported('constructor')).toBe(false)
+  })
+
   test('resolveAgentMcpConfigPath in project scope requires projectRoot', async () => {
     await expect(
       resolveAgentMcpConfigPath('cursor', 'project'),
