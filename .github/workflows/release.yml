@@ -32,6 +32,7 @@ on:
   push:
     tags:
       - 'acpx-ai-provider-v[0-9]*'
+      - 'agent-mcp-manager-v[0-9]*'
       - 'agent-skills-manager-v[0-9]*'
       - 'acp-probe-v[0-9]*'
 
@@ -67,6 +68,11 @@ jobs:
               echo "name=acpx-ai-provider" >> "$GITHUB_OUTPUT"
               echo "dir=packages/acpx-ai-provider" >> "$GITHUB_OUTPUT"
               echo "match=acpx-ai-provider-v[0-9]*" >> "$GITHUB_OUTPUT"
+              ;;
+            agent-mcp-manager-v*)
+              echo "name=agent-mcp-manager" >> "$GITHUB_OUTPUT"
+              echo "dir=packages/agent-mcp-manager" >> "$GITHUB_OUTPUT"
+              echo "match=agent-mcp-manager-v[0-9]*" >> "$GITHUB_OUTPUT"
               ;;
             agent-skills-manager-v*)
               echo "name=agent-skills-manager" >> "$GITHUB_OUTPUT"
