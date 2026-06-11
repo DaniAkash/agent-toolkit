@@ -142,7 +142,7 @@ describe('flush()', () => {
   test('closes any open tool-input block', () => {
     const t = newTranslator()
     feed(t, [tool({ toolCallId: 't1', title: 'greet', text: 'a' })])
-    expect(t.flush()).toEqual([{ type: 'tool-input-end', id: 'id-1' }])
+    expect(t.flush()).toEqual([{ type: 'tool-input-end', id: 't1' }])
   })
 })
 
@@ -158,8 +158,8 @@ describe('tool_call — pending and in_progress', () => {
       }),
     ])
     expect(parts).toEqual([
-      { type: 'tool-input-start', id: 'id-1', toolName: 'greet' },
-      { type: 'tool-input-delta', id: 'id-1', delta: '{"x":1}' },
+      { type: 'tool-input-start', id: 't1', toolName: 'greet' },
+      { type: 'tool-input-delta', id: 't1', delta: '{"x":1}' },
     ])
   })
 
@@ -169,7 +169,7 @@ describe('tool_call — pending and in_progress', () => {
     const start = parts.find((p) => p.type === 'tool-input-start')
     expect(start).toEqual({
       type: 'tool-input-start',
-      id: 'id-1',
+      id: 't1',
       toolName: 'tool',
     })
   })
@@ -300,6 +300,89 @@ describe('tool_call — completed and failed', () => {
       result: '{"name":"world"}',
     })
     expect((result as { isError?: boolean }).isError).toBeUndefined()
+  })
+
+  test('uses the runtime toolCallId for every tool lifecycle id', () => {
+    const t = newTranslator()
+    const parts = feed(t, [
+      tool({
+        toolCallId: 'call_123',
+        title: 'mcp.browseros.navigate',
+        text: '{"url":"https://example.com"}',
+        status: 'completed',
+      }),
+    ])
+
+    expect(parts).toEqual([
+      {
+        type: 'tool-input-start',
+        id: 'call_123',
+        toolName: 'mcp.browseros.navigate',
+      },
+      {
+        type: 'tool-input-delta',
+        id: 'call_123',
+        delta: '{"url":"https://example.com"}',
+      },
+      { type: 'tool-input-end', id: 'call_123' },
+      {
+        type: 'tool-call',
+        toolCallId: 'call_123',
+        toolName: 'mcp.browseros.navigate',
+        input: '{"url":"https://example.com"}',
+        providerExecuted: true,
+      },
+      {
+        type: 'tool-result',
+        toolCallId: 'call_123',
+        toolName: 'mcp.browseros.navigate',
+        result: '{"url":"https://example.com"}',
+      },
+    ])
+  })
+
+  test('streaming in_progress → completed keeps the same toolCallId on every tool-input-* part', () => {
+    // Realistic flow: the agent sends one in_progress event with a
+    // partial input, then a terminal completed event with the full
+    // input. Pins the invariant via filter+compare rather than a
+    // literal shape match, so it survives future part-shape evolution
+    // without losing regression value.
+    const t = newTranslator()
+    const parts = feed(t, [
+      tool({
+        toolCallId: 'call_real_xxx',
+        title: 'mcp.browseros.navigate',
+        text: '{"url":"https://exa',
+        status: 'in_progress',
+      }),
+      tool({
+        toolCallId: 'call_real_xxx',
+        title: 'mcp.browseros.navigate',
+        text: '{"url":"https://example.com"}',
+        status: 'completed',
+      }),
+    ])
+
+    const inputStart = parts.find((p) => p.type === 'tool-input-start')
+    const inputDeltas = parts.filter((p) => p.type === 'tool-input-delta')
+    const inputEnd = parts.find((p) => p.type === 'tool-input-end')
+    const toolCall = parts.find((p) => p.type === 'tool-call')
+    const toolResult = parts.find((p) => p.type === 'tool-result')
+
+    expect(inputStart).toBeDefined()
+    expect(inputEnd).toBeDefined()
+    expect(toolCall).toBeDefined()
+    expect(toolResult).toBeDefined()
+    expect(inputDeltas.length).toBeGreaterThan(0)
+
+    const callId = (toolCall as { toolCallId: string }).toolCallId
+    expect(callId).toBe('call_real_xxx')
+    expect((inputStart as { id: string }).id).toBe(callId)
+    for (const delta of inputDeltas) {
+      expect((delta as { id: string }).id).toBe(callId)
+    }
+    expect((inputEnd as { id: string }).id).toBe(callId)
+    expect((toolResult as { toolCallId: string }).toolCallId).toBe(callId)
   })
 
   test('failed emits the same parts but with isError on tool-result', () => {

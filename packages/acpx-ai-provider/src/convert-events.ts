@@ -183,11 +183,10 @@ export class EventTranslator {
 
     let state = this.toolCalls.get(callId)
     if (!state) {
-      const blockId = this.generateId()
       const toolName = event.title?.trim() || 'tool'
-      state = { blockId, toolName, emittedText: '', inputClosed: false }
+      state = { blockId: callId, toolName, emittedText: '', inputClosed: false }
       this.toolCalls.set(callId, state)
-      parts.push({ type: 'tool-input-start', id: blockId, toolName })
+      parts.push({ type: 'tool-input-start', id: callId, toolName })
     }
 
     parts.push(...this.appendToolText(state, event.text))
