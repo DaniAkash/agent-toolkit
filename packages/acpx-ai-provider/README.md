@@ -81,11 +81,9 @@ for await (const chunk of textStream) process.stdout.write(chunk)
 
 ## Multi-turn chat: acpx owns the memory
 
-This is the single most important thing to know when wiring `acpx-ai-provider` into a chat UI. If you skip it you will hit either silently-doubled conversation history or a hard AI SDK validator crash on the second turn.
+Set the right mental model up-front and you will save yourself an integration mistake. If you have built against stateless cloud LLMs (OpenAI, Anthropic direct, etc.) you have probably been re-feeding the full `UIMessage[]` history into `streamText` on every turn. That pattern is correct for those providers and unnecessary — and in one specific case, wrong — for acpx.
 
-**Invariant:** `acpx/runtime` owns the agent's conversation memory. Every persistent session lives at `<stateDir>/<sessionKey>/` and the runtime calls ACP's `session/load` on every `streamText` / `generateText` invocation. The agent sees the full prior turn history through that reload. The provider does not have to, and **must not**, re-send it.
-
-If you have built against stateless cloud LLMs (OpenAI, Anthropic direct, etc.) you have probably been re-feeding the full `UIMessage[]` history into `streamText` on every turn. That pattern is correct for those providers and actively wrong for acpx.
+**Invariant:** `acpx/runtime` owns the agent's conversation memory. Every persistent session lives at `<stateDir>/<sessionKey>/` and the runtime calls ACP's `session/load` on every `streamText` / `generateText` invocation. The agent sees the full prior turn history through that reload. The provider does not need you to re-send it.
 
 ### Correct pattern
 
@@ -102,22 +100,28 @@ const result = streamText({
 
 `messages` is always a single-entry array containing only the new user message, regardless of how many turns have happened in the session.
 
-The UI layer can still keep a growing `UIMessage[]` array for rendering the transcript. That display state is separate from the agent's memory and must not be fed back into `streamText` for ACP-backed providers.
+The UI layer can still keep a growing `UIMessage[]` array for rendering the transcript. That display state is separate from the agent's memory.
 
-### Anti-pattern
+### What happens if you re-feed the full history
 
-```ts
-// DON'T do this against acpx-backed models.
-streamText({
-  model: provider.languageModel(),
-  messages: history,   // full UIMessage[] including prior assistant turns
-})
+The provider has a `fresh` vs `continuation` mode that affects how it converts `messages` into the text it sends the agent:
+
+- **First call by a given `AcpxProvider` instance for a `sessionKey`** (including the first call after a process restart that resumes a session) — `fresh` mode. All messages in the array are flattened into the prompt text sent to the agent. If the session was already resumed from disk via `session/load`, **the agent now sees prior turns twice** (once from disk, once from the re-fed history). One-time double bookkeeping for that turn — wasted tokens and confused context.
+- **Every subsequent call within the same provider instance** — `continuation` mode. The provider silently strips `messages` down to the latest `user` message before sending. No agent-side duplication, but the AI SDK still validates the full history end-to-end on the way in. Wasted CPU, no functional impact.
+
+### One historical hard failure
+
+Before [#39](https://github.com/DaniAkash/acpx/pull/39), assistant turns persisted from prior `streamText` calls contained `tool-<name>` parts whose `id` did not match the corresponding `tool-call.toolCallId`. When the AI SDK rehydrated those parts on the next call, its input validator threw:
+
+```
+Type validation failed for messages[N].parts[M].input (<tool>, id: "acpx-K"):
+Value: undefined.
+Error message: No tool schema found for tool part <tool>
 ```
 
-Two ways it fails:
+This was a hard crash on turn 2, not a quiet inefficiency. PR [#39](https://github.com/DaniAkash/acpx/pull/39) corrects the id mismatch so the persisted history no longer trips the validator. Once that lands and you upgrade, re-feeding history degrades to "wasteful but functional" rather than "broken".
 
-- **Double bookkeeping.** The agent receives every prior turn twice — once from `session/load`, once from the re-fed `history`. Wasted tokens, context-window pressure, and confusing duplication in the agent's view of the conversation.
-- **Validator crash on turn 2.** Prior assistant turns the integrator persisted contain `tool-<name>` parts that don't carry their tool schema when the AI SDK rehydrates them on the next call. The AI SDK input validator walks every prior part and throws `No tool schema found for tool part <name>`. This particular crash mode is masked by [#39](https://github.com/DaniAkash/acpx/pull/39) once it lands, but the double-bookkeeping problem remains.
+The recommended pattern — send only the new user message — avoids the double-bookkeeping case on resumed sessions, avoids the wasted CPU on continuation calls, and is the only pattern that survives a downgrade or sessionKey change without surprises.
 
 ### Cross-restart resume
 
