@@ -513,6 +513,38 @@ describe('status — usage_update', () => {
     })
   })
 
+  test('failed turn keeps contextWindow + cost AND adds errorCode + errorMessage on providerMetadata.acpx', () => {
+    const t = newTranslator()
+    feed(t, [
+      status({
+        tag: 'usage_update',
+        used: 500,
+        size: 4096,
+        cost: { amount: 0.05, currency: 'USD' },
+      }),
+    ])
+    const finishPart = t.finish({
+      result: {
+        status: 'failed',
+        error: { message: 'boom', code: 'rate' },
+      },
+    }) as Extract<LanguageModelV2StreamPart, { type: 'finish' }>
+    expect(finishPart.providerMetadata?.acpx).toEqual({
+      contextWindow: 4096,
+      cost: { amount: 0.05, currency: 'USD' },
+      errorCode: 'rate',
+      errorMessage: 'boom',
+    })
+  })
+
+  test('finish() omits providerMetadata entirely when no usage_update and not failed', () => {
+    const t = newTranslator()
+    const finishPart = t.finish({
+      result: { status: 'completed', stopReason: 'end_turn' },
+    }) as Extract<LanguageModelV2StreamPart, { type: 'finish' }>
+    expect(finishPart.providerMetadata).toBeUndefined()
+  })
+
   test('onUsageUpdate callback fires with the raw event', () => {
     const seen: Array<{ used?: number; size?: number }> = []
     const t = new EventTranslator({

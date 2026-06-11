@@ -252,4 +252,460 @@ describe('AcpxProvider — compact', () => {
     await provider.compact()
     expect(runtime.startTurnCalls.at(-1)?.text).toBe('/compact')
   })
+
+  test('matches /condense as a compact-equivalent name', async () => {
+    const runtime = new MockAcpRuntime({
+      turnScripts: [
+        {
+          events: [
+            acpEvent.availableCommands([
+              { name: '/condense', description: 'Condense', hasInput: false },
+            ]),
+          ],
+          result: acpResult.completed('end_turn'),
+        },
+        {
+          events: [],
+          result: acpResult.completed('end_turn'),
+        },
+      ],
+    })
+    const provider = createAcpxProvider({
+      agent: 'claude',
+      cwd: '/tmp/test',
+      sessionKey: 'cond-session',
+      runtime,
+    })
+
+    const { stream } = await provider.languageModel().doStream({
+      prompt: userPrompt as never,
+    })
+    const reader = stream.getReader()
+    while (true) {
+      const { done } = await reader.read()
+      if (done) break
+    }
+
+    await provider.compact()
+    expect(runtime.startTurnCalls.at(-1)?.text).toBe('/condense')
+  })
+
+  test('adds a leading slash when the advertised name has none', async () => {
+    const runtime = new MockAcpRuntime({
+      turnScripts: [
+        {
+          events: [
+            acpEvent.availableCommands([
+              { name: 'compact', description: 'Compact', hasInput: false },
+            ]),
+          ],
+          result: acpResult.completed('end_turn'),
+        },
+        {
+          events: [],
+          result: acpResult.completed('end_turn'),
+        },
+      ],
+    })
+    const provider = createAcpxProvider({
+      agent: 'claude',
+      cwd: '/tmp/test',
+      sessionKey: 'no-slash-session',
+      runtime,
+    })
+
+    const { stream } = await provider.languageModel().doStream({
+      prompt: userPrompt as never,
+    })
+    const reader = stream.getReader()
+    while (true) {
+      const { done } = await reader.read()
+      if (done) break
+    }
+
+    await provider.compact()
+    expect(runtime.startTurnCalls.at(-1)?.text).toBe('/compact')
+  })
+
+  test('throws when only unrelated commands are advertised', async () => {
+    const runtime = new MockAcpRuntime({
+      turnScripts: [
+        {
+          events: [
+            acpEvent.availableCommands([
+              { name: '/clear', description: 'Clear', hasInput: false },
+              { name: '/cost', description: 'Cost', hasInput: false },
+            ]),
+          ],
+          result: acpResult.completed('end_turn'),
+        },
+      ],
+    })
+    const provider = createAcpxProvider({
+      agent: 'claude',
+      cwd: '/tmp/test',
+      sessionKey: 'unrelated-session',
+      runtime,
+    })
+
+    const { stream } = await provider.languageModel().doStream({
+      prompt: userPrompt as never,
+    })
+    const reader = stream.getReader()
+    while (true) {
+      const { done } = await reader.read()
+      if (done) break
+    }
+
+    await expect(provider.compact()).rejects.toThrow(
+      /does not advertise a compact command/,
+    )
+  })
+})
+
+describe('AcpxProvider — multi-session isolation', () => {
+  test('getUsage and getAvailableCommands keep per-sessionKey state separate', async () => {
+    const runtime = new MockAcpRuntime({
+      turnScripts: [
+        {
+          events: [
+            acpEvent.availableCommands([{ name: '/clear', hasInput: false }]),
+            acpEvent.usage(100, 1000),
+          ],
+          result: acpResult.completed('end_turn'),
+        },
+        {
+          events: [
+            acpEvent.availableCommands([
+              { name: '/compact', hasInput: false },
+              { name: '/cost', hasInput: false },
+            ]),
+            acpEvent.usage(200, 2000),
+          ],
+          result: acpResult.completed('end_turn'),
+        },
+      ],
+    })
+    const provider = createAcpxProvider({
+      agent: 'claude',
+      cwd: '/tmp/test',
+      runtime,
+    })
+
+    // Drive a turn under sessionKey 'A'.
+    const streamA = await provider
+      .languageModel(undefined, {
+        sessionKey: 'A',
+      })
+      .doStream({ prompt: userPrompt as never })
+    const readerA = streamA.stream.getReader()
+    while (true) {
+      const { done } = await readerA.read()
+      if (done) break
+    }
+
+    // Drive a turn under sessionKey 'B'.
+    const streamB = await provider
+      .languageModel(undefined, {
+        sessionKey: 'B',
+      })
+      .doStream({ prompt: userPrompt as never })
+    const readerB = streamB.stream.getReader()
+    while (true) {
+      const { done } = await readerB.read()
+      if (done) break
+    }
+
+    // Usage state isolated.
+    expect(provider.getUsage('A')?.used).toBe(100)
+    expect(provider.getUsage('A')?.size).toBe(1000)
+    expect(provider.getUsage('B')?.used).toBe(200)
+    expect(provider.getUsage('B')?.size).toBe(2000)
+
+    // Commands state isolated.
+    expect(provider.getAvailableCommands('A').map((c) => c.name)).toEqual([
+      '/clear',
+    ])
+    expect(provider.getAvailableCommands('B').map((c) => c.name)).toEqual([
+      '/compact',
+      '/cost',
+    ])
+
+    // Reading an unknown sessionKey returns empty/undefined.
+    expect(provider.getUsage('does-not-exist')).toBeUndefined()
+    expect(provider.getAvailableCommands('does-not-exist')).toEqual([])
+  })
+})
+
+describe('AcpxProvider — default sessionKey resolution', () => {
+  test('getUsage and getAvailableCommands without args fall through to resolveSessionKey({})', async () => {
+    const runtime = new MockAcpRuntime({
+      turnScripts: [
+        {
+          events: [
+            acpEvent.availableCommands([{ name: '/compact', hasInput: false }]),
+            acpEvent.usage(42, 4096),
+          ],
+          result: acpResult.completed('end_turn'),
+        },
+      ],
+    })
+    const provider = createAcpxProvider({
+      agent: 'claude',
+      cwd: '/tmp/test',
+      sessionKey: 'default-session',
+      runtime,
+    })
+
+    const { stream } = await provider.languageModel().doStream({
+      prompt: userPrompt as never,
+    })
+    const reader = stream.getReader()
+    while (true) {
+      const { done } = await reader.read()
+      if (done) break
+    }
+
+    // No sessionKey arg → uses settings.sessionKey.
+    expect(provider.getUsage()?.used).toBe(42)
+    expect(provider.getAvailableCommands().map((c) => c.name)).toEqual([
+      '/compact',
+    ])
+  })
+
+  test('default sessionKey falls back to "<agent>::<cwd>" when settings.sessionKey is unset', async () => {
+    const runtime = new MockAcpRuntime({
+      turnScripts: [
+        {
+          events: [acpEvent.usage(7, 700)],
+          result: acpResult.completed('end_turn'),
+        },
+      ],
+    })
+    const provider = createAcpxProvider({
+      agent: 'claude',
+      cwd: '/tmp/fallback-cwd',
+      runtime,
+    })
+
+    const { stream } = await provider.languageModel().doStream({
+      prompt: userPrompt as never,
+    })
+    const reader = stream.getReader()
+    while (true) {
+      const { done } = await reader.read()
+      if (done) break
+    }
+
+    expect(provider.getUsage()?.used).toBe(7)
+    expect(provider.getUsage('claude::/tmp/fallback-cwd')?.used).toBe(7)
+  })
+})
+
+describe('AcpxProvider — EventEmitter contract', () => {
+  test('multiple listeners on the same channel all receive every event', async () => {
+    const runtime = new MockAcpRuntime({
+      turnScripts: [
+        {
+          events: [acpEvent.usage(1, 10), acpEvent.usage(2, 10)],
+          result: acpResult.completed('end_turn'),
+        },
+      ],
+    })
+    const provider = createAcpxProvider({
+      agent: 'claude',
+      cwd: '/tmp/test',
+      sessionKey: 's',
+      runtime,
+    })
+
+    const a: number[] = []
+    const b: number[] = []
+    provider.events.on('usage', (s) => a.push(s.used ?? -1))
+    provider.events.on('usage', (s) => b.push(s.used ?? -1))
+
+    const { stream } = await provider.languageModel().doStream({
+      prompt: userPrompt as never,
+    })
+    const reader = stream.getReader()
+    while (true) {
+      const { done } = await reader.read()
+      if (done) break
+    }
+
+    expect(a).toEqual([1, 2])
+    expect(b).toEqual([1, 2])
+  })
+
+  test('events.off removes a listener so subsequent events do not reach it', async () => {
+    const runtime = new MockAcpRuntime({
+      turnScripts: [
+        {
+          events: [acpEvent.usage(1, 10)],
+          result: acpResult.completed('end_turn'),
+        },
+        {
+          events: [acpEvent.usage(2, 10)],
+          result: acpResult.completed('end_turn'),
+        },
+      ],
+    })
+    const provider = createAcpxProvider({
+      agent: 'claude',
+      cwd: '/tmp/test',
+      sessionKey: 's',
+      runtime,
+    })
+
+    const seen: number[] = []
+    const listener = (s: { used?: number }) => seen.push(s.used ?? -1)
+    provider.events.on('usage', listener)
+
+    // First turn — listener fires.
+    const s1 = await provider.languageModel().doStream({
+      prompt: userPrompt as never,
+    })
+    const r1 = s1.stream.getReader()
+    while (true) {
+      const { done } = await r1.read()
+      if (done) break
+    }
+
+    // Detach and run a second turn — listener does not fire again.
+    provider.events.off('usage', listener)
+    const s2 = await provider.languageModel().doStream({
+      prompt: userPrompt as never,
+    })
+    const r2 = s2.stream.getReader()
+    while (true) {
+      const { done } = await r2.read()
+      if (done) break
+    }
+
+    expect(seen).toEqual([1])
+  })
+
+  test('availableCommands event fires with empty list when the agent advertises zero commands', async () => {
+    const runtime = new MockAcpRuntime({
+      turnScripts: [
+        {
+          events: [acpEvent.availableCommands([])],
+          result: acpResult.completed('end_turn'),
+        },
+      ],
+    })
+    const provider = createAcpxProvider({
+      agent: 'claude',
+      cwd: '/tmp/test',
+      sessionKey: 's',
+      runtime,
+    })
+
+    const events: Array<{ commands: unknown[] }> = []
+    provider.events.on('availableCommands', (e) => events.push(e))
+
+    const { stream } = await provider.languageModel().doStream({
+      prompt: userPrompt as never,
+    })
+    const reader = stream.getReader()
+    while (true) {
+      const { done } = await reader.read()
+      if (done) break
+    }
+
+    expect(events).toHaveLength(1)
+    expect(events[0]?.commands).toEqual([])
+    expect(provider.getAvailableCommands('s')).toEqual([])
+  })
+
+  test('multiple usage_update events in one turn fire the listener in order', async () => {
+    const runtime = new MockAcpRuntime({
+      turnScripts: [
+        {
+          events: [
+            acpEvent.usage(10, 100),
+            acpEvent.usage(20, 100),
+            acpEvent.usage(30, 100),
+          ],
+          result: acpResult.completed('end_turn'),
+        },
+      ],
+    })
+    const provider = createAcpxProvider({
+      agent: 'claude',
+      cwd: '/tmp/test',
+      sessionKey: 's',
+      runtime,
+    })
+
+    const used: number[] = []
+    provider.events.on('usage', (s) => used.push(s.used ?? -1))
+
+    const { stream } = await provider.languageModel().doStream({
+      prompt: userPrompt as never,
+    })
+    const reader = stream.getReader()
+    while (true) {
+      const { done } = await reader.read()
+      if (done) break
+    }
+
+    expect(used).toEqual([10, 20, 30])
+    // Latest snapshot wins on the sync getter.
+    expect(provider.getUsage('s')?.used).toBe(30)
+  })
+})
+
+describe('AcpxProvider — runSlashCommand option pass-through', () => {
+  test('timeoutMs and signal thread through to runtime.startTurn', async () => {
+    const runtime = new MockAcpRuntime({
+      turnScripts: [
+        {
+          events: [],
+          result: acpResult.completed('end_turn'),
+        },
+      ],
+    })
+    const provider = createAcpxProvider({
+      agent: 'claude',
+      cwd: '/tmp/test',
+      sessionKey: 's',
+      runtime,
+    })
+
+    const controller = new AbortController()
+    await provider.runSlashCommand({
+      name: '/status',
+      timeoutMs: 12_345,
+      signal: controller.signal,
+    })
+
+    const call = runtime.startTurnCalls.at(-1)
+    expect(call?.text).toBe('/status')
+    expect(call?.timeoutMs).toBe(12_345)
+    expect(call?.signal).toBe(controller.signal)
+  })
+
+  test('agent override threads through to ensureHandle and startTurn', async () => {
+    const runtime = new MockAcpRuntime({
+      turnScripts: [
+        {
+          events: [],
+          result: acpResult.completed('end_turn'),
+        },
+      ],
+    })
+    const provider = createAcpxProvider({
+      agent: 'claude',
+      cwd: '/tmp/test',
+      sessionKey: 's',
+      runtime,
+    })
+
+    await provider.runSlashCommand({ name: '/status', agent: 'codex' })
+
+    // ensureSession was called with the override agent.
+    const ensure = runtime.ensureSessionCalls.at(-1)
+    expect(ensure?.agent).toBe('codex')
+  })
 })
