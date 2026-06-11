@@ -142,7 +142,7 @@ describe('flush()', () => {
   test('closes any open tool-input block', () => {
     const t = newTranslator()
     feed(t, [tool({ toolCallId: 't1', title: 'greet', text: 'a' })])
-    expect(t.flush()).toEqual([{ type: 'tool-input-end', id: 'id-1' }])
+    expect(t.flush()).toEqual([{ type: 'tool-input-end', id: 't1' }])
   })
 })
 
@@ -158,8 +158,8 @@ describe('tool_call — pending and in_progress', () => {
       }),
     ])
     expect(parts).toEqual([
-      { type: 'tool-input-start', id: 'id-1', toolName: 'greet' },
-      { type: 'tool-input-delta', id: 'id-1', delta: '{"x":1}' },
+      { type: 'tool-input-start', id: 't1', toolName: 'greet' },
+      { type: 'tool-input-delta', id: 't1', delta: '{"x":1}' },
     ])
   })
 
@@ -169,7 +169,7 @@ describe('tool_call — pending and in_progress', () => {
     const start = parts.find((p) => p.type === 'tool-input-start')
     expect(start).toEqual({
       type: 'tool-input-start',
-      id: 'id-1',
+      id: 't1',
       toolName: 'tool',
     })
   })
@@ -351,6 +351,98 @@ describe('tool_call — completed and failed', () => {
     ])
     const start = parts.find((p) => p.type === 'tool-input-start')
     expect(start).toBeDefined()
+  })
+})
+
+describe('tool_call — id correlation invariant (regression for #37)', () => {
+  test('tool-input-* parts share their id with the trailing tool-call/tool-result toolCallId', () => {
+    const t = newTranslator()
+    const parts = feed(t, [
+      tool({
+        toolCallId: 'call_real_xxx',
+        title: 'mcp.browseros.navigate',
+        text: '{"url":"https://example.com"}',
+        status: 'in_progress',
+      }),
+      tool({
+        toolCallId: 'call_real_xxx',
+        title: 'mcp.browseros.navigate',
+        text: '{"url":"https://example.com"}',
+        status: 'completed',
+      }),
+    ])
+
+    const inputStart = parts.find((p) => p.type === 'tool-input-start')
+    const inputDeltas = parts.filter((p) => p.type === 'tool-input-delta')
+    const inputEnd = parts.find((p) => p.type === 'tool-input-end')
+    const toolCall = parts.find((p) => p.type === 'tool-call')
+    const toolResult = parts.find((p) => p.type === 'tool-result')
+
+    expect(inputStart).toBeDefined()
+    expect(inputEnd).toBeDefined()
+    expect(toolCall).toBeDefined()
+    expect(toolResult).toBeDefined()
+    expect(inputDeltas.length).toBeGreaterThan(0)
+
+    const callId = (toolCall as { toolCallId: string }).toolCallId
+    expect(callId).toBe('call_real_xxx')
+    expect((inputStart as { id: string }).id).toBe(callId)
+    for (const delta of inputDeltas) {
+      expect((delta as { id: string }).id).toBe(callId)
+    }
+    expect((inputEnd as { id: string }).id).toBe(callId)
+    expect((toolResult as { toolCallId: string }).toolCallId).toBe(callId)
+  })
+
+  test('multiple tool calls each correlate their own input id with their toolCallId', () => {
+    const t = newTranslator()
+    const parts = feed(t, [
+      tool({
+        toolCallId: 'call_a',
+        title: 'first',
+        text: '{"x":1}',
+        status: 'completed',
+      }),
+      tool({
+        toolCallId: 'call_b',
+        title: 'second',
+        text: '{"y":2}',
+        status: 'completed',
+      }),
+    ])
+
+    const inputStarts = parts.filter(
+      (p) => p.type === 'tool-input-start',
+    ) as Array<{
+      id: string
+      toolName: string
+    }>
+    const toolCalls = parts.filter((p) => p.type === 'tool-call') as Array<{
+      toolCallId: string
+      toolName: string
+    }>
+
+    expect(inputStarts).toHaveLength(2)
+    expect(toolCalls).toHaveLength(2)
+    expect(inputStarts.map((p) => p.id).sort()).toEqual(['call_a', 'call_b'])
+    expect(toolCalls.map((p) => p.toolCallId).sort()).toEqual([
+      'call_a',
+      'call_b',
+    ])
+
+    // Every tool-input-* part across the stream carries an id that
+    // matches some tool-call's toolCallId. This pins the invariant
+    // across parallel calls without needing per-call ordering.
+    const toolCallIds = new Set(toolCalls.map((p) => p.toolCallId))
+    for (const p of parts) {
+      if (
+        p.type === 'tool-input-start' ||
+        p.type === 'tool-input-delta' ||
+        p.type === 'tool-input-end'
+      ) {
+        expect(toolCallIds.has((p as { id: string }).id)).toBe(true)
+      }
+    }
   })
 })
 

@@ -183,11 +183,16 @@ export class EventTranslator {
 
     let state = this.toolCalls.get(callId)
     if (!state) {
-      const blockId = this.generateId()
       const toolName = event.title?.trim() || 'tool'
-      state = { blockId, toolName, emittedText: '', inputClosed: false }
+      // Use the upstream callId as the input-block id so the
+      // tool-input-start/-delta/-end stream carries the same id as
+      // the terminal tool-call / tool-result pair. The AI SDK UI
+      // message reducer correlates parts by id; mismatched ids leave
+      // the input-streaming part stuck and create a duplicate
+      // dynamic-tool part downstream.
+      state = { blockId: callId, toolName, emittedText: '', inputClosed: false }
       this.toolCalls.set(callId, state)
-      parts.push({ type: 'tool-input-start', id: blockId, toolName })
+      parts.push({ type: 'tool-input-start', id: callId, toolName })
     }
 
     parts.push(...this.appendToolText(state, event.text))
