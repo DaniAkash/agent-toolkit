@@ -569,10 +569,14 @@ agent (Claude Code, Codex) intercepts on its side. The provider's
 `available_commands_update` event and sends it as a regular turn:
 
 ```ts
-// Wait for the agent to advertise its commands. Typically arrives
-// during the first turn or right after `prepare()`.
-await provider.prepare()
-// …or run a no-op turn first to surface the commands list
+// Drive one real turn so available_commands_update flows through.
+// `prepare()` alone is not enough — the event only reaches the
+// provider's in-memory command map during an active doStream / doGenerate
+// turn. See the note below.
+await streamText({
+  model: provider.languageModel(),
+  prompt: 'hi',
+})
 
 if (provider.getAvailableCommands().some((c) => c.name.includes('compact'))) {
   await provider.compact()
@@ -585,6 +589,14 @@ lower-level `runSlashCommand`:
 ```ts
 await provider.runSlashCommand({ name: '/clear' })
 ```
+
+> **Note on `prepare()`:** `prepare()` spawns the ACP session but does
+> **not** populate `provider.getAvailableCommands()`. The
+> `available_commands_update` event only flows through the
+> `EventTranslator` callback during an active turn (`doStream` /
+> `doGenerate`). Subscribe to `provider.events.on('availableCommands', …)`
+> *before* the first turn, or read from the in-memory map after at
+> least one turn has completed.
 
 ### Where the per-turn usage lands
 
