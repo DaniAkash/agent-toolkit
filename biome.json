@@ -151,6 +151,32 @@
       }
     },
     {
+      "includes": ["**/agent-mcp-manager/src/_internal/paths.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noProcessEnv": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["**/agent-mcp-manager/src/manager.ts"],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noExcessiveCognitiveComplexity": {
+              "level": "error",
+              "options": { "maxAllowedComplexity": 50 }
+            }
+          },
+          "nursery": {
+            "noExcessiveLinesPerFile": "off"
+          }
+        }
+      }
+    },
+    {
       "includes": ["**/acpx-ai-provider/src/convert-events.ts"],
       "linter": {
         "rules": {

@@ -79,6 +79,71 @@ const { textStream } = streamText({
 for await (const chunk of textStream) process.stdout.write(chunk)
 ```
 
+## Multi-turn chat: acpx owns the memory
+
+Set the right mental model up-front and you will save yourself an integration mistake. If you have built against stateless cloud LLMs (OpenAI, Anthropic direct, etc.) you have probably been re-feeding the full `UIMessage[]` history into `streamText` on every turn. That pattern is correct for those providers and unnecessary — and in one specific case, wrong — for acpx.
+
+**Invariant:** `acpx/runtime` owns the agent's conversation memory. Every persistent session lives at `<stateDir>/<sessionKey>/` and the runtime calls ACP's `session/load` on every `streamText` / `generateText` invocation. The agent sees the full prior turn history through that reload. The provider does not need you to re-send it.
+
+### Correct pattern
+
+```ts
+// First turn AND every continuation turn: send ONLY the new user
+// message. acpx loads the rest from <stateDir>/<sessionKey>/
+// transparently via session/load.
+const result = streamText({
+  model: provider.languageModel(),
+  messages: [{ role: 'user', content: newUserText }],
+  abortSignal,
+})
+```
+
+`messages` is always a single-entry array containing only the new user message, regardless of how many turns have happened in the session.
+
+The UI layer can still keep a growing `UIMessage[]` array for rendering the transcript. That display state is separate from the agent's memory.
+
+### What happens if you re-feed the full history
+
+The provider has a `fresh` vs `continuation` mode that affects how it converts `messages` into the text it sends the agent:
+
+- **First call by a given `AcpxProvider` instance for a `sessionKey`** (including the first call after a process restart that resumes a session) — `fresh` mode. All messages in the array are flattened into the prompt text sent to the agent. If the session was already resumed from disk via `session/load`, **the agent now sees prior turns twice** (once from disk, once from the re-fed history). One-time double bookkeeping for that turn — wasted tokens and confused context.
+- **Every subsequent call within the same provider instance** — `continuation` mode. The provider silently strips `messages` down to the latest `user` message before sending. No agent-side duplication, but the AI SDK still validates the full history end-to-end on the way in. Wasted CPU, no functional impact.
+
+Neither mode does anything useful with the re-fed assistant turns — the agent already has them via `session/load`. Sending only the new user message avoids both the one-time duplication on resumed sessions and the wasted CPU on continuation calls.
+
+> **Upgrading from `acpx-ai-provider@0.0.6` or earlier?** Those versions emitted `tool-input-*` parts whose `id` did not match the corresponding `tool-call.toolCallId`. The AI SDK input validator threw `No tool schema found for tool part <name>` on turn 2 when the integrator re-fed persisted history. Current versions correlate the ids correctly, so this specific crash mode no longer surfaces. The advice in this section stands regardless of version.
+
+### Cross-restart resume
+
+`sessionMode: 'persistent'` (the default) keeps the session record on disk between process restarts. To pick up a prior conversation after a restart, construct the provider with the same `sessionKey` (and same `stateDir` if you customised it). The first call goes through `session/load` on the underlying ACP agent and the conversation continues from where it left off:
+
+```ts
+const provider = createAcpxProvider({
+  agent: 'claude',
+  sessionKey: 'workspace/abc123',   // stable across process restarts
+  stateDir: '/var/myapp/acpx-state', // optional; defaults to ~/.acpx
+  sessionMode: 'persistent',         // default; explicit for clarity
+})
+
+// First call after restart picks up prior turns from disk.
+const result = streamText({
+  model: provider.languageModel(),
+  messages: [{ role: 'user', content: 'continue from where we left off' }],
+})
+```
+
+`resumeSessionId` is intentionally omitted in most setups. It exists for the rarer case of adopting an existing ACP backend session id (one created outside acpx) under acpx's management. For normal chat flows, do not pass it.
+
+### When to make a new provider vs reuse
+
+| Case | What to do |
+|---|---|
+| Same agent + same session, new user message | Reuse the provider. Send `messages: [{ role: 'user', content: newUserText }]`. |
+| Same agent + same session, model / effort / config change | Reuse the provider. Route the change via `provider.setConfigOption('model', newId)` instead of re-creating. |
+| Different agent or different `sessionKey` | Create a new provider with the new tuple. Optionally `provider.close()` the old one or let it age out. |
+
+The lesson: provider identity follows the `(agent, sessionKey)` tuple. Within a tuple, reuse the provider and send only new user input. Across tuples, make a new provider.
+
 ## Configuration
 
 ```ts
@@ -171,6 +236,8 @@ gh auth login
 ```
 
 ## Persistent sessions
+
+> **See also**: [Multi-turn chat: acpx owns the memory](#multi-turn-chat-acpx-owns-the-memory) for what to send as `messages` on continuation turns, and why re-feeding the AI SDK `UIMessage[]` history is unnecessary (and one-time wrong on resumed sessions).
 
 By default the provider keeps a session alive across calls so the agent
 preserves context. Each `languageModel()` instance for the same

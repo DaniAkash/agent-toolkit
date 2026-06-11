@@ -1,23 +1,6 @@
-# Third-Party Notices
+MIT License
 
-`agent-skills-manager` includes code derived from the following third-party projects.
-
-## skills (vercel-labs/skills)
-
-- Source: https://github.com/vercel-labs/skills
-- Version: 1.5.7
-- License: MIT
-- Files derived from this project (located under `src/_vendor/`):
-  - `agents.ts` — copied verbatim with import-path adjustments
-  - `sanitize.ts` — `sanitizeName` extracted from upstream `src/installer.ts`
-  - `frontmatter.ts` — copied verbatim with import-path adjustments
-  - `types.ts` — `AgentType` union and `AgentConfig` interface extracted
-    from upstream `src/types.ts`
-
-### MIT License
-
-```
-Copyright (c) Vercel Labs
+Copyright (c) 2026 Dani Akash
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -36,4 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-```

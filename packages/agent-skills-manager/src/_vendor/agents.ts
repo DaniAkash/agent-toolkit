@@ -1,4 +1,4 @@
-// Vendored from vercel-labs/skills@1.5.6 src/agents.ts. See THIRD_PARTY_NOTICES.md
+// Vendored from vercel-labs/skills@1.5.7 src/agents.ts. See THIRD_PARTY_NOTICES.md
 // for upstream attribution. Imports updated for our package layout.
 //
 // Local edit: explicit return + parameter types on getOpenClawGlobalSkillsDir

@@ -1,23 +1,27 @@
 # Third-Party Notices
 
-`agent-skills-manager` includes code derived from the following third-party projects.
+`agent-mcp-manager` includes data derived from the following third-party
+projects.
 
-## skills (vercel-labs/skills)
+## mcp-gateway (docker/mcp-gateway)
 
-- Source: https://github.com/vercel-labs/skills
-- Version: 1.5.7
+- Source: https://github.com/docker/mcp-gateway
 - License: MIT
 - Files derived from this project (located under `src/_vendor/`):
-  - `agents.ts` — copied verbatim with import-path adjustments
-  - `sanitize.ts` — `sanitizeName` extracted from upstream `src/installer.ts`
-  - `frontmatter.ts` — copied verbatim with import-path adjustments
-  - `types.ts` — `AgentType` union and `AgentConfig` interface extracted
-    from upstream `src/types.ts`
+  - `catalog.ts` — the v0.1 agent catalog (per-OS config paths,
+    install-check heuristics, emitter selection) is hand-derived from
+    upstream `pkg/client/config.yml`. Specifically the entries for
+    `claude-code`, `claude-desktop`, `cursor`, `vscode`, `gemini`,
+    `codex`, and `zed`.
+
+No source code from `mcp-gateway` is incorporated; only the catalog
+shape (paths and config-file conventions). Emitter implementations are
+TypeScript-native and do not depend on `yq` or any Go code.
 
 ### MIT License
 
 ```
-Copyright (c) Vercel Labs
+Copyright (c) Docker, Inc.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -34,6 +38,6 @@ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
 ```
