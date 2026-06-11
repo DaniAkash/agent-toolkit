@@ -341,6 +341,50 @@ describe('tool_call — completed and failed', () => {
     ])
   })
 
+  test('streaming in_progress → completed keeps the same toolCallId on every tool-input-* part', () => {
+    // Realistic flow: the agent sends one in_progress event with a
+    // partial input, then a terminal completed event with the full
+    // input. Pins the invariant via filter+compare rather than a
+    // literal shape match, so it survives future part-shape evolution
+    // without losing regression value.
+    const t = newTranslator()
+    const parts = feed(t, [
+      tool({
+        toolCallId: 'call_real_xxx',
+        title: 'mcp.browseros.navigate',
+        text: '{"url":"https://exa',
+        status: 'in_progress',
+      }),
+      tool({
+        toolCallId: 'call_real_xxx',
+        title: 'mcp.browseros.navigate',
+        text: '{"url":"https://example.com"}',
+        status: 'completed',
+      }),
+    ])
+
+    const inputStart = parts.find((p) => p.type === 'tool-input-start')
+    const inputDeltas = parts.filter((p) => p.type === 'tool-input-delta')
+    const inputEnd = parts.find((p) => p.type === 'tool-input-end')
+    const toolCall = parts.find((p) => p.type === 'tool-call')
+    const toolResult = parts.find((p) => p.type === 'tool-result')
+
+    expect(inputStart).toBeDefined()
+    expect(inputEnd).toBeDefined()
+    expect(toolCall).toBeDefined()
+    expect(toolResult).toBeDefined()
+    expect(inputDeltas.length).toBeGreaterThan(0)
+
+    const callId = (toolCall as { toolCallId: string }).toolCallId
+    expect(callId).toBe('call_real_xxx')
+    expect((inputStart as { id: string }).id).toBe(callId)
+    for (const delta of inputDeltas) {
+      expect((delta as { id: string }).id).toBe(callId)
+    }
+    expect((inputEnd as { id: string }).id).toBe(callId)
+    expect((toolResult as { toolCallId: string }).toolCallId).toBe(callId)
+  })
+
   test('failed emits the same parts but with isError on tool-result', () => {
     const t = newTranslator()
     const parts = feed(t, [
