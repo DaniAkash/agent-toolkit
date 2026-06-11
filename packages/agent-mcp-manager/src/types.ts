@@ -105,10 +105,14 @@ export interface UnlinkServerResult {
   serverName: string
   agent: AgentId
   configPath: string
-  /** False if no entry was present or the entry was foreign/unmanaged. */
+  /**
+   * True when the entry was present on disk and the manifest, and was
+   * removed. False when there was nothing on disk to remove (no-op).
+   * Note: when the entry exists on disk but isn't recorded in the
+   * manifest, `unlink()` throws `ForeignEntryError` instead of
+   * returning a result.
+   */
   removed: boolean
-  /** True when `removed === false` because the entry isn't in the manifest. */
-  unmanaged?: boolean
 }
 
 export interface RemoveServerOptions {

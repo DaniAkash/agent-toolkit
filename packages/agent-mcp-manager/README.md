@@ -56,7 +56,9 @@ Two layers, clear split of responsibility:
 
 The manifest is authoritative for **intent and metadata**; the on-disk
 config files are authoritative for **current state**. `rescan()`
-cross-checks the two and flags drift / orphan / unmanaged entries.
+cross-checks the two and reports `verified` / `broken` / `unmanaged`
+entries. Drift detection (deep-compare manifest spec vs on-disk entry)
+is planned for v0.2.
 
 ## Quick start
 
@@ -65,6 +67,33 @@ import { createMcpManager, detectInstalledAgents } from 'agent-mcp-manager'
 
 const mgr = createMcpManager()
 
+// stdio transport — broadest agent compatibility, including Codex.
+await mgr.add({
+  name: 'filesystem',
+  spec: {
+    transport: 'stdio',
+    command: 'npx',
+    args: ['-y', '@modelcontextprotocol/server-filesystem', process.cwd()],
+  },
+})
+
+const agents = await detectInstalledAgents()
+for (const a of agents.filter((a) => a.installed)) {
+  await mgr.link({ serverName: 'filesystem', agent: a.id })
+}
+
+// Later, full teardown across every linked agent:
+await mgr.remove({ serverName: 'filesystem' })
+```
+
+### Registering a remote (http / sse) MCP server
+
+The `http` and `sse` transports are supported by Claude Code, Claude
+Desktop, Cursor, VS Code, Gemini CLI, and Zed — but **not Codex**
+(Codex's MCP config is stdio-only upstream, and the TOML emitter rejects
+non-stdio specs). Filter your fan-out accordingly:
+
+```ts
 await mgr.add({
   name: 'github',
   spec: {
@@ -75,12 +104,10 @@ await mgr.add({
 })
 
 const agents = await detectInstalledAgents()
-for (const a of agents.filter((a) => a.installed)) {
+const transportSupported = (id: string) => id !== 'codex'
+for (const a of agents.filter((a) => a.installed && transportSupported(a.id))) {
   await mgr.link({ serverName: 'github', agent: a.id })
 }
-
-// Later, full teardown across every linked agent:
-await mgr.remove({ serverName: 'github' })
 ```
 
 ## Supported agents (v0.1)
