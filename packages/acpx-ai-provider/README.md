@@ -109,19 +109,9 @@ The provider has a `fresh` vs `continuation` mode that affects how it converts `
 - **First call by a given `AcpxProvider` instance for a `sessionKey`** (including the first call after a process restart that resumes a session) — `fresh` mode. All messages in the array are flattened into the prompt text sent to the agent. If the session was already resumed from disk via `session/load`, **the agent now sees prior turns twice** (once from disk, once from the re-fed history). One-time double bookkeeping for that turn — wasted tokens and confused context.
 - **Every subsequent call within the same provider instance** — `continuation` mode. The provider silently strips `messages` down to the latest `user` message before sending. No agent-side duplication, but the AI SDK still validates the full history end-to-end on the way in. Wasted CPU, no functional impact.
 
-### One historical hard failure
+Neither mode does anything useful with the re-fed assistant turns — the agent already has them via `session/load`. Sending only the new user message avoids both the one-time duplication on resumed sessions and the wasted CPU on continuation calls.
 
-Before [#39](https://github.com/DaniAkash/acpx/pull/39), assistant turns persisted from prior `streamText` calls contained `tool-<name>` parts whose `id` did not match the corresponding `tool-call.toolCallId`. When the AI SDK rehydrated those parts on the next call, its input validator threw:
-
-```
-Type validation failed for messages[N].parts[M].input (<tool>, id: "acpx-K"):
-Value: undefined.
-Error message: No tool schema found for tool part <tool>
-```
-
-This was a hard crash on turn 2, not a quiet inefficiency. PR [#39](https://github.com/DaniAkash/acpx/pull/39) corrects the id mismatch so the persisted history no longer trips the validator. Once that lands and you upgrade, re-feeding history degrades to "wasteful but functional" rather than "broken".
-
-The recommended pattern — send only the new user message — avoids the double-bookkeeping case on resumed sessions, avoids the wasted CPU on continuation calls, and is the only pattern that survives a downgrade or sessionKey change without surprises.
+> **Upgrading from `acpx-ai-provider@0.0.6` or earlier?** Those versions emitted `tool-input-*` parts whose `id` did not match the corresponding `tool-call.toolCallId`. The AI SDK input validator threw `No tool schema found for tool part <name>` on turn 2 when the integrator re-fed persisted history. Current versions correlate the ids correctly, so this specific crash mode no longer surfaces. The advice in this section stands regardless of version.
 
 ### Cross-restart resume
 
@@ -247,7 +237,7 @@ gh auth login
 
 ## Persistent sessions
 
-> **See also**: [Multi-turn chat: acpx owns the memory](#multi-turn-chat-acpx-owns-the-memory) for what to send as `messages` on continuation turns, and why you must not re-feed the AI SDK `UIMessage[]` history.
+> **See also**: [Multi-turn chat: acpx owns the memory](#multi-turn-chat-acpx-owns-the-memory) for what to send as `messages` on continuation turns, and why re-feeding the AI SDK `UIMessage[]` history is unnecessary (and one-time wrong on resumed sessions).
 
 By default the provider keeps a session alive across calls so the agent
 preserves context. Each `languageModel()` instance for the same
