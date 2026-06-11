@@ -4,13 +4,11 @@ import * as path from 'node:path'
 import { McpManagerError } from '../errors.ts'
 import type { ServerManifest } from '../types.ts'
 
-const EMPTY_MANIFEST: ServerManifest = { version: 1, servers: {} }
-
 export function emptyManifest(): ServerManifest {
   return { version: 1, servers: {} }
 }
 
-export function manifestPath(workspaceDir: string): string {
+function manifestPath(workspaceDir: string): string {
   return path.join(workspaceDir, 'manifest.json')
 }
 
@@ -68,5 +66,3 @@ export async function writeManifest(
   await fsp.writeFile(tmp, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
   await fsp.rename(tmp, file)
 }
-
-export { EMPTY_MANIFEST }

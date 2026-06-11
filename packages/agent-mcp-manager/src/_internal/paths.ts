@@ -7,7 +7,7 @@ import * as fsp from 'node:fs/promises'
  */
 const ENV_VAR_RE = /\$([A-Za-z_][A-Za-z0-9_]*)/g
 
-export function expandPath(p: string): string | null {
+function expandPath(p: string): string | null {
   let missing = false
   const out = p.replace(ENV_VAR_RE, (_, name: string) => {
     const value = process.env[name]
@@ -29,7 +29,7 @@ export function expandPaths(paths: string[]): string[] {
   return out
 }
 
-export async function pathExists(p: string): Promise<boolean> {
+async function pathExists(p: string): Promise<boolean> {
   try {
     await fsp.stat(p)
     return true
