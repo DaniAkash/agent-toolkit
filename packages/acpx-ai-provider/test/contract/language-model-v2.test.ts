@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import type { LanguageModelV2 } from '@ai-sdk/provider'
+import { MockAcpRuntime } from 'acpx-test-helpers'
 import { type AcpxLanguageModel, createAcpxProvider } from '../../src/index.ts'
-import { MockAcpRuntime } from '../helpers/mock-acp-runtime.ts'
 
 // Compile-time conformance check. If AI SDK ever ships a breaking change
 // to LanguageModelV2 that AcpxLanguageModel no longer satisfies, this

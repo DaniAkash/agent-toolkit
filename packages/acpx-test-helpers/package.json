@@ -1,0 +1,31 @@
+{
+  "name": "acpx-test-helpers",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Internal test helpers for acpx packages: MockAcpRuntime + ACP event/result builders + stream conversion utilities.",
+  "license": "MIT",
+  "author": "Dani Akash",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    }
+  },
+  "sideEffects": false,
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "acpx": ">=0.8.0",
+    "@ai-sdk/provider-utils": ">=4.0.0"
+  },
+  "devDependencies": {
+    "@ai-sdk/provider-utils": "5.0.0-beta.30",
+    "acpx": "^0.8.0",
+    "typescript": "^6.0.3"
+  }
+}

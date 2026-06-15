@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import type { AcpRuntime } from 'acpx/runtime'
+import { MockAcpRuntime } from 'acpx-test-helpers'
 import { createAcpxProvider } from '../../src/provider.ts'
-import { MockAcpRuntime } from '../helpers/mock-acp-runtime.ts'
 
 describe('AcpxProvider — getModels', () => {
   test('returns the models field from runtime status', async () => {
