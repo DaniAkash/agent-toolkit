@@ -26,7 +26,7 @@ describe('generateText — text-only', () => {
     expect(finishReason).toBe('stop')
   })
 
-  test('exposes accumulated cachedInputTokens from a usage_update', async () => {
+  test('exposes accumulated inputTokenDetails.cacheReadTokens from a usage_update', async () => {
     const runtime = new MockAcpRuntime({
       turnScripts: [
         {

@@ -52,10 +52,10 @@
     "ai": ">=7.0.0-beta.0"
   },
   "devDependencies": {
-    "@ai-sdk/provider": "^4.0.0-beta.14",
-    "@ai-sdk/provider-utils": "^5.0.0-beta.30",
+    "@ai-sdk/provider": "4.0.0-beta.14",
+    "@ai-sdk/provider-utils": "5.0.0-beta.30",
     "acpx": "^0.8.0",
-    "ai": "^7.0.0-beta.116",
+    "ai": "7.0.0-beta.116",
     "bunup": "^0.16.31",
     "typescript": "^6.0.3",
     "zod": "^4.4.3"

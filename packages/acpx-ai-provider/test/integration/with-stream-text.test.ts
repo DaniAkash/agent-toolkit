@@ -43,7 +43,7 @@ describe('streamText — text-only turn', () => {
     expect(await result.finishReason).toBe('stop')
   })
 
-  test('usage resolves with cachedInputTokens from the size field', async () => {
+  test('usage resolves with inputTokenDetails.cacheReadTokens from the size field', async () => {
     const runtime = new MockAcpRuntime({
       turnScripts: [
         {
@@ -137,7 +137,7 @@ describe('streamText — failure', () => {
   })
 })
 
-describe('streamText — stream shape', () => {
+describe('streamText — fullStream shape', () => {
   test('emits text-start / text-delta / text-end / finish-step / finish', async () => {
     const runtime = new MockAcpRuntime({
       turnScripts: [
@@ -155,7 +155,11 @@ describe('streamText — stream shape', () => {
       stopWhen: isStepCount(1),
     })
     const types: string[] = []
-    for await (const part of result.stream) types.push(part.type)
+    // ai@7.0.0-beta.116 still uses `fullStream`. The migration guide
+    // notes the rename to `stream` is coming, but it has only landed
+    // on canary so far (canary.156+). Switch to `result.stream` once
+    // the rename ships in a beta release.
+    for await (const part of result.fullStream) types.push(part.type)
     expect(types).toContain('text-start')
     expect(types).toContain('text-delta')
     expect(types).toContain('text-end')

@@ -320,7 +320,7 @@ const result = streamText({
   prompt: 'Refactor user.ts to use Result<T, E>',
 })
 
-for await (const part of result.stream) {
+for await (const part of result.fullStream) {
   if (part.type === 'reasoning-delta') {
     ui.appendThinking(part.delta) // streaming "💭…" bubble
   } else if (part.type === 'text-delta') {
