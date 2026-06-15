@@ -1,5 +1,5 @@
 import { commonTool } from '@ai-sdk/harness'
-import { z } from 'zod'
+import { z } from 'zod/v4'
 
 /**
  * Built-in tools exposed by ACP agents, declared with the standard harness

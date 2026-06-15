@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { z } from 'zod/v4'
 
 /**
  * Bridge coordinates for reattaching to a live runtime. Persisted by the

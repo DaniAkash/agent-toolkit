@@ -1,3 +1,9 @@
+export {
+  type AcpxBridgeMcpServer,
+  type AcpxBridgeStartMessage,
+  acpxBridgeMcpServerSchema,
+  acpxBridgeStartMessageSchema,
+} from './acpx-bridge-protocol.ts'
 export { ACPX_BUILTIN_TOOLS } from './acpx-builtin-tools.ts'
 export type { AcpxHarnessSettings } from './acpx-harness.ts'
 export { acpxHarness, createAcpxHarness } from './acpx-harness.ts'
