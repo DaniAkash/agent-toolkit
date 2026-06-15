@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { stepCountIs, streamText } from 'ai'
+import { isStepCount, streamText } from 'ai'
 import { createAcpxProvider } from '../../src/index.ts'
 import { acpEvent, acpResult } from '../helpers/acp-event-builders.ts'
 import { MockAcpRuntime } from '../helpers/mock-acp-runtime.ts'
@@ -19,7 +19,7 @@ describe('streamText — text-only turn', () => {
     const result = streamText({
       model: provider.languageModel(),
       prompt: 'say hi',
-      stopWhen: stepCountIs(1),
+      stopWhen: isStepCount(1),
     })
     expect(await result.text).toBe('hello')
   })
@@ -38,7 +38,7 @@ describe('streamText — text-only turn', () => {
     const result = streamText({
       model: provider.languageModel(),
       prompt: 'hi',
-      stopWhen: stepCountIs(1),
+      stopWhen: isStepCount(1),
     })
     expect(await result.finishReason).toBe('stop')
   })
@@ -57,10 +57,12 @@ describe('streamText — text-only turn', () => {
     const result = streamText({
       model: provider.languageModel(),
       prompt: 'hi',
-      stopWhen: stepCountIs(1),
+      stopWhen: isStepCount(1),
     })
     const usage = await result.usage
-    expect(usage.cachedInputTokens).toBe(4096)
+    // AI SDK v7 moved cachedInputTokens to inputTokenDetails.cacheReadTokens
+    // on the consumer-facing LanguageModelUsage.
+    expect(usage.inputTokenDetails.cacheReadTokens).toBe(4096)
   })
 
   test('textStream yields the same content', async () => {
@@ -77,7 +79,7 @@ describe('streamText — text-only turn', () => {
     const result = streamText({
       model: provider.languageModel(),
       prompt: 'hi',
-      stopWhen: stepCountIs(1),
+      stopWhen: isStepCount(1),
     })
     let acc = ''
     for await (const chunk of result.textStream) acc += chunk
@@ -107,7 +109,7 @@ describe('streamText — tool-call turn', () => {
     const result = streamText({
       model: provider.languageModel(),
       prompt: 'greet world',
-      stopWhen: stepCountIs(1),
+      stopWhen: isStepCount(1),
     })
     expect(await result.finishReason).toBe('tool-calls')
   })
@@ -128,14 +130,14 @@ describe('streamText — failure', () => {
     const result = streamText({
       model: provider.languageModel(),
       prompt: 'hi',
-      stopWhen: stepCountIs(1),
+      stopWhen: isStepCount(1),
       onError: () => {},
     })
     expect(await result.finishReason).toBe('error')
   })
 })
 
-describe('streamText — fullStream shape', () => {
+describe('streamText — stream shape', () => {
   test('emits text-start / text-delta / text-end / finish-step / finish', async () => {
     const runtime = new MockAcpRuntime({
       turnScripts: [
@@ -150,10 +152,10 @@ describe('streamText — fullStream shape', () => {
     const result = streamText({
       model: provider.languageModel(),
       prompt: 'hi',
-      stopWhen: stepCountIs(1),
+      stopWhen: isStepCount(1),
     })
     const types: string[] = []
-    for await (const part of result.fullStream) types.push(part.type)
+    for await (const part of result.stream) types.push(part.type)
     expect(types).toContain('text-start')
     expect(types).toContain('text-delta')
     expect(types).toContain('text-end')

@@ -32,7 +32,7 @@ import { mkdtemp, readFile, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { AcpPermissionDecision, AcpPermissionRequest } from 'acpx/runtime'
-import { generateText, stepCountIs } from 'ai'
+import { generateText, isStepCount } from 'ai'
 import { createAcpxProvider } from '../../src/index.ts'
 
 const REQUESTED = (process.env.SMOKE_AGENTS ?? '')
@@ -104,7 +104,7 @@ describe.skipIf(!shouldRun)(
         try {
           await generateText({
             model: provider.languageModel(),
-            stopWhen: stepCountIs(8),
+            stopWhen: isStepCount(8),
             prompt:
               `Create a file at the absolute path "${fileToCreate}" containing the literal text "hello from acp-probe". ` +
               `Use your file-write tool. If the write is denied, stop immediately and tell me it was denied — do not retry.`,
@@ -150,7 +150,7 @@ describe.skipIf(!shouldRun)(
         try {
           await generateText({
             model: provider.languageModel(),
-            stopWhen: stepCountIs(8),
+            stopWhen: isStepCount(8),
             prompt:
               `Create a file at the absolute path "${fileToCreate}" containing exactly the literal text "${expectedContent}" (no trailing newline, no quotes). ` +
               `Confirm when done.`,
@@ -187,7 +187,7 @@ describe.skipIf(!shouldRun)(
         try {
           await generateText({
             model: provider.languageModel(),
-            stopWhen: stepCountIs(8),
+            stopWhen: isStepCount(8),
             prompt: `Try to create a file at "${fileToCreate}" with content "fallthrough". If the write is denied, stop and report.`,
           })
         } finally {

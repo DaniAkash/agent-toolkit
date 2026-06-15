@@ -47,7 +47,7 @@
  */
 
 import { describe, expect, test } from 'bun:test'
-import { generateObject, generateText, stepCountIs, streamText } from 'ai'
+import { generateObject, generateText, isStepCount, streamText } from 'ai'
 import { z } from 'zod'
 import { createAcpxProvider } from '../../src/index.ts'
 
@@ -103,7 +103,7 @@ for (const agent of AGENTS) {
             model: provider.languageModel(),
             prompt:
               'Reply with exactly the lowercase word: ok\nDo not include any other words, punctuation, or formatting.',
-            stopWhen: stepCountIs(1),
+            stopWhen: isStepCount(1),
           })
           expect(text.toLowerCase()).toContain('ok')
           expect(['stop', 'tool-calls', 'unknown']).toContain(finishReason)
@@ -123,7 +123,7 @@ for (const agent of AGENTS) {
             model: provider.languageModel(),
             prompt:
               'Output the numbers 1, 2, 3, 4, and 5, each on its own line, with no other text.',
-            stopWhen: stepCountIs(1),
+            stopWhen: isStepCount(1),
           })
 
           let chunkCount = 0
@@ -156,14 +156,14 @@ for (const agent of AGENTS) {
             model,
             prompt:
               'Remember this: my favorite fruit is mangosteen. Acknowledge with exactly the word: noted',
-            stopWhen: stepCountIs(1),
+            stopWhen: isStepCount(1),
           })
 
           const { text } = await generateText({
             model,
             prompt:
               'What is my favorite fruit? Reply with only the fruit name in lowercase, no other words.',
-            stopWhen: stepCountIs(1),
+            stopWhen: isStepCount(1),
           })
 
           expect(text.toLowerCase()).toContain('mangosteen')
