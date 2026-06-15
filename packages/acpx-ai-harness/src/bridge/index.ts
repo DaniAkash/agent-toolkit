@@ -1,17 +1,14 @@
 import { runBridge } from '@ai-sdk/harness/bridge'
-import { acpxBridgeStartMessageSchema } from '../acpx-bridge-protocol.ts'
+import type { AcpxBridgeStartMessage } from '../acpx-bridge-protocol.ts'
+import { runAcpxTurn } from './run-turn.ts'
 
 /**
  * Entry point for the in-sandbox bridge process.
  *
  * Spawned by the host with `--workdir <path> --bridge-state-dir <path>` and
- * environment variables `BRIDGE_CHANNEL_TOKEN` / `BRIDGE_WS_PORT`. Boots a
- * WebSocket server (via @ai-sdk/harness/bridge) and services one prompt
- * turn per `start` frame from the host.
- *
- * The real turn driver lands on the next commit. For now `onStart` validates
- * the start frame and exits via the harness error path, so the build pipeline
- * is exercisable end-to-end without committing to acpx wiring yet.
+ * the environment variables `BRIDGE_CHANNEL_TOKEN` / `BRIDGE_WS_PORT` that
+ * `@ai-sdk/harness/bridge` reads internally. Boots a WebSocket server and
+ * services one prompt turn per `start` frame from the host.
  */
 
 function parseArgs(argv: ReadonlyArray<string>): {
@@ -43,38 +40,12 @@ const args = parseArgs(process.argv.slice(2))
 if (!args.workdir) emitFatal('Missing --workdir argument.')
 if (!args.bridgeStateDir) emitFatal('Missing --bridge-state-dir argument.')
 
-await runBridge({
+const workdir = args.workdir
+const bridgeStateDir = args.bridgeStateDir
+
+await runBridge<AcpxBridgeStartMessage>({
   bridgeType: 'acpx',
-  bridgeStateDir: args.bridgeStateDir!,
-  onStart: async (start, turn) => {
-    const parsed = acpxBridgeStartMessageSchema.parse(start)
-    turn.emit({ type: 'stream-start' })
-    turn.emit({
-      type: 'error',
-      error: {
-        message:
-          'acpx-ai-harness: bridge turn driver not implemented yet. ' +
-          `Received start for agent=${parsed.agent}, sessionKey=${parsed.sessionKey}.`,
-        code: 'not-implemented',
-      },
-    })
-    turn.emit({
-      type: 'finish',
-      finishReason: { unified: 'error', raw: 'not-implemented' },
-      totalUsage: {
-        inputTokens: {
-          total: undefined,
-          noCache: undefined,
-          cacheRead: undefined,
-          cacheWrite: undefined,
-        },
-        outputTokens: {
-          total: undefined,
-          text: undefined,
-          reasoning: undefined,
-        },
-      },
-    })
-  },
+  bridgeStateDir,
+  onStart: (start, turn) => runAcpxTurn(start, turn, { workdir }),
   onDetach: () => ({}),
 })
