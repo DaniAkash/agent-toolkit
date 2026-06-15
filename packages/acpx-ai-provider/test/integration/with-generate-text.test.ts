@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { generateText, stepCountIs } from 'ai'
+import { generateText, isStepCount } from 'ai'
 import { AcpxError } from '../../src/errors.ts'
 import { createAcpxProvider } from '../../src/index.ts'
 import { acpEvent, acpResult } from '../helpers/acp-event-builders.ts'
@@ -20,13 +20,13 @@ describe('generateText — text-only', () => {
     const { text, finishReason } = await generateText({
       model: provider.languageModel(),
       prompt: 'say hi',
-      stopWhen: stepCountIs(1),
+      stopWhen: isStepCount(1),
     })
     expect(text).toBe('hello')
     expect(finishReason).toBe('stop')
   })
 
-  test('exposes accumulated cachedInputTokens from a usage_update', async () => {
+  test('exposes accumulated inputTokenDetails.cacheReadTokens from a usage_update', async () => {
     const runtime = new MockAcpRuntime({
       turnScripts: [
         {
@@ -40,9 +40,13 @@ describe('generateText — text-only', () => {
     const { usage } = await generateText({
       model: provider.languageModel(),
       prompt: 'hi',
-      stopWhen: stepCountIs(1),
+      stopWhen: isStepCount(1),
     })
-    expect(usage.cachedInputTokens).toBe(1024)
+    // AI SDK v7 moved cachedInputTokens to inputTokenDetails.cacheReadTokens
+    // on the consumer-facing LanguageModelUsage. The provider still emits
+    // cachedInputTokens at the top level of the underlying V2Usage, and the
+    // SDK maps it through.
+    expect(usage.inputTokenDetails.cacheReadTokens).toBe(1024)
   })
 
   test('reasoning content is preserved alongside text', async () => {
@@ -59,7 +63,7 @@ describe('generateText — text-only', () => {
     const { text, content } = await generateText({
       model: provider.languageModel(),
       prompt: 'hi',
-      stopWhen: stepCountIs(1),
+      stopWhen: isStepCount(1),
     })
     expect(text).toBe('done')
     expect(content.some((c) => c.type === 'reasoning')).toBe(true)
@@ -88,7 +92,7 @@ describe('generateText — tool-call', () => {
     const { toolCalls, toolResults, finishReason } = await generateText({
       model: provider.languageModel(),
       prompt: 'greet',
-      stopWhen: stepCountIs(1),
+      stopWhen: isStepCount(1),
     })
     expect(finishReason).toBe('tool-calls')
     expect(toolCalls).toHaveLength(1)
@@ -112,7 +116,7 @@ describe('generateText — failure', () => {
     const promise = generateText({
       model: provider.languageModel(),
       prompt: 'hi',
-      stopWhen: stepCountIs(1),
+      stopWhen: isStepCount(1),
     })
     await expect(promise).rejects.toBeInstanceOf(AcpxError)
     await expect(promise).rejects.toMatchObject({

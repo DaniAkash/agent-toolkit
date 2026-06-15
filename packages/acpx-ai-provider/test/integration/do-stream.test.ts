@@ -211,8 +211,8 @@ describe('doStream — usage and finish', () => {
     const parts = await streamParts(runtime)
 
     // The new leading error part — the whole point of issue #32: a
-    // consumer iterating fullStream now gets diagnostic data instead
-    // of a silent finishReason: 'error'.
+    // consumer iterating the AI SDK stream now gets diagnostic data
+    // instead of a silent finishReason: 'error'.
     const errorIdx = parts.findIndex((p) => p.type === 'error')
     expect(errorIdx).toBeGreaterThanOrEqual(0)
     const errorPart = parts[errorIdx] as Extract<
