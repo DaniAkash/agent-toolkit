@@ -14,6 +14,10 @@ export {
   acpxLifecycleStateSchema,
 } from './acpx-lifecycle.ts'
 export {
+  NATIVE_TO_COMMON_BY_AGENT,
+  toCommonToolName,
+} from './acpx-native-tool-names.ts'
+export {
   type AcpxPermissionMode,
   harnessPermissionModeToAcpx,
 } from './acpx-permission.ts'
