@@ -1,19 +1,21 @@
 {
-  "name": "acpx-ai-provider",
-  "version": "0.0.6",
-  "description": "Vercel AI SDK provider on top of acpx/runtime — bring any ACP agent (Claude, Codex, Gemini, Copilot, Cursor…) to AI SDK with one install.",
+  "name": "acpx-ai-harness",
+  "version": "0.0.0",
+  "description": "Vercel AI SDK v7 HarnessV1 adapter for acpx, bring any ACP agent (Claude, Codex, Gemini, Copilot, Cursor) to the AI SDK Harnesses ecosystem.",
   "license": "MIT",
   "author": "Dani Akash",
-  "homepage": "https://github.com/DaniAkash/acpx/tree/main/packages/acpx-ai-provider#readme",
+  "homepage": "https://github.com/DaniAkash/acpx/tree/main/packages/acpx-ai-harness#readme",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/DaniAkash/acpx.git",
-    "directory": "packages/acpx-ai-provider"
+    "directory": "packages/acpx-ai-harness"
   },
   "bugs": "https://github.com/DaniAkash/acpx/issues",
   "keywords": [
     "ai-sdk",
-    "ai-sdk-provider",
+    "ai-sdk-harness",
+    "harness",
+    "harness-adapter",
     "acp",
     "agent-client-protocol",
     "acpx",
@@ -44,22 +46,28 @@
     "build": "bunup",
     "dev": "bunup --watch",
     "test": "bun test",
-    "test:smoke": "SMOKE_AGENTS=all bun test test/e2e",
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
+    "@ai-sdk/harness": ">=1.0.0-canary.10",
     "acpx": ">=0.8.0",
     "ai": ">=7.0.0-beta.0"
   },
+  "dependencies": {
+    "ws": "^8.20.1",
+    "zod": "3.25.76"
+  },
   "devDependencies": {
-    "@ai-sdk/provider": "4.0.0-beta.14",
-    "@ai-sdk/provider-utils": "5.0.0-beta.30",
+    "@ai-sdk/harness": "1.0.0-canary.10",
+    "@ai-sdk/provider": "4.0.0-canary.18",
+    "@ai-sdk/provider-utils": "5.0.0-canary.48",
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "@types/ws": "^8",
     "acpx": "^0.8.0",
     "acpx-test-helpers": "workspace:*",
     "ai": "7.0.0-beta.116",
     "bunup": "^0.16.31",
-    "typescript": "^6.0.3",
-    "zod": "^4.4.3"
+    "typescript": "^6.0.3"
   },
   "publishConfig": {
     "access": "public",

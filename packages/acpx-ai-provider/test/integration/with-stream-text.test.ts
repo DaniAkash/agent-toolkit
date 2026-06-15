@@ -1,8 +1,7 @@
 import { describe, expect, test } from 'bun:test'
+import { acpEvent, acpResult, MockAcpRuntime } from 'acpx-test-helpers'
 import { isStepCount, streamText } from 'ai'
 import { createAcpxProvider } from '../../src/index.ts'
-import { acpEvent, acpResult } from '../helpers/acp-event-builders.ts'
-import { MockAcpRuntime } from '../helpers/mock-acp-runtime.ts'
 
 describe('streamText — text-only turn', () => {
   test('result.text resolves to concatenated deltas', async () => {

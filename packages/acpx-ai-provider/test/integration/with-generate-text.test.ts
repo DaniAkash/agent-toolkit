@@ -1,9 +1,8 @@
 import { describe, expect, test } from 'bun:test'
+import { acpEvent, acpResult, MockAcpRuntime } from 'acpx-test-helpers'
 import { generateText, isStepCount } from 'ai'
 import { AcpxError } from '../../src/errors.ts'
 import { createAcpxProvider } from '../../src/index.ts'
-import { acpEvent, acpResult } from '../helpers/acp-event-builders.ts'
-import { MockAcpRuntime } from '../helpers/mock-acp-runtime.ts'
 
 describe('generateText — text-only', () => {
   test('returns the concatenated text and a stop reason', async () => {
