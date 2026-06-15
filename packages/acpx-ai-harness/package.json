@@ -43,7 +43,8 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "bunup",
+    "build": "bunup && bun run copy-bridge-assets",
+    "copy-bridge-assets": "node -e \"import('node:fs/promises').then(async fs => { await fs.copyFile('src/bridge/package.json', 'dist/bridge/package.json') })\"",
     "dev": "bunup --watch",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
