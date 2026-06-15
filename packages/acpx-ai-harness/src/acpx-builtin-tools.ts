@@ -56,7 +56,7 @@ export const ACPX_BUILTIN_TOOLS = {
     inputSchema: z.object({ pattern: z.string() }),
   }),
   webSearch: commonTool('webSearch', {
-    nativeName: 'web_search',
+    nativeName: 'webSearch',
     toolUseKind: 'readonly',
     description: 'Search the web.',
     inputSchema: z.object({ query: z.string() }),

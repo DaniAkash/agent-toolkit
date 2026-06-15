@@ -195,11 +195,7 @@ export class AcpxEventTranslator {
     }
 
     if (event.text) {
-      if (event.text.startsWith(state.emittedText)) {
-        state.emittedText = event.text
-      } else {
-        state.emittedText = event.text
-      }
+      state.emittedText = event.text
     }
 
     if (isTerminalToolStatus(event.status)) {
