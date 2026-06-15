@@ -5,6 +5,10 @@ export {
   acpxBridgeStartMessageSchema,
 } from './acpx-bridge-protocol.ts'
 export { ACPX_BUILTIN_TOOLS } from './acpx-builtin-tools.ts'
+export {
+  AcpxEventTranslator,
+  type AcpxEventTranslatorOptions,
+} from './acpx-event-translator.ts'
 export type { AcpxHarnessSettings } from './acpx-harness.ts'
 export { acpxHarness, createAcpxHarness } from './acpx-harness.ts'
 export {
