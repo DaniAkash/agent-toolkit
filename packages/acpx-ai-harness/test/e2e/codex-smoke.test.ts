@@ -1,27 +1,57 @@
-import { afterAll, expect, test } from 'bun:test'
+import { expect, test } from 'bun:test'
 import { HarnessAgent } from '@ai-sdk/harness/agent'
+import type { Experimental_SandboxSession } from '@ai-sdk/provider-utils'
 import { createVercelSandbox } from '@ai-sdk/sandbox-vercel'
 import { createAcpxHarness } from '../../src/acpx-harness.ts'
-import { describeForAgent } from './helpers.ts'
+import { collectAgentEnv, describeForAgent } from './helpers.ts'
 
 const AGENT = 'codex'
 const SESSION_TIMEOUT_MS = 5 * 60 * 1000
 
-describeForAgent(AGENT, 'acpx-ai-harness e2e (codex)', () => {
-  // Each test creates its own HarnessAgent so failures don't bleed across
-  // tests; sandbox creation happens lazily inside agent.createSession().
-  // The Vercel-side sandbox is destroyed by session.destroy() at the end
-  // of each test.
+/**
+ * Install the codex CLI inside the freshly-created sandbox so acpx can
+ * spawn it on the first turn. Runs via HarnessAgent.onSandboxSession,
+ * which fires after sandbox creation and before the harness adapter
+ * starts; npm's global install short-circuits if the package is already
+ * present, so resumed sessions are safe.
+ */
+const installCodex = async ({
+  session,
+  abortSignal,
+}: {
+  readonly session: Experimental_SandboxSession
+  readonly sessionWorkDir: string
+  readonly abortSignal?: AbortSignal
+}) => {
+  const result = await session.run({
+    command: 'npm install -g @openai/codex',
+    abortSignal,
+  })
+  if (result.exitCode !== 0) {
+    throw new Error(
+      `npm install -g @openai/codex exited ${result.exitCode}: ${result.stderr}`,
+    )
+  }
+}
 
+const buildAgent = () => {
+  const harness = createAcpxHarness({ agent: 'codex' })
+  const sandbox = createVercelSandbox({
+    runtime: 'node22',
+    env: collectAgentEnv(AGENT),
+  })
+  return new HarnessAgent({
+    harness,
+    sandbox,
+    onSandboxSession: installCodex,
+  })
+}
+
+describeForAgent(AGENT, 'acpx-ai-harness e2e (codex)', () => {
   test(
     'generate() returns text from a real codex turn',
     async () => {
-      const harness = createAcpxHarness({ agent: 'codex' })
-      const sandbox = createVercelSandbox({
-        runtime: 'node22',
-      })
-      const agent = new HarnessAgent({ harness, sandbox })
-
+      const agent = buildAgent()
       const session = await agent.createSession()
       try {
         const result = await agent.generate({
@@ -41,12 +71,7 @@ describeForAgent(AGENT, 'acpx-ai-harness e2e (codex)', () => {
   test(
     'stream() yields incremental text-delta parts',
     async () => {
-      const harness = createAcpxHarness({ agent: 'codex' })
-      const sandbox = createVercelSandbox({
-        runtime: 'node22',
-      })
-      const agent = new HarnessAgent({ harness, sandbox })
-
+      const agent = buildAgent()
       const session = await agent.createSession()
       try {
         const result = await agent.stream({
@@ -67,9 +92,4 @@ describeForAgent(AGENT, 'acpx-ai-harness e2e (codex)', () => {
     },
     SESSION_TIMEOUT_MS,
   )
-
-  // Sanity afterAll so an unclean test still produces a clean output
-  afterAll(() => {
-    // no-op; placeholder for future shared cleanup
-  })
 })

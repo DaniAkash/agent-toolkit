@@ -131,8 +131,11 @@ SMOKE_AGENTS=codex \
   VERCEL_TOKEN=... \
   VERCEL_TEAM_ID=... \
   VERCEL_PROJECT_ID=... \
+  OPENAI_API_KEY=... \
   bun run test:e2e      # spawn real codex on Vercel sandbox
 ```
+
+The codex e2e suite installs the `@openai/codex` CLI inside the sandbox via an `onSandboxSession` hook and forwards `OPENAI_API_KEY` into the sandbox env at creation, so the test is self-contained as long as the four env vars above are set. The first run pays the npm install cost; later runs reuse the bootstrap snapshot.
 
 ## License
 
