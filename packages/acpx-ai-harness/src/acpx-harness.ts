@@ -5,6 +5,7 @@ import {
 } from './acpx-bridge-assets.ts'
 import { ACPX_BUILTIN_TOOLS } from './acpx-builtin-tools.ts'
 import { acpxLifecycleStateSchema } from './acpx-lifecycle.ts'
+import { doStartImpl } from './host-session.ts'
 
 export interface AcpxHarnessSettings {
   /** ACP agent id, e.g. `'claude'`, `'codex'`, `'gemini'`. */
@@ -65,12 +66,7 @@ export function createAcpxHarness(
     supportsBuiltinToolApprovals: true,
     lifecycleStateSchema: acpxLifecycleStateSchema,
     getBootstrap,
-    async doStart() {
-      throw new Error(
-        'acpx-ai-harness: doStart() is not implemented yet. ' +
-          'This is a placeholder while the package is under construction.',
-      )
-    },
+    doStart: (startOptions) => doStartImpl(settings, startOptions),
   }
 }
 

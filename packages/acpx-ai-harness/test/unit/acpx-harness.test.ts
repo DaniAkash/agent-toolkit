@@ -98,15 +98,37 @@ describe('acpxLifecycleStateSchema', () => {
   })
 })
 
-describe('doStart placeholder', () => {
-  test('throws a descriptive not-implemented error', async () => {
+describe('doStart resume/continue paths', () => {
+  test('throws HarnessCapabilityUnsupportedError when resumeFrom is set', async () => {
     await expect(
       acpxHarness.doStart({
         sessionId: 's',
         sessionWorkDir: '/tmp/x',
-        // biome-ignore lint/suspicious/noExplicitAny: placeholder call shape
-      } as any),
-    ).rejects.toThrow(/not implemented/i)
+        sandboxSession: {} as never,
+        resumeFrom: {
+          type: 'resume-session',
+          harnessId: 'acpx',
+          specificationVersion: 'harness-v1',
+          data: {},
+        },
+      } as never),
+    ).rejects.toThrow(/resume.*not implemented/i)
+  })
+
+  test('throws HarnessCapabilityUnsupportedError when continueFrom is set', async () => {
+    await expect(
+      acpxHarness.doStart({
+        sessionId: 's',
+        sessionWorkDir: '/tmp/x',
+        sandboxSession: {} as never,
+        continueFrom: {
+          type: 'continue-turn',
+          harnessId: 'acpx',
+          specificationVersion: 'harness-v1',
+          data: {},
+        },
+      } as never),
+    ).rejects.toThrow(/continue.*not implemented/i)
   })
 })
 
