@@ -116,6 +116,42 @@ describe('runAcpxTurn — happy path (text-only turn against MockAcpRuntime)', (
   })
 })
 
+describe('runAcpxTurn — host tools deferral', () => {
+  test('emits an unsupported-tool warning per host AI SDK tool on stream-start', async () => {
+    const runtime = new MockAcpRuntime({
+      turnScripts: [
+        {
+          events: [acpEvent.text('hi')],
+          result: acpResult.completed('end_turn'),
+        },
+      ],
+    })
+    const { turn, emitted } = makeFakeBridgeTurn()
+    await runAcpxTurn(
+      baseStart({
+        tools: [
+          { name: 'getWeather', description: 'weather lookup' },
+          { name: 'sendEmail', description: 'compose mail' },
+        ],
+      }),
+      turn,
+      { workdir: '/tmp/bridge-work', runtime },
+    )
+    const streamStart = emitted.find(
+      (p) => p.type === 'stream-start',
+    ) as Extract<HarnessV1StreamPart, { type: 'stream-start' }>
+    expect(streamStart.warnings).toHaveLength(2)
+    expect(streamStart.warnings?.[0]).toMatchObject({
+      type: 'unsupported-tool',
+      tool: 'getWeather',
+    })
+    expect(streamStart.warnings?.[1]).toMatchObject({
+      type: 'unsupported-tool',
+      tool: 'sendEmail',
+    })
+  })
+})
+
 describe('runAcpxTurn — failure paths', () => {
   test('a failed acpx turn surfaces as error + finish', async () => {
     const runtime = new MockAcpRuntime({

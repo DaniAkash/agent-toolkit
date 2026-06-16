@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import os from 'node:os'
 import path from 'node:path'
+import type { HarnessV1CallWarning } from '@ai-sdk/harness'
 import type { BridgeTurn } from '@ai-sdk/harness/bridge'
 import {
   type AcpRuntime,
@@ -15,6 +16,7 @@ import {
 } from '../acpx-bridge-protocol.ts'
 import { AcpxEventTranslator } from '../acpx-event-translator.ts'
 import { harnessPermissionModeToAcpx } from '../acpx-permission.ts'
+import { toRuntimeMcpServers } from './mcp-servers.ts'
 
 export interface RunAcpxTurnOptions {
   /** The working directory the bridge was launched against. */
@@ -56,7 +58,9 @@ export async function runAcpxTurn(
     generateId: () => randomUUID(),
     emit: (part) => turn.emit(part),
   })
-  translator.start()
+  translator.start({
+    warnings: buildStreamStartWarnings(parsed),
+  })
 
   const acpTurn = runtime.startTurn({
     handle,
@@ -95,8 +99,23 @@ function createAcpxRuntime(
     sessionStore: createFileSessionStore({ stateDir }),
     agentRegistry: createAgentRegistry({}),
     permissionMode: harnessPermissionModeToAcpx(start.permissionMode),
+    mcpServers: toRuntimeMcpServers(start.mcpServers),
   }
   return createAcpRuntime(runtimeOptions)
+}
+
+function buildStreamStartWarnings(
+  start: AcpxBridgeStartMessage,
+): ReadonlyArray<HarnessV1CallWarning> | undefined {
+  if (!start.tools || start.tools.length === 0) return undefined
+  return start.tools.map((tool) => ({
+    type: 'unsupported-tool' as const,
+    tool: tool.name,
+    details:
+      'acpx-ai-harness does not yet forward host AI SDK tools to the underlying ACP agent. ' +
+      'Use stdio / http / sse MCP servers via the `mcpServers` start-frame field instead. ' +
+      'See https://github.com/DaniAkash/acpx/issues for the tracking issue.',
+  }))
 }
 
 function serialiseError(err: unknown): {

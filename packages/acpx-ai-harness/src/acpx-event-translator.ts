@@ -1,4 +1,4 @@
-import type { HarnessV1StreamPart } from '@ai-sdk/harness'
+import type { HarnessV1CallWarning, HarnessV1StreamPart } from '@ai-sdk/harness'
 import type {
   LanguageModelV4FinishReason,
   LanguageModelV4Usage,
@@ -76,12 +76,20 @@ export class AcpxEventTranslator {
     this.emit = opts.emit
   }
 
-  start(options: { modelId?: string } = {}): void {
+  start(
+    options: {
+      modelId?: string
+      warnings?: ReadonlyArray<HarnessV1CallWarning>
+    } = {},
+  ): void {
     if (this.started) return
     this.started = true
     this.emit({
       type: 'stream-start',
       ...(options.modelId ? { modelId: options.modelId } : {}),
+      ...(options.warnings && options.warnings.length > 0
+        ? { warnings: options.warnings }
+        : {}),
     })
   }
 
