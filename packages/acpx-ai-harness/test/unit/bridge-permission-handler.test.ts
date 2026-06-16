@@ -104,7 +104,7 @@ describe('createPermissionHandler', () => {
   })
 
   test('a pre-aborted signal short-circuits before requesting approval', async () => {
-    const { turn } = makeFakeTurn()
+    const { turn, emitted, pending } = makeFakeTurn()
     const handler = createPermissionHandler(turn)
     const requestCtl = new AbortController()
     requestCtl.abort()
@@ -112,5 +112,38 @@ describe('createPermissionHandler', () => {
       signal: requestCtl.signal,
     })
     expect(decision).toBeUndefined()
+    // No approval request emitted, no requestToolApproval invocation queued.
+    expect(emitted).toEqual([])
+    expect(pending).toEqual([])
+  })
+
+  test('removes the abort listener once approval resolves', async () => {
+    const { turn, pending } = makeFakeTurn()
+    const handler = createPermissionHandler(turn)
+    const requestCtl = new AbortController()
+    let listenerCount = 0
+    const origAdd = requestCtl.signal.addEventListener.bind(requestCtl.signal)
+    const origRemove = requestCtl.signal.removeEventListener.bind(
+      requestCtl.signal,
+    )
+    requestCtl.signal.addEventListener = ((
+      ...args: Parameters<typeof origAdd>
+    ) => {
+      listenerCount++
+      return origAdd(...args)
+    }) as typeof origAdd
+    requestCtl.signal.removeEventListener = ((
+      ...args: Parameters<typeof origRemove>
+    ) => {
+      listenerCount--
+      return origRemove(...args)
+    }) as typeof origRemove
+
+    const promise = handler(makeRequest('call-5'), {
+      signal: requestCtl.signal,
+    })
+    pending[0]?.resolve({ approved: true })
+    await promise
+    expect(listenerCount).toBe(0)
   })
 })

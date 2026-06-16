@@ -116,8 +116,7 @@ function buildStreamStartWarnings(
     tool: tool.name,
     details:
       'acpx-ai-harness does not yet forward host AI SDK tools to the underlying ACP agent. ' +
-      'Use stdio / http / sse MCP servers via the `mcpServers` start-frame field instead. ' +
-      'See https://github.com/DaniAkash/acpx/issues for the tracking issue.',
+      'Use stdio / http / sse MCP servers via the `mcpServers` start-frame field instead.',
   }))
 }
 

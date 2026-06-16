@@ -22,6 +22,11 @@ export function createPermissionHandler(turn: BridgeTurn) {
     req: AcpPermissionRequest,
     ctx: { signal: AbortSignal },
   ): Promise<AcpPermissionDecision | undefined> => {
+    // Pre-aborted: don't emit a doomed approval request and don't register an
+    // abort listener that nobody will clean up. Falls through to acpx's
+    // configured permissionMode.
+    if (ctx.signal.aborted) return undefined
+
     const toolCallId = req.raw.toolCall.toolCallId
     const approvalId = toolCallId
 
@@ -31,13 +36,13 @@ export function createPermissionHandler(turn: BridgeTurn) {
       toolCallId,
     })
 
+    let onAbort: (() => void) | undefined
     try {
       const decision = await Promise.race([
         turn.requestToolApproval(approvalId),
         new Promise<never>((_, reject) => {
-          const onAbort = () => reject(new Error('aborted'))
-          if (ctx.signal.aborted) onAbort()
-          else ctx.signal.addEventListener('abort', onAbort, { once: true })
+          onAbort = () => reject(new Error('aborted'))
+          ctx.signal.addEventListener('abort', onAbort, { once: true })
         }),
       ])
       return decision.approved
@@ -45,6 +50,8 @@ export function createPermissionHandler(turn: BridgeTurn) {
         : { outcome: 'reject_once' }
     } catch {
       return undefined
+    } finally {
+      if (onAbort) ctx.signal.removeEventListener('abort', onAbort)
     }
   }
 }

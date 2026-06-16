@@ -19,7 +19,10 @@ function parseArgs(argv: ReadonlyArray<string>): {
   for (let i = 0; i < argv.length; i++) {
     const flag = argv[i]
     const value = argv[i + 1]
-    if (!value) continue
+    // Treat the next flag as "no value" so a typo like
+    // `--workdir --bridge-state-dir foo` errors loudly via the
+    // missing-arg check below instead of silently mis-assigning.
+    if (!value || value.startsWith('--')) continue
     if (flag === '--workdir') {
       out.workdir = value
       i++
