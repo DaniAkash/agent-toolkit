@@ -29,3 +29,9 @@ export {
   type AcpxPermissionMode,
   harnessPermissionModeToAcpx,
 } from './acpx-permission.ts'
+export {
+  type AcpxBridgeInboundMessage,
+  type AcpxChannel,
+  createAcpxChannel,
+  type OpenAcpxChannelOptions,
+} from './sandbox-channel.ts'
