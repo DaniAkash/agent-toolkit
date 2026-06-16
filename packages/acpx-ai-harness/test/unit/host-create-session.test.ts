@@ -117,6 +117,27 @@ describe('createSession.doSuspendTurn', () => {
       /already stopped/,
     )
   })
+
+  test('closes the channel even when channel.suspend() throws', async () => {
+    const fake = makeFakeChannel()
+    // Replace suspend with a thrower to exercise the finally branch.
+    const orig = fake.channel.suspend
+    ;(fake.channel as { suspend: () => Promise<number> }).suspend =
+      async () => {
+        throw new Error('suspend failed')
+      }
+    const session = createSession(makeInput({}, fake))
+    await expect(session.doSuspendTurn()).rejects.toThrow(/suspend failed/)
+    expect(fake.channel.isClosed()).toBe(true)
+    ;(fake.channel as { suspend: () => Promise<number> }).suspend = orig
+  })
+
+  test('closes the channel after a successful suspend', async () => {
+    const fake = makeFakeChannel()
+    const session = createSession(makeInput({}, fake))
+    await session.doSuspendTurn()
+    expect(fake.channel.isClosed()).toBe(true)
+  })
 })
 
 describe('createSession.doDetach', () => {
@@ -133,6 +154,13 @@ describe('createSession.doDetach', () => {
         lastSeenEventId: input.fake.suspendValue,
       },
     })
+  })
+
+  test('closes the channel after detach', async () => {
+    const fake = makeFakeChannel()
+    const session = createSession(makeInput({}, fake))
+    await session.doDetach()
+    expect(fake.channel.isClosed()).toBe(true)
   })
 })
 
@@ -180,6 +208,15 @@ describe('createSession.doContinueTurn', () => {
       cwd: '/tmp/work',
       continue: true,
     })
+  })
+
+  test('on FRESH: rejects with a clear error rather than hanging forever', async () => {
+    const session = createSession(
+      makeInput({ respawnStrategy: 'fresh', isResume: false }),
+    )
+    await expect(session.doContinueTurn({ emit: () => {} })).rejects.toThrow(
+      /requires a session created with `continueFrom`/i,
+    )
   })
 })
 

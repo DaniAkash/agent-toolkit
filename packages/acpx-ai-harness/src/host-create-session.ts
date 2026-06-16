@@ -94,6 +94,20 @@ export function createSession(input: CreateSessionInput): HarnessV1Session {
     opts: HarnessV1ContinueTurnOptions,
   ): Promise<HarnessV1PromptControl> => {
     assertLive('doContinueTurn')
+    // doContinueTurn is only meaningful after doStart({ continueFrom }).
+    // Fail fast if a consumer ever calls it on a fresh session — without
+    // either an in-flight turn to attach to or a rerun nudge to send,
+    // the returned `done` would hang forever.
+    if (input.respawnStrategy === 'fresh') {
+      return Promise.reject(
+        new HarnessCapabilityUnsupportedError({
+          harnessId: 'acpx',
+          message:
+            'acpx-ai-harness: doContinueTurn() requires a session created with `continueFrom`. ' +
+            'Call doPromptTurn() on a fresh session instead.',
+        }),
+      )
+    }
     const control = wirePromptControl({
       channel: input.channel,
       emit: opts.emit,
@@ -134,10 +148,22 @@ export function createSession(input: CreateSessionInput): HarnessV1Session {
     },
   })
 
+  const suspendAndClose = async (): Promise<number> => {
+    try {
+      return await input.channel.suspend()
+    } finally {
+      try {
+        input.channel.close()
+      } catch {
+        /* idempotent */
+      }
+    }
+  }
+
   const doSuspendTurn = async (): Promise<HarnessV1ContinueTurnState> => {
     assertLive('doSuspendTurn')
     stopped = true
-    const lastSeenEventId = await input.channel.suspend()
+    const lastSeenEventId = await suspendAndClose()
     return {
       type: 'continue-turn',
       harnessId: 'acpx',
@@ -149,7 +175,7 @@ export function createSession(input: CreateSessionInput): HarnessV1Session {
   const doDetach = async (): Promise<HarnessV1ResumeSessionState> => {
     assertLive('doDetach')
     stopped = true
-    const lastSeenEventId = await input.channel.suspend()
+    const lastSeenEventId = await suspendAndClose()
     return {
       type: 'resume-session',
       harnessId: 'acpx',
