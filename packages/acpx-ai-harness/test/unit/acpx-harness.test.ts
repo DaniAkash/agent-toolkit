@@ -98,13 +98,25 @@ describe('acpxLifecycleStateSchema', () => {
   })
 })
 
-describe('doStart resume/continue paths', () => {
-  test('throws HarnessCapabilityUnsupportedError when resumeFrom is set', async () => {
+describe('doStart with a resume payload that has no bridge coords', () => {
+  test('falls through to fresh spawn (RERUN) instead of rejecting', async () => {
+    // The recovery dispatcher should pick the RERUN rung when no bridge
+    // block is present in resumeFrom. We give it a sandbox session with
+    // no ports so the fresh-spawn path errors with the "no ports" guard,
+    // which proves we got past the old "resume not implemented" reject.
+    const fakeSandbox = {
+      id: 'sbx',
+      defaultWorkingDirectory: '/sandbox',
+      ports: [],
+      getPortUrl: async () => '',
+      stop: async () => {},
+      restricted: () => ({}) as never,
+    } as never
     await expect(
       acpxHarness.doStart({
         sessionId: 's',
         sessionWorkDir: '/tmp/x',
-        sandboxSession: {} as never,
+        sandboxSession: fakeSandbox,
         resumeFrom: {
           type: 'resume-session',
           harnessId: 'acpx',
@@ -112,23 +124,7 @@ describe('doStart resume/continue paths', () => {
           data: {},
         },
       } as never),
-    ).rejects.toThrow(/resume.*not implemented/i)
-  })
-
-  test('throws HarnessCapabilityUnsupportedError when continueFrom is set', async () => {
-    await expect(
-      acpxHarness.doStart({
-        sessionId: 's',
-        sessionWorkDir: '/tmp/x',
-        sandboxSession: {} as never,
-        continueFrom: {
-          type: 'continue-turn',
-          harnessId: 'acpx',
-          specificationVersion: 'harness-v1',
-          data: {},
-        },
-      } as never),
-    ).rejects.toThrow(/continue.*not implemented/i)
+    ).rejects.toThrow(/no ports/i)
   })
 })
 

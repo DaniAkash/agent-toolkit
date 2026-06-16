@@ -2,6 +2,32 @@ import type {
   HarnessV1NetworkSandboxSession,
   HarnessV1Prompt,
 } from '@ai-sdk/harness'
+import type { Experimental_SandboxProcess } from '@ai-sdk/provider-utils'
+
+const PROC_EXIT_TIMEOUT_MS = 5_000
+
+/**
+ * Best-effort wait for the bridge process to exit, falling back to a kill
+ * after a short timeout. Idempotent and tolerant of `undefined` so the
+ * ATTACH path (where we don't own the proc handle) can call into it.
+ */
+export async function awaitProcExit(
+  proc: Experimental_SandboxProcess | undefined,
+): Promise<void> {
+  if (!proc) return
+  try {
+    await Promise.race([
+      proc.wait(),
+      new Promise<void>((resolve) => setTimeout(resolve, PROC_EXIT_TIMEOUT_MS)),
+    ])
+  } finally {
+    try {
+      await proc.kill()
+    } catch {
+      /* idempotent */
+    }
+  }
+}
 
 export function pickPort(
   sandboxSession: HarnessV1NetworkSandboxSession,

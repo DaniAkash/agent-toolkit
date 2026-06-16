@@ -12,9 +12,11 @@ import { markBridgeStarting, waitForBridgeReady } from '@ai-sdk/harness/utils'
 import type { Experimental_SandboxProcess } from '@ai-sdk/provider-utils'
 import type { AcpxBridgeStartMessage } from './acpx-bridge-protocol.ts'
 import type { AcpxHarnessSettings } from './acpx-harness.ts'
+import { pickResumeCoords, tryAttachToExistingBridge } from './host-attach.ts'
 import { requestDetachPayload } from './host-detach.ts'
 import { wirePromptControl } from './host-prompt-control.ts'
 import {
+  awaitProcExit,
   extractPromptText,
   pickPort,
   shellQuote,
@@ -28,20 +30,42 @@ export async function doStartImpl(
   settings: AcpxHarnessSettings,
   start: HarnessV1StartOptions,
 ): Promise<HarnessV1Session> {
-  if (start.resumeFrom || start.continueFrom) {
-    throw new HarnessCapabilityUnsupportedError({
-      harnessId: 'acpx',
-      message:
-        'acpx-ai-harness: resume and continue paths are not implemented yet. ' +
-        'Only fresh `doStart()` is supported in this release.',
+  const sandboxSession = start.sandboxSession
+  const agent = settings.agent ?? 'codex'
+  const isResumeRequest = Boolean(start.resumeFrom || start.continueFrom)
+
+  // Rung 1: ATTACH to a live bridge if the caller passed coords pointing at
+  // one. Failures (sandbox changed, WS unreachable) silently fall through
+  // to a fresh spawn.
+  const resumeCoords = pickResumeCoords(start)
+  if (resumeCoords) {
+    const attached = await tryAttachToExistingBridge({
+      sandboxSession,
+      coords: resumeCoords,
     })
+    if (attached) {
+      return createSession({
+        sessionId: start.sessionId,
+        sessionWorkDir: start.sessionWorkDir,
+        settings,
+        agent,
+        channel: attached.channel,
+        proc: undefined,
+        bridgeCoords: {
+          port: attached.coords.port,
+          token: attached.coords.token,
+          sandboxId: attached.coords.sandboxId ?? sandboxSession.id,
+        },
+        isResume: true,
+      })
+    }
   }
 
-  const sandboxSession = start.sandboxSession
+  // Rung 2: RERUN. Spawn a fresh bridge; acpx will reload the persisted
+  // session from disk via sessionKey on the first turn.
   const port = pickPort(sandboxSession, settings.port)
   const token = randomBytes(32).toString('hex')
   const bridgeStateDir = `${start.sessionWorkDir}/.bridge-state`
-  const agent = settings.agent ?? 'codex'
 
   await markBridgeStarting({
     sandbox: sandboxSession.restricted(),
@@ -100,6 +124,7 @@ export async function doStartImpl(
     channel,
     proc,
     bridgeCoords: { port, token, sandboxId: sandboxSession.id },
+    isResume: isResumeRequest,
   })
 }
 
@@ -115,8 +140,15 @@ interface CreateSessionInput {
   readonly settings: AcpxHarnessSettings
   readonly agent: string
   readonly channel: AcpxChannel
-  readonly proc: Experimental_SandboxProcess
+  /**
+   * Bridge process handle, or undefined when we ATTACH'd to a bridge
+   * spawned by a previous process. On ATTACH the host doesn't own the
+   * process lifecycle, so doDestroy / doStop send `shutdown` / `detach`
+   * frames and trust the bridge to exit.
+   */
+  readonly proc: Experimental_SandboxProcess | undefined
   readonly bridgeCoords: BridgeCoordsLite
+  readonly isResume: boolean
 }
 
 function createSession(input: CreateSessionInput): HarnessV1Session {
@@ -173,19 +205,8 @@ function createSession(input: CreateSessionInput): HarnessV1Session {
     } catch {
       /* socket may already be gone */
     }
-    try {
-      await Promise.race([
-        input.proc.wait(),
-        new Promise<void>((resolve) => setTimeout(resolve, 5_000)),
-      ])
-    } finally {
-      try {
-        await input.proc.kill()
-      } catch {
-        /* idempotent */
-      }
-      input.channel.close()
-    }
+    await awaitProcExit(input.proc)
+    input.channel.close()
   }
 
   const buildBridgeState = (lastSeenEventId: number) => ({
@@ -226,19 +247,8 @@ function createSession(input: CreateSessionInput): HarnessV1Session {
     stopped = true
     input.channel.beginClose()
     const detachData = await requestDetachPayload(input.channel)
-    try {
-      await Promise.race([
-        input.proc.wait(),
-        new Promise<void>((resolve) => setTimeout(resolve, 5_000)),
-      ])
-    } finally {
-      try {
-        await input.proc.kill()
-      } catch {
-        /* idempotent */
-      }
-      input.channel.close()
-    }
+    await awaitProcExit(input.proc)
+    input.channel.close()
     return {
       type: 'resume-session',
       harnessId: 'acpx',
@@ -249,7 +259,7 @@ function createSession(input: CreateSessionInput): HarnessV1Session {
 
   return {
     sessionId: input.sessionId,
-    isResume: false,
+    isResume: input.isResume,
     doPromptTurn,
     doContinueTurn: async () => {
       throw new HarnessCapabilityUnsupportedError({
