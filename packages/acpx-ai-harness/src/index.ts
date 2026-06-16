@@ -1,4 +1,8 @@
 export {
+  defaultReadBridgeAsset,
+  type ReadBridgeAsset,
+} from './acpx-bridge-assets.ts'
+export {
   type AcpxBridgeMcpServer,
   type AcpxBridgeStartMessage,
   acpxBridgeMcpServerSchema,

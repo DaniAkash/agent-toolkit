@@ -109,3 +109,71 @@ describe('doStart placeholder', () => {
     ).rejects.toThrow(/not implemented/i)
   })
 })
+
+describe('getBootstrap recipe', () => {
+  const PKG = '{"name":"acpx-ai-harness-bridge","version":"0.0.0"}'
+  const BUNDLE = 'console.log("bridge bundle stub")'
+
+  function buildWithFakeAssets() {
+    const reads: string[] = []
+    const harness = createAcpxHarness({
+      readBridgeAsset: async (name) => {
+        reads.push(name)
+        if (name === 'package.json') return PKG
+        if (name === 'index.js') return BUNDLE
+        throw new Error(`unexpected asset: ${name}`)
+      },
+    })
+    return { harness, reads }
+  }
+
+  test('declares the acpx harnessId on the recipe', async () => {
+    const { harness } = buildWithFakeAssets()
+    const recipe = await harness.getBootstrap?.()
+    expect(recipe?.harnessId).toBe('acpx')
+  })
+
+  test('uses an ephemeral bootstrap directory under /tmp', async () => {
+    const { harness } = buildWithFakeAssets()
+    const recipe = await harness.getBootstrap?.()
+    expect(recipe?.bootstrapDir).toBe('/tmp/harness/acpx')
+  })
+
+  test('lays down the bridge manifest + bundle under the bootstrap dir', async () => {
+    const { harness } = buildWithFakeAssets()
+    const recipe = await harness.getBootstrap?.()
+    expect(recipe?.files).toEqual([
+      { path: '/tmp/harness/acpx/package.json', content: PKG },
+      { path: '/tmp/harness/acpx/bridge.mjs', content: BUNDLE },
+    ])
+  })
+
+  test('runs install via pnpm with a local store dir', async () => {
+    const { harness } = buildWithFakeAssets()
+    const recipe = await harness.getBootstrap?.()
+    const installCmd = recipe?.commands.find((c) => c.command.includes('pnpm'))
+    expect(installCmd?.command).toContain('pnpm')
+    expect(installCmd?.command).toContain('/tmp/harness/acpx')
+    expect(installCmd?.command).toContain('--store-dir')
+  })
+
+  test('runs `acpx --version` as the post-install smoke check', async () => {
+    const { harness } = buildWithFakeAssets()
+    const recipe = await harness.getBootstrap?.()
+    const lastCmd = recipe?.commands.at(-1)?.command
+    expect(lastCmd).toContain('acpx --version')
+  })
+
+  test('reads each asset only once across repeated getBootstrap calls', async () => {
+    const { harness, reads } = buildWithFakeAssets()
+    await harness.getBootstrap?.()
+    await harness.getBootstrap?.()
+    await harness.getBootstrap?.()
+    expect(reads).toEqual(['package.json', 'index.js'])
+  })
+
+  test('default reader is wired when no override is supplied', () => {
+    const harness = createAcpxHarness()
+    expect(typeof harness.getBootstrap).toBe('function')
+  })
+})
