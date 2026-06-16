@@ -1,9 +1,9 @@
 import { randomBytes } from 'node:crypto'
 import type {
-  HarnessV1NetworkSandboxSession,
-  HarnessV1Prompt,
+  HarnessV1ContinueTurnState,
   HarnessV1PromptControl,
   HarnessV1PromptTurnOptions,
+  HarnessV1ResumeSessionState,
   HarnessV1Session,
   HarnessV1StartOptions,
 } from '@ai-sdk/harness'
@@ -12,7 +12,13 @@ import { markBridgeStarting, waitForBridgeReady } from '@ai-sdk/harness/utils'
 import type { Experimental_SandboxProcess } from '@ai-sdk/provider-utils'
 import type { AcpxBridgeStartMessage } from './acpx-bridge-protocol.ts'
 import type { AcpxHarnessSettings } from './acpx-harness.ts'
+import { requestDetachPayload } from './host-detach.ts'
 import { wirePromptControl } from './host-prompt-control.ts'
+import {
+  extractPromptText,
+  pickPort,
+  shellQuote,
+} from './host-session-utils.ts'
 import { type AcpxChannel, createAcpxChannel } from './sandbox-channel.ts'
 
 const BRIDGE_BUNDLE_PATH = '/tmp/harness/acpx/bridge.mjs'
@@ -47,8 +53,8 @@ export async function doStartImpl(
   const proc = await sandboxSession.restricted().spawn({
     command:
       `node ${BRIDGE_BUNDLE_PATH} ` +
-      `--workdir ${quote(start.sessionWorkDir)} ` +
-      `--bridge-state-dir ${quote(bridgeStateDir)}`,
+      `--workdir ${shellQuote(start.sessionWorkDir)} ` +
+      `--bridge-state-dir ${shellQuote(bridgeStateDir)}`,
     env: {
       BRIDGE_CHANNEL_TOKEN: token,
       BRIDGE_WS_PORT: String(port),
@@ -93,7 +99,14 @@ export async function doStartImpl(
     agent,
     channel,
     proc,
+    bridgeCoords: { port, token, sandboxId: sandboxSession.id },
   })
+}
+
+interface BridgeCoordsLite {
+  readonly port: number
+  readonly token: string
+  readonly sandboxId: string
 }
 
 interface CreateSessionInput {
@@ -103,6 +116,7 @@ interface CreateSessionInput {
   readonly agent: string
   readonly channel: AcpxChannel
   readonly proc: Experimental_SandboxProcess
+  readonly bridgeCoords: BridgeCoordsLite
 }
 
 function createSession(input: CreateSessionInput): HarnessV1Session {
@@ -174,21 +188,79 @@ function createSession(input: CreateSessionInput): HarnessV1Session {
     }
   }
 
-  const notImplemented = (method: string) => async () => {
-    throw new HarnessCapabilityUnsupportedError({
+  const buildBridgeState = (lastSeenEventId: number) => ({
+    bridge: {
+      port: input.bridgeCoords.port,
+      token: input.bridgeCoords.token,
+      sandboxId: input.bridgeCoords.sandboxId,
+      lastSeenEventId,
+    },
+  })
+
+  const doSuspendTurn = async (): Promise<HarnessV1ContinueTurnState> => {
+    assertLive('doSuspendTurn')
+    stopped = true
+    const lastSeenEventId = await input.channel.suspend()
+    return {
+      type: 'continue-turn',
       harnessId: 'acpx',
-      message: `acpx-ai-harness: ${method}() lands in a follow-up release.`,
-    })
+      specificationVersion: 'harness-v1',
+      data: buildBridgeState(lastSeenEventId),
+    }
+  }
+
+  const doDetach = async (): Promise<HarnessV1ResumeSessionState> => {
+    assertLive('doDetach')
+    stopped = true
+    const lastSeenEventId = await input.channel.suspend()
+    return {
+      type: 'resume-session',
+      harnessId: 'acpx',
+      specificationVersion: 'harness-v1',
+      data: buildBridgeState(lastSeenEventId),
+    }
+  }
+
+  const doStop = async (): Promise<HarnessV1ResumeSessionState> => {
+    assertLive('doStop')
+    stopped = true
+    input.channel.beginClose()
+    const detachData = await requestDetachPayload(input.channel)
+    try {
+      await Promise.race([
+        input.proc.wait(),
+        new Promise<void>((resolve) => setTimeout(resolve, 5_000)),
+      ])
+    } finally {
+      try {
+        await input.proc.kill()
+      } catch {
+        /* idempotent */
+      }
+      input.channel.close()
+    }
+    return {
+      type: 'resume-session',
+      harnessId: 'acpx',
+      specificationVersion: 'harness-v1',
+      data: detachData as HarnessV1ResumeSessionState['data'],
+    }
   }
 
   return {
     sessionId: input.sessionId,
     isResume: false,
     doPromptTurn,
-    doContinueTurn: notImplemented('doContinueTurn'),
-    doSuspendTurn: notImplemented('doSuspendTurn'),
-    doDetach: notImplemented('doDetach'),
-    doStop: notImplemented('doStop'),
+    doContinueTurn: async () => {
+      throw new HarnessCapabilityUnsupportedError({
+        harnessId: 'acpx',
+        message:
+          'acpx-ai-harness: doContinueTurn() lands in a follow-up release.',
+      })
+    },
+    doSuspendTurn,
+    doDetach,
+    doStop,
     doDestroy,
     doCompact: async () => {
       throw new HarnessCapabilityUnsupportedError({
@@ -198,35 +270,4 @@ function createSession(input: CreateSessionInput): HarnessV1Session {
       })
     },
   }
-}
-
-function pickPort(
-  sandboxSession: HarnessV1NetworkSandboxSession,
-  override: number | undefined,
-): number {
-  if (override !== undefined) return override
-  const first = sandboxSession.ports[0]
-  if (first === undefined) {
-    throw new Error(
-      'acpx-ai-harness: the sandbox session exposes no ports; cannot launch the bridge.',
-    )
-  }
-  return first
-}
-
-function quote(s: string): string {
-  return `'${s.replace(/'/g, "'\\''")}'`
-}
-
-function extractPromptText(prompt: HarnessV1Prompt): string {
-  if (typeof prompt === 'string') return prompt
-  const content = prompt.content
-  if (typeof content === 'string') return content
-  if (Array.isArray(content)) {
-    return content
-      .filter((p) => p.type === 'text')
-      .map((p) => (p as { text: string }).text)
-      .join('')
-  }
-  return ''
 }
