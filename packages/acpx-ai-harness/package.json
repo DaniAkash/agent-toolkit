@@ -46,7 +46,9 @@
     "build": "bunup && bun run copy-bridge-assets",
     "copy-bridge-assets": "node --input-type=module -e \"import { copyFile, mkdir } from 'node:fs/promises'; await mkdir('dist/bridge', { recursive: true }); await copyFile('src/bridge/package.json', 'dist/bridge/package.json');\"",
     "dev": "bunup --watch",
-    "test": "bun test",
+    "test": "bun test test/unit",
+    "test:e2e": "bun run build && bun test test/e2e",
+    "test:smoke": "SMOKE_AGENTS=all bun run test:e2e",
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
@@ -62,6 +64,7 @@
     "@ai-sdk/harness": "1.0.0-canary.10",
     "@ai-sdk/provider": "4.0.0-canary.18",
     "@ai-sdk/provider-utils": "5.0.0-canary.48",
+    "@ai-sdk/sandbox-vercel": "1.0.0-canary.10",
     "@modelcontextprotocol/sdk": "1.29.0",
     "@types/ws": "^8",
     "acpx": "^0.8.0",
