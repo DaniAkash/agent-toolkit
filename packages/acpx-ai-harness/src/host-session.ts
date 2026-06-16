@@ -1,26 +1,10 @@
 import { randomBytes } from 'node:crypto'
-import type {
-  HarnessV1ContinueTurnState,
-  HarnessV1PromptControl,
-  HarnessV1PromptTurnOptions,
-  HarnessV1ResumeSessionState,
-  HarnessV1Session,
-  HarnessV1StartOptions,
-} from '@ai-sdk/harness'
-import { HarnessCapabilityUnsupportedError } from '@ai-sdk/harness'
+import type { HarnessV1Session, HarnessV1StartOptions } from '@ai-sdk/harness'
 import { markBridgeStarting, waitForBridgeReady } from '@ai-sdk/harness/utils'
-import type { Experimental_SandboxProcess } from '@ai-sdk/provider-utils'
-import type { AcpxBridgeStartMessage } from './acpx-bridge-protocol.ts'
 import type { AcpxHarnessSettings } from './acpx-harness.ts'
 import { pickResumeCoords, tryAttachToExistingBridge } from './host-attach.ts'
-import { requestDetachPayload } from './host-detach.ts'
-import { wirePromptControl } from './host-prompt-control.ts'
-import {
-  awaitProcExit,
-  extractPromptText,
-  pickPort,
-  shellQuote,
-} from './host-session-utils.ts'
+import { createSession } from './host-create-session.ts'
+import { pickPort, shellQuote } from './host-session-utils.ts'
 import { type AcpxChannel, createAcpxChannel } from './sandbox-channel.ts'
 
 const BRIDGE_BUNDLE_PATH = '/tmp/harness/acpx/bridge.mjs'
@@ -57,6 +41,7 @@ export async function doStartImpl(
           sandboxId: attached.coords.sandboxId ?? sandboxSession.id,
         },
         isResume: true,
+        respawnStrategy: 'attach',
       })
     }
   }
@@ -125,159 +110,6 @@ export async function doStartImpl(
     proc,
     bridgeCoords: { port, token, sandboxId: sandboxSession.id },
     isResume: isResumeRequest,
+    respawnStrategy: isResumeRequest ? 'rerun' : 'fresh',
   })
-}
-
-interface BridgeCoordsLite {
-  readonly port: number
-  readonly token: string
-  readonly sandboxId: string
-}
-
-interface CreateSessionInput {
-  readonly sessionId: string
-  readonly sessionWorkDir: string
-  readonly settings: AcpxHarnessSettings
-  readonly agent: string
-  readonly channel: AcpxChannel
-  /**
-   * Bridge process handle, or undefined when we ATTACH'd to a bridge
-   * spawned by a previous process. On ATTACH the host doesn't own the
-   * process lifecycle, so doDestroy / doStop send `shutdown` / `detach`
-   * frames and trust the bridge to exit.
-   */
-  readonly proc: Experimental_SandboxProcess | undefined
-  readonly bridgeCoords: BridgeCoordsLite
-  readonly isResume: boolean
-}
-
-function createSession(input: CreateSessionInput): HarnessV1Session {
-  let stopped = false
-  let instructionsApplied = false
-
-  const assertLive = (method: string) => {
-    if (stopped) {
-      throw new Error(
-        `acpx-ai-harness session ${input.sessionId} is already stopped; cannot call ${method}.`,
-      )
-    }
-  }
-
-  const doPromptTurn = (
-    opts: HarnessV1PromptTurnOptions,
-  ): Promise<HarnessV1PromptControl> => {
-    assertLive('doPromptTurn')
-    const prompt = extractPromptText(opts.prompt)
-    const trimmedInstructions = opts.instructions?.trim() ?? ''
-    const shouldApply = !instructionsApplied && trimmedInstructions.length > 0
-    const text = shouldApply ? `${trimmedInstructions}\n\n${prompt}` : prompt
-    if (shouldApply) instructionsApplied = true
-
-    const frame: AcpxBridgeStartMessage = {
-      type: 'start',
-      prompt: text,
-      agent: input.agent,
-      sessionKey: input.sessionId,
-      cwd: input.sessionWorkDir,
-      ...(input.settings.model ? { model: input.settings.model } : {}),
-      ...(input.settings.stateDir ? { stateDir: input.settings.stateDir } : {}),
-      ...(opts.tools && opts.tools.length > 0
-        ? { tools: opts.tools.map((t) => ({ ...t })) }
-        : {}),
-    }
-
-    const control = wirePromptControl({
-      channel: input.channel,
-      emit: opts.emit,
-      abortSignal: opts.abortSignal,
-    })
-
-    input.channel.send(frame)
-    return Promise.resolve(control)
-  }
-
-  const doDestroy = async (): Promise<void> => {
-    if (stopped) return
-    stopped = true
-    try {
-      input.channel.beginClose()
-      input.channel.send({ type: 'shutdown' })
-    } catch {
-      /* socket may already be gone */
-    }
-    await awaitProcExit(input.proc)
-    input.channel.close()
-  }
-
-  const buildBridgeState = (lastSeenEventId: number) => ({
-    bridge: {
-      port: input.bridgeCoords.port,
-      token: input.bridgeCoords.token,
-      sandboxId: input.bridgeCoords.sandboxId,
-      lastSeenEventId,
-    },
-  })
-
-  const doSuspendTurn = async (): Promise<HarnessV1ContinueTurnState> => {
-    assertLive('doSuspendTurn')
-    stopped = true
-    const lastSeenEventId = await input.channel.suspend()
-    return {
-      type: 'continue-turn',
-      harnessId: 'acpx',
-      specificationVersion: 'harness-v1',
-      data: buildBridgeState(lastSeenEventId),
-    }
-  }
-
-  const doDetach = async (): Promise<HarnessV1ResumeSessionState> => {
-    assertLive('doDetach')
-    stopped = true
-    const lastSeenEventId = await input.channel.suspend()
-    return {
-      type: 'resume-session',
-      harnessId: 'acpx',
-      specificationVersion: 'harness-v1',
-      data: buildBridgeState(lastSeenEventId),
-    }
-  }
-
-  const doStop = async (): Promise<HarnessV1ResumeSessionState> => {
-    assertLive('doStop')
-    stopped = true
-    input.channel.beginClose()
-    const detachData = await requestDetachPayload(input.channel)
-    await awaitProcExit(input.proc)
-    input.channel.close()
-    return {
-      type: 'resume-session',
-      harnessId: 'acpx',
-      specificationVersion: 'harness-v1',
-      data: detachData as HarnessV1ResumeSessionState['data'],
-    }
-  }
-
-  return {
-    sessionId: input.sessionId,
-    isResume: input.isResume,
-    doPromptTurn,
-    doContinueTurn: async () => {
-      throw new HarnessCapabilityUnsupportedError({
-        harnessId: 'acpx',
-        message:
-          'acpx-ai-harness: doContinueTurn() lands in a follow-up release.',
-      })
-    },
-    doSuspendTurn,
-    doDetach,
-    doStop,
-    doDestroy,
-    doCompact: async () => {
-      throw new HarnessCapabilityUnsupportedError({
-        harnessId: 'acpx',
-        message:
-          'acpx-ai-harness: doCompact() is not supported. acpx runtimes auto-compact internally; manual compaction has no API.',
-      })
-    },
-  }
 }
