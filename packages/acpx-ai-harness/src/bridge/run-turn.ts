@@ -17,6 +17,7 @@ import {
 import { AcpxEventTranslator } from '../acpx-event-translator.ts'
 import { harnessPermissionModeToAcpx } from '../acpx-permission.ts'
 import { toRuntimeMcpServers } from './mcp-servers.ts'
+import { createPermissionHandler } from './permission-handler.ts'
 
 export interface RunAcpxTurnOptions {
   /** The working directory the bridge was launched against. */
@@ -43,7 +44,7 @@ export async function runAcpxTurn(
   options: RunAcpxTurnOptions,
 ): Promise<void> {
   const parsed = acpxBridgeStartMessageSchema.parse(start)
-  const runtime = options.runtime ?? createAcpxRuntime(parsed, options)
+  const runtime = options.runtime ?? createAcpxRuntime(parsed, options, turn)
 
   const handle = await runtime.ensureSession({
     sessionKey: parsed.sessionKey,
@@ -92,6 +93,7 @@ export async function runAcpxTurn(
 function createAcpxRuntime(
   start: AcpxBridgeStartMessage,
   options: RunAcpxTurnOptions,
+  turn: BridgeTurn,
 ): AcpRuntime {
   const stateDir = start.stateDir ?? path.join(os.homedir(), '.acpx')
   const runtimeOptions: AcpRuntimeOptions = {
@@ -100,6 +102,7 @@ function createAcpxRuntime(
     agentRegistry: createAgentRegistry({}),
     permissionMode: harnessPermissionModeToAcpx(start.permissionMode),
     mcpServers: toRuntimeMcpServers(start.mcpServers),
+    onPermissionRequest: createPermissionHandler(turn),
   }
   return createAcpRuntime(runtimeOptions)
 }
