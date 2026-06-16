@@ -72,7 +72,25 @@ Other sandbox providers conforming to `HarnessV1SandboxProvider` work as long as
 
 ### Agents
 
-The ACP agent binary (e.g. `codex`, `claude`, `gemini`) must be available on the sandbox image at `acpx`'s startup. For Vercel sandbox you can bake the install into the runtime image, install at session start via an `onSandboxSession` hook on `HarnessAgent`, or pre-fork a snapshot.
+The harness's bootstrap recipe installs the ACP agent CLI inside the sandbox automatically for the agents below. Vercel sandbox keys snapshots by the recipe hash, so the install cost is paid once and amortised across sessions.
+
+| `agent` setting | Installed via | Auth env var |
+|---|---|---|
+| `'codex'` (default) | `npm install -g @openai/codex` | `OPENAI_API_KEY` |
+| `'claude'` | `npm install -g @anthropic-ai/claude-code` | `ANTHROPIC_API_KEY` |
+| `'gemini'` | `npm install -g @google/gemini-cli` | `GEMINI_API_KEY` |
+| any other id | (skipped — bring your own install) | (varies) |
+
+The auth env vars need to reach the sandbox at creation time, not on the host. With Vercel sandbox:
+
+```ts
+const sandbox = createVercelSandbox({
+  runtime: 'node22',
+  env: { OPENAI_API_KEY: process.env.OPENAI_API_KEY! },
+})
+```
+
+For agents the harness doesn't know about (or for custom installs), wire your own install via the framework's `onSandboxSession` hook on `HarnessAgent` and the harness will skip its own install step.
 
 ## Lifecycle
 
@@ -135,7 +153,7 @@ SMOKE_AGENTS=codex \
   bun run test:e2e      # spawn real codex on Vercel sandbox
 ```
 
-The codex e2e suite installs the `@openai/codex` CLI inside the sandbox via an `onSandboxSession` hook and forwards `OPENAI_API_KEY` into the sandbox env at creation, so the test is self-contained as long as the four env vars above are set. The first run pays the npm install cost; later runs reuse the bootstrap snapshot.
+The codex e2e suite is self-contained as long as the four env vars above are set: the harness's bootstrap recipe installs the `@openai/codex` CLI inside the sandbox, and the test forwards `OPENAI_API_KEY` into the sandbox env at creation. The first run pays the npm install cost; later runs reuse Vercel sandbox's bootstrap snapshot.
 
 ## License
 

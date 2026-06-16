@@ -132,9 +132,10 @@ describe('getBootstrap recipe', () => {
   const PKG = '{"name":"acpx-ai-harness-bridge","version":"0.0.0"}'
   const BUNDLE = 'console.log("bridge bundle stub")'
 
-  function buildWithFakeAssets() {
+  function buildWithFakeAssets(agent?: string) {
     const reads: string[] = []
     const harness = createAcpxHarness({
+      ...(agent ? { agent } : {}),
       readBridgeAsset: async (name) => {
         reads.push(name)
         if (name === 'package.json') return PKG
@@ -193,5 +194,53 @@ describe('getBootstrap recipe', () => {
   test('default reader is wired when no override is supplied', () => {
     const harness = createAcpxHarness()
     expect(typeof harness.getBootstrap).toBe('function')
+  })
+
+  test('installs the codex CLI on the codex agent (default)', async () => {
+    const { harness } = buildWithFakeAssets()
+    const recipe = await harness.getBootstrap?.()
+    const install = recipe?.commands.find((c) =>
+      c.command.includes('@openai/codex'),
+    )
+    expect(install?.command).toBe('npm install -g @openai/codex')
+  })
+
+  test('installs the claude-code CLI on the claude agent', async () => {
+    const { harness } = buildWithFakeAssets('claude')
+    const recipe = await harness.getBootstrap?.()
+    const install = recipe?.commands.find((c) =>
+      c.command.includes('@anthropic-ai/claude-code'),
+    )
+    expect(install?.command).toBe('npm install -g @anthropic-ai/claude-code')
+  })
+
+  test('installs the gemini CLI on the gemini agent', async () => {
+    const { harness } = buildWithFakeAssets('gemini')
+    const recipe = await harness.getBootstrap?.()
+    const install = recipe?.commands.find((c) =>
+      c.command.includes('@google/gemini-cli'),
+    )
+    expect(install?.command).toBe('npm install -g @google/gemini-cli')
+  })
+
+  test('skips the agent install step for unknown agents', async () => {
+    const { harness } = buildWithFakeAssets('some-custom-agent')
+    const recipe = await harness.getBootstrap?.()
+    const installs = recipe?.commands.filter((c) =>
+      c.command.startsWith('npm install -g'),
+    )
+    expect(installs).toEqual([])
+  })
+
+  test('agent install runs after pnpm but before the acpx smoke check', async () => {
+    const { harness } = buildWithFakeAssets('codex')
+    const recipe = await harness.getBootstrap?.()
+    const commands = recipe?.commands.map((c) => c.command) ?? []
+    const pnpmIdx = commands.findIndex((c) => c.includes('pnpm'))
+    const installIdx = commands.findIndex((c) => c.includes('@openai/codex'))
+    const versionIdx = commands.findIndex((c) => c.includes('acpx --version'))
+    expect(pnpmIdx).toBeGreaterThan(-1)
+    expect(installIdx).toBeGreaterThan(pnpmIdx)
+    expect(versionIdx).toBeGreaterThan(installIdx)
   })
 })

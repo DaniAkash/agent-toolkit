@@ -1,4 +1,5 @@
 import type { HarnessV1, HarnessV1Bootstrap } from '@ai-sdk/harness'
+import { installCommandForAgent } from './acpx-agent-installs.ts'
 import {
   defaultReadBridgeAsset,
   type ReadBridgeAsset,
@@ -26,11 +27,13 @@ export interface AcpxHarnessSettings {
 }
 
 const BOOTSTRAP_DIR = '/tmp/harness/acpx'
+const DEFAULT_AGENT = 'codex'
 
 export function createAcpxHarness(
   settings: AcpxHarnessSettings = {},
 ): HarnessV1<typeof ACPX_BUILTIN_TOOLS> {
   const readBridgeAsset = settings.readBridgeAsset ?? defaultReadBridgeAsset
+  const agent = settings.agent ?? DEFAULT_AGENT
   let cachedBootstrap: HarnessV1Bootstrap | undefined
 
   const getBootstrap = async (): Promise<HarnessV1Bootstrap> => {
@@ -39,6 +42,7 @@ export function createAcpxHarness(
       readBridgeAsset('package.json'),
       readBridgeAsset('index.js'),
     ])
+    const installAgent = installCommandForAgent(agent)
     cachedBootstrap = {
       harnessId: 'acpx',
       bootstrapDir: BOOTSTRAP_DIR,
@@ -51,6 +55,7 @@ export function createAcpxHarness(
         {
           command: `pnpm --dir ${BOOTSTRAP_DIR} install --no-frozen-lockfile --store-dir ${BOOTSTRAP_DIR}/.pnpm-store`,
         },
+        ...(installAgent ? [{ command: installAgent }] : []),
         {
           command: `cd ${BOOTSTRAP_DIR} && ./node_modules/.bin/acpx --version`,
         },

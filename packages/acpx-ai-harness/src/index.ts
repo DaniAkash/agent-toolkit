@@ -1,4 +1,8 @@
 export {
+  ACPX_AGENT_INSTALL_COMMANDS,
+  installCommandForAgent,
+} from './acpx-agent-installs.ts'
+export {
   defaultReadBridgeAsset,
   type ReadBridgeAsset,
 } from './acpx-bridge-assets.ts'
