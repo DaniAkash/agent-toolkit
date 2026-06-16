@@ -1,0 +1,57 @@
+import type { BridgeTurn } from '@ai-sdk/harness/bridge'
+import type { AcpPermissionDecision, AcpPermissionRequest } from 'acpx/runtime'
+
+/**
+ * Build an acpx `onPermissionRequest` callback that surfaces the request as a
+ * harness `tool-approval-request` event and waits for the host to respond via
+ * `submitToolApproval`.
+ *
+ * The harness consumer sees:
+ *   1. `tool-approval-request` { approvalId, toolCallId } for the agent's
+ *      pending tool call.
+ *   2. (host inspects, calls `submitToolApproval({ approved, reason? })`.)
+ *   3. acpx then either continues (approved) or short-circuits the tool
+ *      (rejected). When the tool runs to completion, the translator's normal
+ *      `tool-call` / `tool-result` emission path covers the rest.
+ *
+ * Returns `undefined` when the bridge turn was aborted while waiting — acpx
+ * treats `undefined` as "fall through to the configured permissionMode."
+ */
+export function createPermissionHandler(turn: BridgeTurn) {
+  return async (
+    req: AcpPermissionRequest,
+    ctx: { signal: AbortSignal },
+  ): Promise<AcpPermissionDecision | undefined> => {
+    // Pre-aborted: don't emit a doomed approval request and don't register an
+    // abort listener that nobody will clean up. Falls through to acpx's
+    // configured permissionMode.
+    if (ctx.signal.aborted) return undefined
+
+    const toolCallId = req.raw.toolCall.toolCallId
+    const approvalId = toolCallId
+
+    turn.emit({
+      type: 'tool-approval-request',
+      approvalId,
+      toolCallId,
+    })
+
+    let onAbort: (() => void) | undefined
+    try {
+      const decision = await Promise.race([
+        turn.requestToolApproval(approvalId),
+        new Promise<never>((_, reject) => {
+          onAbort = () => reject(new Error('aborted'))
+          ctx.signal.addEventListener('abort', onAbort, { once: true })
+        }),
+      ])
+      return decision.approved
+        ? { outcome: 'allow_once' }
+        : { outcome: 'reject_once' }
+    } catch {
+      return undefined
+    } finally {
+      if (onAbort) ctx.signal.removeEventListener('abort', onAbort)
+    }
+  }
+}
