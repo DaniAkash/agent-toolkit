@@ -1,4 +1,8 @@
 export {
+  defaultReadBridgeAsset,
+  type ReadBridgeAsset,
+} from './acpx-bridge-assets.ts'
+export {
   type AcpxBridgeMcpServer,
   type AcpxBridgeStartMessage,
   acpxBridgeMcpServerSchema,
@@ -25,3 +29,9 @@ export {
   type AcpxPermissionMode,
   harnessPermissionModeToAcpx,
 } from './acpx-permission.ts'
+export {
+  type AcpxBridgeInboundMessage,
+  type AcpxChannel,
+  createAcpxChannel,
+  type OpenAcpxChannelOptions,
+} from './sandbox-channel.ts'

@@ -1,6 +1,11 @@
-import type { HarnessV1 } from '@ai-sdk/harness'
+import type { HarnessV1, HarnessV1Bootstrap } from '@ai-sdk/harness'
+import {
+  defaultReadBridgeAsset,
+  type ReadBridgeAsset,
+} from './acpx-bridge-assets.ts'
 import { ACPX_BUILTIN_TOOLS } from './acpx-builtin-tools.ts'
 import { acpxLifecycleStateSchema } from './acpx-lifecycle.ts'
+import { doStartImpl } from './host-session.ts'
 
 export interface AcpxHarnessSettings {
   /** ACP agent id, e.g. `'claude'`, `'codex'`, `'gemini'`. */
@@ -13,23 +18,55 @@ export interface AcpxHarnessSettings {
   readonly startupTimeoutMs?: number
   /** Override the sandbox port when multiple are exposed. */
   readonly port?: number
+  /**
+   * Test seam: override the bridge-asset reader. Defaults to reading the
+   * shipped `dist/bridge/<name>` files from disk.
+   */
+  readonly readBridgeAsset?: ReadBridgeAsset
 }
 
+const BOOTSTRAP_DIR = '/tmp/harness/acpx'
+
 export function createAcpxHarness(
-  _settings: AcpxHarnessSettings = {},
+  settings: AcpxHarnessSettings = {},
 ): HarnessV1<typeof ACPX_BUILTIN_TOOLS> {
+  const readBridgeAsset = settings.readBridgeAsset ?? defaultReadBridgeAsset
+  let cachedBootstrap: HarnessV1Bootstrap | undefined
+
+  const getBootstrap = async (): Promise<HarnessV1Bootstrap> => {
+    if (cachedBootstrap) return cachedBootstrap
+    const [pkg, bundle] = await Promise.all([
+      readBridgeAsset('package.json'),
+      readBridgeAsset('index.js'),
+    ])
+    cachedBootstrap = {
+      harnessId: 'acpx',
+      bootstrapDir: BOOTSTRAP_DIR,
+      files: [
+        { path: `${BOOTSTRAP_DIR}/package.json`, content: pkg },
+        { path: `${BOOTSTRAP_DIR}/bridge.mjs`, content: bundle },
+      ],
+      commands: [
+        { command: `mkdir -p ${BOOTSTRAP_DIR}` },
+        {
+          command: `pnpm --dir ${BOOTSTRAP_DIR} install --no-frozen-lockfile --store-dir ${BOOTSTRAP_DIR}/.pnpm-store`,
+        },
+        {
+          command: `cd ${BOOTSTRAP_DIR} && ./node_modules/.bin/acpx --version`,
+        },
+      ],
+    }
+    return cachedBootstrap
+  }
+
   return {
     specificationVersion: 'harness-v1',
     harnessId: 'acpx',
     builtinTools: ACPX_BUILTIN_TOOLS,
     supportsBuiltinToolApprovals: true,
     lifecycleStateSchema: acpxLifecycleStateSchema,
-    async doStart() {
-      throw new Error(
-        'acpx-ai-harness: doStart() is not implemented yet. ' +
-          'This is a placeholder while the package is under construction.',
-      )
-    },
+    getBootstrap,
+    doStart: (startOptions) => doStartImpl(settings, startOptions),
   }
 }
 
