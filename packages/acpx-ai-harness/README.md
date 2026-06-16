@@ -144,7 +144,7 @@ The harness advertises the seven harness common-tool entries (`read`, `write`, `
 ```bash
 bun install
 bun run build           # emits dist/index.js + dist/bridge/index.js
-bun run test            # unit + integration tests (no sandbox needed)
+bun run test            # unit tests only (no sandbox needed)
 SMOKE_AGENTS=codex \
   VERCEL_TOKEN=... \
   VERCEL_TEAM_ID=... \

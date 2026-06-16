@@ -1,4 +1,8 @@
 import { describe } from 'bun:test'
+import { readFile } from 'node:fs/promises'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import type { ReadBridgeAsset } from '../../src/acpx-bridge-assets.ts'
 
 /**
  * Helpers for running e2e tests against real ACP agents through a real
@@ -94,4 +98,23 @@ export function collectAgentEnv(agent: string): Record<string, string> {
     if (value) out[key] = value
   }
   return out
+}
+
+const DIST_BRIDGE_DIR = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '..',
+  '..',
+  'dist',
+  'bridge',
+)
+
+/**
+ * Bridge-asset reader for the e2e suite. `defaultReadBridgeAsset` resolves
+ * paths relative to its own module — when this test imports `createAcpxHarness`
+ * from `src/`, that points at `src/bridge/` which doesn't have the bundled
+ * `index.js`. The test runs `bun run build` first via the `test:e2e` script,
+ * so we point the reader at `dist/bridge/` explicitly.
+ */
+export const readBridgeAssetFromDist: ReadBridgeAsset = async (name) => {
+  return readFile(path.join(DIST_BRIDGE_DIR, name), 'utf8')
 }

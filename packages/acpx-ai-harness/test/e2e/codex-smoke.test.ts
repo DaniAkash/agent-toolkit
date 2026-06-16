@@ -2,7 +2,11 @@ import { expect, test } from 'bun:test'
 import { HarnessAgent } from '@ai-sdk/harness/agent'
 import { createVercelSandbox } from '@ai-sdk/sandbox-vercel'
 import { createAcpxHarness } from '../../src/acpx-harness.ts'
-import { collectAgentEnv, describeForAgent } from './helpers.ts'
+import {
+  collectAgentEnv,
+  describeForAgent,
+  readBridgeAssetFromDist,
+} from './helpers.ts'
 
 const AGENT = 'codex'
 const SESSION_TIMEOUT_MS = 5 * 60 * 1000
@@ -11,9 +15,19 @@ const SESSION_TIMEOUT_MS = 5 * 60 * 1000
  * The harness's bootstrap recipe handles the codex install inside the
  * sandbox (via `npm install -g @openai/codex`), so the test just needs
  * to forward `OPENAI_API_KEY` into the sandbox env at creation time.
+ *
+ * The `readBridgeAsset` override points the bootstrap at `dist/bridge/`
+ * because this test imports `createAcpxHarness` from `src/`, where
+ * `defaultReadBridgeAsset` would look for the bundled `index.js` next to
+ * its own module (and find only the unbuilt source). The `test:e2e`
+ * script runs `bun run build` first, so `dist/bridge/` is always
+ * present here.
  */
 const buildAgent = () => {
-  const harness = createAcpxHarness({ agent: 'codex' })
+  const harness = createAcpxHarness({
+    agent: 'codex',
+    readBridgeAsset: readBridgeAssetFromDist,
+  })
   const sandbox = createVercelSandbox({
     runtime: 'node22',
     env: collectAgentEnv(AGENT),
