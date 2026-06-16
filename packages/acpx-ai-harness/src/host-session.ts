@@ -56,17 +56,35 @@ export async function doStartImpl(
     abortSignal: start.abortSignal,
   })
 
-  await waitForBridgeReady({
-    proc,
-    sandbox: sandboxSession.restricted(),
-    bridgeStateDir,
-    bridgeType: 'acpx',
-    timeoutMs: settings.startupTimeoutMs ?? DEFAULT_STARTUP_TIMEOUT_MS,
-    abortSignal: start.abortSignal,
-  })
+  // From this point on, anything that throws must tear the bridge process
+  // down or it leaks inside the sandbox. waitForBridgeReady() can time out;
+  // channel.open() can fail if the WS port never becomes reachable.
+  let channel: AcpxChannel | undefined
+  try {
+    await waitForBridgeReady({
+      proc,
+      sandbox: sandboxSession.restricted(),
+      bridgeStateDir,
+      bridgeType: 'acpx',
+      timeoutMs: settings.startupTimeoutMs ?? DEFAULT_STARTUP_TIMEOUT_MS,
+      abortSignal: start.abortSignal,
+    })
 
-  const channel = createAcpxChannel({ sandboxSession, port, token })
-  await channel.open()
+    channel = createAcpxChannel({ sandboxSession, port, token })
+    await channel.open()
+  } catch (err) {
+    try {
+      channel?.close()
+    } catch {
+      /* idempotent */
+    }
+    try {
+      await proc.kill()
+    } catch {
+      /* idempotent */
+    }
+    throw err
+  }
 
   return createSession({
     sessionId: start.sessionId,
@@ -104,11 +122,10 @@ function createSession(input: CreateSessionInput): HarnessV1Session {
   ): Promise<HarnessV1PromptControl> => {
     assertLive('doPromptTurn')
     const prompt = extractPromptText(opts.prompt)
-    const text =
-      !instructionsApplied && opts.instructions
-        ? `${opts.instructions.trim()}\n\n${prompt}`
-        : prompt
-    instructionsApplied = true
+    const trimmedInstructions = opts.instructions?.trim() ?? ''
+    const shouldApply = !instructionsApplied && trimmedInstructions.length > 0
+    const text = shouldApply ? `${trimmedInstructions}\n\n${prompt}` : prompt
+    if (shouldApply) instructionsApplied = true
 
     const frame: AcpxBridgeStartMessage = {
       type: 'start',
@@ -157,7 +174,7 @@ function createSession(input: CreateSessionInput): HarnessV1Session {
     }
   }
 
-  const notImplemented = (method: string) => () => {
+  const notImplemented = (method: string) => async () => {
     throw new HarnessCapabilityUnsupportedError({
       harnessId: 'acpx',
       message: `acpx-ai-harness: ${method}() lands in a follow-up release.`,
@@ -173,7 +190,7 @@ function createSession(input: CreateSessionInput): HarnessV1Session {
     doDetach: notImplemented('doDetach'),
     doStop: notImplemented('doStop'),
     doDestroy,
-    doCompact: () => {
+    doCompact: async () => {
       throw new HarnessCapabilityUnsupportedError({
         harnessId: 'acpx',
         message:

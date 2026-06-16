@@ -45,34 +45,52 @@ export function wirePromptControl(
     rejectDone = reject
   })
   const unsubs: Array<() => void> = []
+  let settled = false
+  let onAbort: (() => void) | undefined
 
   const cleanup = () => {
     for (const u of unsubs) {
       u()
     }
+    unsubs.length = 0
+    if (onAbort && input.abortSignal) {
+      input.abortSignal.removeEventListener('abort', onAbort)
+      onAbort = undefined
+    }
+  }
+
+  const settleResolve = () => {
+    if (settled) return
+    settled = true
+    resolveDone()
+    cleanup()
+  }
+
+  const settleReject = (err: unknown) => {
+    if (settled) return
+    settled = true
+    rejectDone(err)
+    cleanup()
   }
 
   for (const type of STREAM_PART_TYPES) {
     unsubs.push(
       input.channel.on(type, (event) => {
         input.emit(event as HarnessV1StreamPart)
-        if (event.type === 'finish') {
-          resolveDone()
-          cleanup()
-        }
+        if (event.type === 'finish') settleResolve()
       }),
     )
   }
 
   if (input.abortSignal) {
-    const onAbort = () => {
+    onAbort = () => {
+      if (settled) return
       try {
         input.channel.send({ type: 'abort' })
       } catch {
         /* socket may already be gone */
       }
-      rejectDone(new Error('aborted'))
-      cleanup()
+      settleReject(new Error('aborted'))
     }
     if (input.abortSignal.aborted) onAbort()
     else input.abortSignal.addEventListener('abort', onAbort, { once: true })
