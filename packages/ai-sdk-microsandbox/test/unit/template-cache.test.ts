@@ -238,6 +238,38 @@ describe('TemplateCache — concurrency', () => {
     expect(calls).toBe(1)
     expect(a.snapshotName).toBe(b.snapshotName)
   })
+
+  test('same identity with different settings does NOT share the in-flight Promise', async () => {
+    const { factory } = newBuilderFactory()
+    const snapshotApi = new MockSnapshotApi()
+    const cache = new TemplateCache({ cacheRoot, snapshotApi })
+
+    let calls = 0
+    const onFirstCreate = async () => {
+      calls += 1
+      await new Promise((resolve) => setTimeout(resolve, 20))
+    }
+
+    const [a, b] = await Promise.all([
+      cache.resolveTemplate({
+        identity: 'foo',
+        settings: { image: 'debian' },
+        builderFactory: factory,
+        onFirstCreate,
+      }),
+      cache.resolveTemplate({
+        identity: 'foo',
+        // Different image → different optionsHash; must NOT share the
+        // in-flight Promise with the call above.
+        settings: { image: 'ubuntu' },
+        builderFactory: factory,
+        onFirstCreate,
+      }),
+    ])
+
+    expect(calls).toBe(2)
+    expect(a.snapshotName).not.toBe(b.snapshotName)
+  })
 })
 
 describe('TemplateCache — invalidation', () => {

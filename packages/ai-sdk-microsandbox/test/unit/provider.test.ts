@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { tmpdir } from 'node:os'
 import type { Sandbox, SandboxBuilder } from 'microsandbox'
 import { MicrosandboxNetworkSandboxSession } from '../../src/microsandbox-network-sandbox-session.ts'
 import {
@@ -6,11 +7,20 @@ import {
   MicrosandboxProvider,
 } from '../../src/microsandbox-provider.ts'
 import { MicrosandboxSettingsError } from '../../src/settings.ts'
+import type { SnapshotApi } from '../../src/template-cache.ts'
 import { MockSandbox } from '../helpers/mock-sandbox.ts'
 import { MockSandboxBuilder } from '../helpers/mock-sandbox-builder.ts'
 
 function asSandbox(mock: MockSandbox): Sandbox {
   return mock as unknown as Sandbox
+}
+
+function minimalSnapshotApi(): SnapshotApi {
+  return {
+    stopAndSnapshot: async () => undefined,
+    snapshotExists: async () => false,
+    removeSnapshotIfExists: async () => undefined,
+  }
 }
 
 interface BuilderFactoryHarness {
@@ -211,25 +221,27 @@ describe('MicrosandboxProvider — createSession (create mode)', () => {
     expect(history).toHaveLength(0)
   })
 
-  test('identity + onFirstCreate is now supported (Phase 4)', async () => {
-    // No longer throws; the full identity-branch behavior is verified in
-    // provider-identity.test.ts which wires the TemplateCache test seam.
-    const provider = createMicrosandbox({ image: 'debian' })
-    // We can't run this against a real builder here, but at least confirm
-    // it doesn't synchronously reject with HarnessCapabilityUnsupportedError.
-    const promise = provider.createSession({
+  test('identity + onFirstCreate no longer throws HarnessCapabilityUnsupportedError', async () => {
+    // Full identity-branch behavior is verified in provider-identity.test.ts;
+    // here we just confirm the unsupported-capability throw from Phase 3 is
+    // gone. Hermetic — uses the builderFactory + templateCache seams.
+    const { factory } = newBuilderFactoryHarness()
+    const provider = new MicrosandboxProvider(
+      { image: 'debian' },
+      {
+        builderFactory: factory,
+        templateCacheOptions: {
+          // A fresh cache root per test isolates filesystem state.
+          // os.tmpdir() suffices; we don't read anything back here.
+          cacheRoot: `${tmpdir()}/provider-test-${Date.now()}`,
+          snapshotApi: minimalSnapshotApi(),
+        },
+      },
+    )
+    const session = await provider.createSession({
       identity: 'claude-code-v1',
       onFirstCreate: async () => undefined,
     })
-    // Catch any error so this test focuses on the rejection *type*.
-    let rejection: unknown
-    try {
-      await promise
-    } catch (error) {
-      rejection = error
-    }
-    expect((rejection as { name?: string })?.name).not.toBe(
-      'HarnessCapabilityUnsupportedError',
-    )
+    expect(session).toBeDefined()
   })
 })

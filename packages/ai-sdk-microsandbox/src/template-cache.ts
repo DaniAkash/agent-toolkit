@@ -130,16 +130,19 @@ export class TemplateCache {
   /**
    * Resolve a snapshot template for the given identity. Cache hit returns
    * immediately; cache miss invokes `onFirstCreate` exactly once per
-   * identity across all concurrent callers in this process.
+   * (identity, optionsHash) tuple across all concurrent callers in this
+   * process. Keying the in-flight map by both prevents cross-settings
+   * contamination when two providers with different settings happen to
+   * share an identity string.
    */
   async resolveTemplate(input: ResolveTemplateInput): Promise<TemplateRecord> {
     input.abortSignal?.throwIfAborted()
+    const optionsHash = computeOptionsHash(input.settings)
     const inflight = getGlobalCache().inflight
-    const inflightKey = identityHash(input.identity)
+    const inflightKey = `${identityHash(input.identity)}:${optionsHash}`
     const existing = inflight.get(inflightKey)
     if (existing) return await existing
 
-    const optionsHash = computeOptionsHash(input.settings)
     const promise = this.materialiseTemplate({
       ...input,
       optionsHash,

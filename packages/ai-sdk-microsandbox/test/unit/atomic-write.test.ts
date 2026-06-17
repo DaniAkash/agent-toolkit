@@ -115,4 +115,29 @@ describe('atomicWriteIntoDirectory', () => {
     const entries = await readdir(root)
     expect(entries).toEqual(['target'])
   })
+
+  test('preserves the original finalDir when the commit fails after backup', async () => {
+    const finalDir = join(root, 'target')
+    // Seed an existing finalDir with content the helper must not lose.
+    await atomicWriteIntoDirectory({
+      finalDir,
+      filename: 'data.txt',
+      payload: 'original',
+    })
+    // Drive a commit failure by throwing in prepare() — finalDir still
+    // exists from the seed write; the helper should clean up its tmp dir
+    // and leave the original intact.
+    await expect(
+      atomicWriteIntoDirectory({
+        finalDir,
+        filename: 'data.txt',
+        payload: 'replacement',
+        prepare: async () => {
+          throw new Error('commit aborted')
+        },
+      }),
+    ).rejects.toThrow('commit aborted')
+    const content = await readFile(join(finalDir, 'data.txt'), 'utf8')
+    expect(content).toBe('original')
+  })
 })
