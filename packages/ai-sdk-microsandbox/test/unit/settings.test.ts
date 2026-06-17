@@ -124,8 +124,6 @@ describe('isMicrosandboxCreateSettings', () => {
   })
 
   test('returns false for wrap-mode settings', () => {
-    expect(
-      isMicrosandboxCreateSettings({ sandbox: fakeSandbox }),
-    ).toBe(false)
+    expect(isMicrosandboxCreateSettings({ sandbox: fakeSandbox })).toBe(false)
   })
 })
