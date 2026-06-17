@@ -1,27 +1,34 @@
 /**
  * Per-agent install commands the bootstrap recipe runs inside the sandbox.
  *
- * The harness owns this so consumers don't have to wire a custom
- * `onSandboxSession` hook just to put the CLI on PATH. Each command is run
- * once per snapshot identity (Vercel sandbox keys snapshots by the recipe
- * hash, so the install cost is amortised across sessions).
+ * acpx invokes a specific ACP-protocol wrapper binary for each agent (see
+ * acpx's README's "Built-ins" table for the canonical mapping). For the
+ * agents that need a separately-installed wrapper, we pre-warm the npx
+ * cache during bootstrap so the first turn doesn't pay the fetch cost.
+ * Agents whose wrapper is the agent CLI itself (gemini, qwen, kiro, ...)
+ * still need that CLI on PATH; for those we run `npm install -g`.
+ *
+ * Each install command is run once per snapshot identity (Vercel sandbox
+ * keys snapshots by the recipe hash), so the cost is amortised across
+ * sessions.
  *
  * Agents without an entry here aren't installed by the bootstrap. The
- * consumer remains free to install them via the framework's
- * `onSandboxSession` hook for any agent the harness doesn't know about,
- * or to bake them into a custom sandbox image.
+ * consumer can wire a custom `onSandboxSession` hook on `HarnessAgent`
+ * to install one we don't know about, or bake it into a custom sandbox
+ * image.
  *
- * Each agent reads its auth credential from an env var at run time:
- *   - codex   → OPENAI_API_KEY
- *   - claude  → ANTHROPIC_API_KEY
- *   - gemini  → GEMINI_API_KEY
- *
- * The harness does not forward these — they need to be in the sandbox's
- * env at creation time (e.g. `createVercelSandbox({ env: {...} })`).
+ * Auth credentials are NOT in this table; the harness handles them via
+ * `AcpxHarnessSettings.auth` (writes `~/.acpx/config.json` per session)
+ * and the acpx adapter reads them from there at turn time.
  */
 export const ACPX_AGENT_INSTALL_COMMANDS: Readonly<Record<string, string>> = {
-  codex: 'npm install -g @openai/codex',
-  claude: 'npm install -g @anthropic-ai/claude-code',
+  // codex-acp: ACP wrapper over the OpenAI Codex SDK (per acpx README).
+  // npx --yes pre-warms the cache so the first turn doesn't fetch.
+  codex: 'npx --yes @zed-industries/codex-acp --version',
+  // claude-agent-acp: ACP wrapper over Claude Code (per acpx README).
+  claude:
+    'npx --yes @agentclientprotocol/claude-agent-acp --version || npm install -g @anthropic-ai/claude-code',
+  // gemini ships ACP natively (`gemini --acp`); install the CLI.
   gemini: 'npm install -g @google/gemini-cli',
 }
 

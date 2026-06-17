@@ -196,22 +196,26 @@ describe('getBootstrap recipe', () => {
     expect(typeof harness.getBootstrap).toBe('function')
   })
 
-  test('installs the codex CLI on the codex agent (default)', async () => {
+  test('pre-warms the codex-acp wrapper on the codex agent (default)', async () => {
     const { harness } = buildWithFakeAssets()
     const recipe = await harness.getBootstrap?.()
     const install = recipe?.commands.find((c) =>
-      c.command.includes('@openai/codex'),
+      c.command.includes('@zed-industries/codex-acp'),
     )
-    expect(install?.command).toBe('npm install -g @openai/codex')
+    expect(install?.command).toBe(
+      'npx --yes @zed-industries/codex-acp --version',
+    )
   })
 
-  test('installs the claude-code CLI on the claude agent', async () => {
+  test('pre-warms the claude-agent-acp wrapper on the claude agent', async () => {
     const { harness } = buildWithFakeAssets('claude')
     const recipe = await harness.getBootstrap?.()
     const install = recipe?.commands.find((c) =>
-      c.command.includes('@anthropic-ai/claude-code'),
+      c.command.includes('@agentclientprotocol/claude-agent-acp'),
     )
-    expect(install?.command).toBe('npm install -g @anthropic-ai/claude-code')
+    expect(install?.command).toContain(
+      'npx --yes @agentclientprotocol/claude-agent-acp --version',
+    )
   })
 
   test('installs the gemini CLI on the gemini agent', async () => {
@@ -227,7 +231,7 @@ describe('getBootstrap recipe', () => {
     const { harness } = buildWithFakeAssets('some-custom-agent')
     const recipe = await harness.getBootstrap?.()
     const installs = recipe?.commands.filter((c) =>
-      c.command.startsWith('npm install -g'),
+      /(?:npm install -g|npx --yes)/.test(c.command),
     )
     expect(installs).toEqual([])
   })
@@ -237,7 +241,9 @@ describe('getBootstrap recipe', () => {
     const recipe = await harness.getBootstrap?.()
     const commands = recipe?.commands.map((c) => c.command) ?? []
     const pnpmIdx = commands.findIndex((c) => c.includes('pnpm'))
-    const installIdx = commands.findIndex((c) => c.includes('@openai/codex'))
+    const installIdx = commands.findIndex((c) =>
+      c.includes('@zed-industries/codex-acp'),
+    )
     const versionIdx = commands.findIndex((c) => c.includes('acpx --version'))
     expect(pnpmIdx).toBeGreaterThan(-1)
     expect(installIdx).toBeGreaterThan(pnpmIdx)
