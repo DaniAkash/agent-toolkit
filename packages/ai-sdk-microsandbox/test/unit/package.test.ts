@@ -6,7 +6,12 @@ describe('ai-sdk-microsandbox package surface', () => {
     expect(pkg).toBeDefined()
   })
 
-  test('public surface is empty in the scaffold release', () => {
-    expect(Object.keys(pkg)).toEqual([])
+  test('exports MicrosandboxSandboxSession', () => {
+    expect(pkg.MicrosandboxSandboxSession).toBeDefined()
+    expect(typeof pkg.MicrosandboxSandboxSession).toBe('function')
+  })
+
+  test('exports VERSION sentinel', () => {
+    expect(pkg.VERSION).toBe('0.0.0')
   })
 })

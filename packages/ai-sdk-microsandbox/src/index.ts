@@ -1,4 +1,3 @@
-// Public exports land in subsequent releases. This stub keeps the package
-// installable so consumers can pin the name and version ahead of the
-// implementation.
-export {}
+export { MicrosandboxSandboxSession } from './microsandbox-sandbox-session.ts'
+
+export const VERSION = '0.0.0'

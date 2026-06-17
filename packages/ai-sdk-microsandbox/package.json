@@ -55,7 +55,9 @@
     "microsandbox": ">=0.5.7"
   },
   "devDependencies": {
+    "@ai-sdk/provider-utils": "5.0.0-canary.48",
     "bunup": "^0.16.31",
+    "microsandbox": "0.5.7",
     "typescript": "^6.0.3"
   },
   "publishConfig": {
