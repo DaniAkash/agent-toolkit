@@ -6,6 +6,7 @@ export {
 export type {
   MicrosandboxProviderInternals,
   SandboxBuilderFactory,
+  SandboxStarter,
 } from './microsandbox-provider.ts'
 export {
   createMicrosandbox,

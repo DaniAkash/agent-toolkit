@@ -37,9 +37,16 @@ const DEFAULT_BIND = '127.0.0.1'
  */
 export type SandboxBuilderFactory = (name: string) => SandboxBuilder
 
+/**
+ * Test-only seam: replaces `Sandbox.start(name)` so unit tests can verify
+ * the resume path without touching the NAPI binding.
+ */
+export type SandboxStarter = (name: string) => Promise<Sandbox>
+
 /** Test-only seam options. See {@link SandboxBuilderFactory}. */
 export interface MicrosandboxProviderInternals {
   readonly builderFactory?: SandboxBuilderFactory
+  readonly sandboxStart?: SandboxStarter
   /**
    * Override the {@link TemplateCache} the provider uses for the
    * identity/onFirstCreate snapshot path. Defaults to a cache constructed
@@ -76,6 +83,7 @@ export class MicrosandboxProvider implements HarnessV1SandboxProvider {
 
   private readonly settings: MicrosandboxSettings
   private readonly builderFactory: SandboxBuilderFactory
+  private readonly sandboxStart: SandboxStarter
   private readonly templateCache: TemplateCache
 
   constructor(
@@ -86,6 +94,9 @@ export class MicrosandboxProvider implements HarnessV1SandboxProvider {
     this.settings = settings
     this.builderFactory =
       _internal.builderFactory ?? ((name: string) => SandboxClass.builder(name))
+    this.sandboxStart =
+      _internal.sandboxStart ??
+      ((name: string) => SandboxClass.start(name) as Promise<Sandbox>)
     this.templateCache =
       _internal.templateCache ??
       new TemplateCache(_internal.templateCacheOptions)
@@ -125,6 +136,33 @@ export class MicrosandboxProvider implements HarnessV1SandboxProvider {
     }
 
     return await this.createFreshSession(options)
+  }
+
+  resumeSession = async (options: {
+    sessionId: string
+    abortSignal?: AbortSignal
+  }): Promise<HarnessNetworkSession> => {
+    options.abortSignal?.throwIfAborted()
+
+    if (this.isWrapMode()) {
+      // Wrap mode: caller owns the sandbox lifecycle; sessionId carries no
+      // identity here, so resume reduces to a fresh wrap over the same vm.
+      return await this.createWrappedSession()
+    }
+
+    if (!isMicrosandboxCreateSettings(this.settings)) {
+      throw new Error('resumeSession called outside create mode')
+    }
+    const settings: MicrosandboxCreateSettings = this.settings
+    const name = sessionSandboxName(options.sessionId)
+    const sandbox = (await this.sandboxStart(name)) as Sandbox
+    options.abortSignal?.throwIfAborted()
+    return await MicrosandboxNetworkSandboxSession.create({
+      sandbox,
+      ports: createModePorts(settings),
+      publicHostname: settings.publicHostname,
+      ownsLifecycle: true,
+    })
   }
 
   private isWrapMode(): boolean {
