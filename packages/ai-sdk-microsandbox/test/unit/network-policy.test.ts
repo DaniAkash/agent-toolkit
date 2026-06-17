@@ -106,7 +106,7 @@ describe('translateNetworkPolicy', () => {
     expect(() => builder.build()).not.toThrow()
   })
 
-  test('rule order: deny.cidr rules emit AFTER allow rules', () => {
+  test('rule order: deny.cidr rules emit BEFORE allow rules', () => {
     const builder = translateNetworkPolicy({
       mode: 'custom',
       allowedCIDRs: ['10.0.0.0/8'],
@@ -115,9 +115,10 @@ describe('translateNetworkPolicy', () => {
     const policy = buildPolicy(builder) as {
       rules: Array<{ action: string }>
     }
-    // Two rules; allow first, then deny. Insulates against first-match
-    // evaluators that would otherwise let the allow win.
-    expect(policy.rules[0]?.action).toBe('allow')
-    expect(policy.rules[1]?.action).toBe('deny')
+    // Deny first, allow second. Under first-match evaluators the deny wins
+    // for any address covered by both, giving deniedCIDRs the precedence the
+    // harness contract requires.
+    expect(policy.rules[0]?.action).toBe('deny')
+    expect(policy.rules[1]?.action).toBe('allow')
   })
 })

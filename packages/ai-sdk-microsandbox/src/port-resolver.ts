@@ -12,6 +12,15 @@ export interface ResolvedPort {
 const UNSPECIFIED_BIND = new Set(['0.0.0.0', '::'])
 
 /**
+ * Wrap IPv6 literals in `[...]` per RFC 3986; pass IPv4 and hostnames
+ * through unchanged. Heuristic: any host containing `:` is treated as IPv6.
+ */
+function formatHostForUrl(host: string): string {
+  if (host.includes(':')) return `[${host}]`
+  return host
+}
+
+/**
  * Resolve host-port URLs for a sandbox. Owned by the network sandbox session
  * — there's one resolver per session, constructed from the settings the
  * provider used to spin up the sandbox.
@@ -26,7 +35,11 @@ export class PortResolver {
     providerId: string
   }) {
     this.byPort = new Map(input.ports.map((p) => [p.port, p]))
-    this.hostname = input.publicHostname ?? DEFAULT_PUBLIC_HOSTNAME
+    // Treat empty / whitespace-only publicHostname as unset to avoid emitting
+    // URLs like `http://:9090`.
+    const trimmed = input.publicHostname?.trim()
+    this.hostname =
+      trimmed && trimmed.length > 0 ? trimmed : DEFAULT_PUBLIC_HOSTNAME
     this.providerId = input.providerId
   }
 
@@ -55,6 +68,6 @@ export class PortResolver {
         : options.protocol === 'ws'
           ? 'ws'
           : 'http'
-    return `${scheme}://${host}:${entry.port}`
+    return `${scheme}://${formatHostForUrl(host)}:${entry.port}`
   }
 }

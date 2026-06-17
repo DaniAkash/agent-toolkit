@@ -85,4 +85,35 @@ describe('PortResolver', () => {
     })
     expect(resolver.resolve({ port: 8080 })).toBe('http://10.0.0.5:8080')
   })
+
+  test('IPv6 literal bind addresses are bracketed per RFC 3986', () => {
+    const resolver = newResolver({
+      ports: [{ port: 8080, bind: '::1' }],
+    })
+    expect(resolver.resolve({ port: 8080 })).toBe('http://[::1]:8080')
+  })
+
+  test('IPv6 unspecified bind with IPv6 publicHostname produces a bracketed URL', () => {
+    const resolver = newResolver({
+      ports: [{ port: 8080, bind: '::' }],
+      publicHostname: '2001:db8::1',
+    })
+    expect(resolver.resolve({ port: 8080 })).toBe('http://[2001:db8::1]:8080')
+  })
+
+  test('empty publicHostname falls back to the default', () => {
+    const resolver = newResolver({
+      ports: [{ port: 9090, bind: '0.0.0.0' }],
+      publicHostname: '',
+    })
+    expect(resolver.resolve({ port: 9090 })).toBe('http://127.0.0.1:9090')
+  })
+
+  test('whitespace-only publicHostname falls back to the default', () => {
+    const resolver = newResolver({
+      ports: [{ port: 9090, bind: '0.0.0.0' }],
+      publicHostname: '   ',
+    })
+    expect(resolver.resolve({ port: 9090 })).toBe('http://127.0.0.1:9090')
+  })
 })

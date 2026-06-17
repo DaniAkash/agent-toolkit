@@ -90,7 +90,9 @@ export class MicrosandboxSettingsError extends Error {
   }
 }
 
-const PORT_MIN = 0
+// Published ports must be a real, addressable port — port 0 would generate
+// unusable URLs (`http://...:0`) downstream from `getPortUrl`. Reject up front.
+const PORT_MIN = 1
 const PORT_MAX = 65535
 
 function isCreateSettings(

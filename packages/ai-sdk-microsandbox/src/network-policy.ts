@@ -10,10 +10,13 @@ import { NetworkPolicyBuilder } from 'microsandbox'
  * Translation:
  * - `'allow-all'` → `defaultAllow()`
  * - `'deny-all'` → `defaultDeny()`
- * - `'custom'` → `defaultDeny()` + per-host `allow.domainSuffix` rules +
- *   per-CIDR `allow.cidr` / `deny.cidr` rules. Deny rules are emitted last
- *   so first-match evaluators see them ahead of allows; action-precedence
- *   evaluators are unaffected by ordering.
+ * - `'custom'` → `defaultDeny()` + per-CIDR `deny.cidr` rules emitted FIRST
+ *   followed by per-host `allow.domainSuffix` and per-CIDR `allow.cidr`. The
+ *   harness contract guarantees `deniedCIDRs` overrides allows; emitting
+ *   denies first gives deny-precedence under first-match evaluators (the
+ *   common case for network rule engines) while leaving action-precedence
+ *   evaluators unaffected by ordering. Microsandbox's exact evaluation
+ *   semantics are confirmed by integration tests against a real microVM.
  */
 export function translateNetworkPolicy(
   policy: HarnessV1NetworkPolicy,
@@ -25,14 +28,16 @@ export function translateNetworkPolicy(
       return new NetworkPolicyBuilder().defaultDeny()
     case 'custom': {
       const builder = new NetworkPolicyBuilder().defaultDeny()
+      // Denies first — first-match evaluators see them ahead of allows so
+      // deniedCIDRs win against overlapping allowedHosts/allowedCIDRs.
+      for (const cidr of policy.deniedCIDRs ?? []) {
+        builder.rule((r) => r.any().deny((d) => d.cidr(cidr)))
+      }
       for (const host of policy.allowedHosts ?? []) {
         builder.rule((r) => r.any().allow((d) => d.domainSuffix(host)))
       }
       for (const cidr of policy.allowedCIDRs ?? []) {
         builder.rule((r) => r.any().allow((d) => d.cidr(cidr)))
-      }
-      for (const cidr of policy.deniedCIDRs ?? []) {
-        builder.rule((r) => r.any().deny((d) => d.cidr(cidr)))
       }
       return builder
     }

@@ -62,6 +62,24 @@ describe('validateMicrosandboxSettings — create mode', () => {
     ).toThrow(/host port/)
   })
 
+  test('rejects host port 0 (unusable in URLs)', () => {
+    expect(() =>
+      validateMicrosandboxSettings({
+        image: 'debian',
+        ports: [{ host: 0, guest: 80 }],
+      }),
+    ).toThrow(/host port/)
+  })
+
+  test('rejects guest port 0', () => {
+    expect(() =>
+      validateMicrosandboxSettings({
+        image: 'debian',
+        ports: [{ host: 8080, guest: 0 }],
+      }),
+    ).toThrow(/guest port/)
+  })
+
   test('rejects out-of-range guest port', () => {
     expect(() =>
       validateMicrosandboxSettings({
