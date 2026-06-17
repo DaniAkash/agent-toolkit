@@ -10,7 +10,12 @@ export function isFileNotFoundError(error: unknown): boolean {
   if (code === 'ENOENT' || code === 'NotFound') return true
   const message = (error as { message?: unknown }).message
   if (typeof message !== 'string') return false
-  return /no such file|not found|does not exist|enoent/i.test(message)
+  // Intentionally narrow: a bare `not found` substring matches unrelated
+  // errors like "command not found" or "resource not found" that microsandbox
+  // could surface from inside the guest. Stick to the file-specific phrasings
+  // and the explicit ENOENT marker; the `code` check above handles the
+  // structured-error path.
+  return /no such file|does not exist|\bENOENT\b/i.test(message)
 }
 
 /**

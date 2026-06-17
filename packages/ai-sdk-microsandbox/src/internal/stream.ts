@@ -1,14 +1,22 @@
 import type { ExecEvent } from 'microsandbox'
 
-/** Drain a `ReadableStream<Uint8Array>` into a single byte buffer. */
+/**
+ * Drain a `ReadableStream<Uint8Array>` into a single byte buffer. Honors
+ * `abortSignal` between chunks — if abort fires mid-drain we cancel the
+ * source stream and throw `signal.reason`, rather than waiting for the
+ * entire upload to finish.
+ */
 export async function collectStream(
   stream: ReadableStream<Uint8Array>,
+  abortSignal?: AbortSignal,
 ): Promise<Uint8Array> {
+  abortSignal?.throwIfAborted()
   const reader = stream.getReader()
   const chunks: Uint8Array[] = []
   let total = 0
   try {
     while (true) {
+      abortSignal?.throwIfAborted()
       const { value, done } = await reader.read()
       if (done) break
       if (value) {
@@ -16,6 +24,11 @@ export async function collectStream(
         total += value.byteLength
       }
     }
+  } catch (error) {
+    // Best-effort: tell the source we're not reading anymore so it can release
+    // resources. Swallow cancel errors; the original error is what matters.
+    reader.cancel(error).catch(() => {})
+    throw error
   } finally {
     reader.releaseLock()
   }

@@ -134,7 +134,7 @@ export class MicrosandboxSandboxSession implements Experimental_SandboxSession {
     content: ReadableStream<Uint8Array>
     abortSignal?: AbortSignal
   }): Promise<void> {
-    const bytes = await collectStream(content)
+    const bytes = await collectStream(content, abortSignal)
     await this.writeBinaryFile({ path, content: bytes, abortSignal })
   }
 

@@ -31,6 +31,16 @@ describe('isFileNotFoundError', () => {
     expect(isFileNotFoundError(new Error('permission denied'))).toBe(false)
   })
 
+  test('does not match "command not found" (shell exec failure)', () => {
+    expect(isFileNotFoundError(new Error('bash: foo: command not found'))).toBe(
+      false,
+    )
+  })
+
+  test('does not match "resource not found" (generic upstream message)', () => {
+    expect(isFileNotFoundError(new Error('resource not found'))).toBe(false)
+  })
+
   test('returns false for null / undefined / primitives', () => {
     expect(isFileNotFoundError(null)).toBe(false)
     expect(isFileNotFoundError(undefined)).toBe(false)

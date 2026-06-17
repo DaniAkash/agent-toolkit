@@ -259,6 +259,27 @@ describe('MicrosandboxSandboxSession — writeFile (stream)', () => {
       { path: '/s', size: bytes.byteLength },
     ])
   })
+
+  test('aborts mid-drain and does not call fs.write', async () => {
+    const mock = new MockSandbox()
+    const session = newSession(mock)
+    const controller = new AbortController()
+    // Stream that emits one chunk and stays open until externally cancelled.
+    const content = new ReadableStream<Uint8Array>({
+      start(c) {
+        c.enqueue(new Uint8Array([1, 2, 3]))
+      },
+    })
+    queueMicrotask(() => controller.abort(new Error('upload cancelled')))
+    await expect(
+      session.writeFile({
+        path: '/s',
+        content,
+        abortSignal: controller.signal,
+      }),
+    ).rejects.toThrow('upload cancelled')
+    expect(mock.calls.fsWrites).toEqual([])
+  })
 })
 
 describe('MicrosandboxSandboxSession — writeTextFile', () => {

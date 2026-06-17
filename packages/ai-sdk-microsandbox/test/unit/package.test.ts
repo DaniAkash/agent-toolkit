@@ -10,4 +10,8 @@ describe('ai-sdk-microsandbox package surface', () => {
     expect(pkg.MicrosandboxSandboxSession).toBeDefined()
     expect(typeof pkg.MicrosandboxSandboxSession).toBe('function')
   })
+
+  test('exports VERSION sentinel', () => {
+    expect(pkg.VERSION).toBe('0.0.0')
+  })
 })
