@@ -99,7 +99,10 @@ export function pickPort(
   const first = sandboxSession.ports[0]
   if (first === undefined) {
     throw new Error(
-      'acpx-ai-harness: the sandbox session exposes no ports; cannot launch the bridge.',
+      'acpx-ai-harness: the sandbox session exposes no ports; cannot launch the bridge. ' +
+        'Pass `ports: [<port-number>]` to your sandbox provider constructor ' +
+        '(e.g. createVercelSandbox({ ports: [4001], ... })), or set ' +
+        '`settings.port` on createAcpxHarness to a port the sandbox already exposes.',
     )
   }
   return first
