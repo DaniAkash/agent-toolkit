@@ -78,6 +78,7 @@ export type MicrosandboxSettingsErrorCode =
   | 'INVALID_MEMORY'
   | 'INVALID_PORT'
   | 'DUPLICATE_PORT'
+  | 'INVALID_NAME'
 
 export class MicrosandboxSettingsError extends Error {
   override readonly name = 'MicrosandboxSettingsError'
@@ -94,6 +95,11 @@ export class MicrosandboxSettingsError extends Error {
 // unusable URLs (`http://...:0`) downstream from `getPortUrl`. Reject up front.
 const PORT_MIN = 1
 const PORT_MAX = 65535
+
+// Microsandbox sandbox names are limited to 128 UTF-8 bytes; longer strings
+// fail inside the NAPI binding rather than at our boundary. Pre-check so
+// callers get a typed error from `MicrosandboxSettingsError`.
+const MAX_SANDBOX_NAME_BYTES = 128
 
 function isCreateSettings(
   settings: MicrosandboxSettings,
@@ -128,6 +134,21 @@ export function validateMicrosandboxSettings(
       'MISSING_IMAGE',
       'create-mode settings require a non-empty `image` field',
     )
+  }
+  if (settings.name !== undefined) {
+    if (typeof settings.name !== 'string' || settings.name.length === 0) {
+      throw new MicrosandboxSettingsError(
+        'INVALID_NAME',
+        'name must be a non-empty string',
+      )
+    }
+    const byteLength = Buffer.byteLength(settings.name, 'utf8')
+    if (byteLength > MAX_SANDBOX_NAME_BYTES) {
+      throw new MicrosandboxSettingsError(
+        'INVALID_NAME',
+        `name exceeds the ${MAX_SANDBOX_NAME_BYTES} UTF-8 byte limit (got ${byteLength})`,
+      )
+    }
   }
   if (settings.cpus !== undefined) {
     if (!Number.isInteger(settings.cpus) || settings.cpus < 1) {

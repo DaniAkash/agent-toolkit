@@ -24,13 +24,16 @@ describe('sessionSandboxName', () => {
 
   test('truncates names that exceed 128 UTF-8 bytes', () => {
     const overlong = sessionSandboxName('a'.repeat(200))
-    expect(overlong.length).toBeLessThanOrEqual(128)
+    expect(Buffer.byteLength(overlong, 'utf8')).toBeLessThanOrEqual(128)
     expect(overlong.startsWith(SESSION_NAME_PREFIX)).toBe(true)
   })
 
-  test('handles unicode without exceeding the byte budget', () => {
-    // Each star is 4 UTF-8 bytes; 40 of them = 160 bytes before prefix.
+  test('slugifies unicode characters to ASCII-safe output', () => {
+    // The slugifier replaces every non-`[a-zA-Z0-9-]` character with a
+    // single `-`, so multi-byte input never reaches the clamping path.
+    // Verify the slugification + that the byte budget still holds.
     const name = sessionSandboxName('⭐'.repeat(40))
+    expect(name).toBe(`${SESSION_NAME_PREFIX}-${'-'.repeat(40)}`)
     expect(Buffer.byteLength(name, 'utf8')).toBeLessThanOrEqual(128)
   })
 })
@@ -48,6 +51,8 @@ describe('autoSessionName', () => {
   })
 
   test('respects the 128-byte cap', () => {
-    expect(autoSessionName().length).toBeLessThanOrEqual(128)
+    expect(Buffer.byteLength(autoSessionName(), 'utf8')).toBeLessThanOrEqual(
+      128,
+    )
   })
 })
