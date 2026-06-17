@@ -1,8 +1,11 @@
 import type { ExecEvent } from 'microsandbox'
 
 export interface MockExecResult {
-  readonly exitCode?: number
+  /** Exit code returned via `output.code`. */
+  readonly code?: number
+  /** Text returned by `output.stdout()`. */
   readonly stdout?: string
+  /** Text returned by `output.stderr()`. */
   readonly stderr?: string
 }
 
@@ -57,7 +60,7 @@ class MockExecOptionsBuilder {
     return this
   }
 
-  env(env: Record<string, string>): this {
+  envs(env: Record<string, string>): this {
     Object.defineProperty(this.state, 'env', { value: { ...env }, enumerable: true })
     return this
   }
@@ -67,12 +70,24 @@ class MockExecOptionsBuilder {
   }
 }
 
+/**
+ * Mirrors microsandbox's `ExecOutput` shape: `code` is a property, `stdout`
+ * and `stderr` are methods (the real class lazily decodes bytes on call).
+ */
 export class MockExecOutput {
   constructor(
-    public readonly exitCode: number,
-    public readonly stdout: string,
-    public readonly stderr: string,
+    public readonly code: number,
+    private readonly stdoutText: string,
+    private readonly stderrText: string,
   ) {}
+
+  stdout(): string {
+    return this.stdoutText
+  }
+
+  stderr(): string {
+    return this.stderrText
+  }
 }
 
 /**
@@ -215,7 +230,7 @@ export class MockSandbox {
     const result = this.opts.execResults?.[this.execIndex]
     this.execIndex += 1
     return new MockExecOutput(
-      result?.exitCode ?? 0,
+      result?.code ?? 0,
       result?.stdout ?? '',
       result?.stderr ?? '',
     )

@@ -60,22 +60,22 @@ describe('MockSandbox — runtime behaviour', () => {
   test('execWith dispenses canned outputs in FIFO order', async () => {
     const sandbox = new MockSandbox({
       execResults: [
-        { exitCode: 0, stdout: 'first', stderr: '' },
-        { exitCode: 1, stdout: '', stderr: 'second' },
+        { code: 0, stdout: 'first', stderr: '' },
+        { code: 1, stdout: '', stderr: 'second' },
       ],
     })
     const first = await sandbox.execWith('bash', (b) => b.args(['-c', 'echo first']))
-    expect(first.exitCode).toBe(0)
-    expect(first.stdout).toBe('first')
+    expect(first.code).toBe(0)
+    expect(first.stdout()).toBe('first')
     const second = await sandbox.execWith('bash', (b) => b.args(['-c', 'echo second']))
-    expect(second.exitCode).toBe(1)
-    expect(second.stderr).toBe('second')
+    expect(second.code).toBe(1)
+    expect(second.stderr()).toBe('second')
   })
 
   test('execWith records command, args, cwd, env', async () => {
     const sandbox = new MockSandbox()
     await sandbox.execWith('bash', (b) =>
-      b.args(['-c', 'ls']).cwd('/work').env({ FOO: 'bar' }),
+      b.args(['-c', 'ls']).cwd('/work').envs({ FOO: 'bar' }),
     )
     expect(sandbox.calls.execs).toEqual([
       { cmd: 'bash', args: ['-c', 'ls'], cwd: '/work', env: { FOO: 'bar' } },
