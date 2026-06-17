@@ -76,7 +76,7 @@ The harness's bootstrap recipe pre-warms the ACP wrapper binary acpx invokes for
 
 | `agent` setting | Bootstrap pre-warm | `settings.auth` key |
 |---|---|---|
-| `'codex'` (default) | `npx --yes @zed-industries/codex-acp --help > /dev/null` | `openai_api_key` |
+| `'codex'` (default) | `npx --yes @agentclientprotocol/codex-acp --version` | `openai_api_key` |
 | `'claude'` | `npx --yes @agentclientprotocol/claude-agent-acp --version` | `anthropic_api_key` |
 | `'gemini'` | `npm install -g @google/gemini-cli` | `gemini_api_key` |
 | any other id | (skipped, bring your own install) | (varies, see acpx config docs) |
@@ -161,7 +161,7 @@ SMOKE_AGENTS=codex \
   bun run test:e2e      # spawn real codex on Vercel sandbox
 ```
 
-The codex e2e suite is self-contained as long as the four env vars above are set: the harness's bootstrap recipe pre-warms the `@zed-industries/codex-acp` wrapper inside the sandbox, and the test passes `OPENAI_API_KEY` through `settings.auth` so the harness writes it into `~/.acpx/config.json` per session. The first run pays the npm install cost; later runs reuse Vercel sandbox's bootstrap snapshot.
+The codex e2e suite is self-contained as long as the four env vars above are set: the harness's bootstrap recipe pre-warms the `@agentclientprotocol/codex-acp` wrapper inside the sandbox (the package acpx invokes for the `codex` agent), and the test passes `OPENAI_API_KEY` through `settings.auth` so the harness threads it through `~/.acpx/config.json` and the `ACPX_AUTH_*` env vars per session. The first run pays the npm install cost; later runs reuse Vercel sandbox's bootstrap snapshot.
 
 ## License
 

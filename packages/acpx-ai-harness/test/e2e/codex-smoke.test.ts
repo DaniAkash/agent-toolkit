@@ -13,11 +13,12 @@ const SESSION_TIMEOUT_MS = 5 * 60 * 1000
 const BRIDGE_PORT = 4001
 
 /**
- * The harness's bootstrap recipe pre-warms `@zed-industries/codex-acp`
- * via `npx --yes ... --version`, so the test only needs to thread the
- * OpenAI key through `settings.auth`. The harness writes it to
- * `~/.acpx/config.json` per session (the only channel that drives
- * acpx's auth gate per https://acpx.sh/config.html).
+ * The harness's bootstrap recipe pre-warms `@agentclientprotocol/codex-acp`
+ * (the package acpx invokes for the codex agent) via `npx --yes ...
+ * --version`, so the test only needs to thread the OpenAI key through
+ * `settings.auth`. The harness then writes it to `~/.acpx/config.json`
+ * and sets `ACPX_AUTH_OPENAI_API_KEY` per session (the channels that
+ * drive acpx's auth gate per https://acpx.sh/config.html).
  *
  * `readBridgeAsset` points the bootstrap at `dist/bridge/` because this
  * test imports `createAcpxHarness` from `src/`, where

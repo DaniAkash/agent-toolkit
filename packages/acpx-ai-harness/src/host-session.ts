@@ -2,7 +2,10 @@ import { randomBytes } from 'node:crypto'
 import type { HarnessV1Session, HarnessV1StartOptions } from '@ai-sdk/harness'
 import { markBridgeStarting, waitForBridgeReady } from '@ai-sdk/harness/utils'
 import type { AcpxHarnessSettings } from './acpx-harness.ts'
-import { writeAcpxConfigIfNeeded } from './host-acpx-config.ts'
+import {
+  buildAcpxAuthEnv,
+  writeAcpxConfigIfNeeded,
+} from './host-acpx-config.ts'
 import { pickResumeCoords, tryAttachToExistingBridge } from './host-attach.ts'
 import { createSession } from './host-create-session.ts'
 import { pickPort, shellQuote, tailStderr } from './host-session-utils.ts'
@@ -70,6 +73,12 @@ export async function doStartImpl(
     abortSignal: start.abortSignal,
   })
 
+  // Per acpx config docs, the env-var route (ACPX_AUTH_<METHOD_ID>) takes
+  // precedence over the config file route when picking auth credentials,
+  // and works without depending on sandbox HOME or filesystem layout.
+  // Forward both so the runtime picks one up regardless of how it
+  // resolves its config search path.
+  const authEnv = buildAcpxAuthEnv(settings)
   const proc = await sandboxSession.restricted().spawn({
     command:
       `node ${BRIDGE_BUNDLE_PATH} ` +
@@ -78,6 +87,7 @@ export async function doStartImpl(
     env: {
       BRIDGE_CHANNEL_TOKEN: token,
       BRIDGE_WS_PORT: String(port),
+      ...authEnv,
     },
     abortSignal: start.abortSignal,
   })

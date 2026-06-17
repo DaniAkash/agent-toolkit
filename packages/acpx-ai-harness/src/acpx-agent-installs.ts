@@ -22,13 +22,13 @@
  * and the acpx adapter reads them from there at turn time.
  */
 export const ACPX_AGENT_INSTALL_COMMANDS: Readonly<Record<string, string>> = {
-  // codex-acp: ACP wrapper over the OpenAI Codex SDK (per acpx README).
-  // npx --yes pre-warms the cache so the first turn doesn't fetch.
-  // The binary only accepts `--help` / `-h` (no `--version` flag), so
-  // `--help` is the only no-side-effect smoke test we can run here.
-  // Output is discarded to keep bootstrap logs clean.
-  codex: 'npx --yes @zed-industries/codex-acp --help > /dev/null',
-  // claude-agent-acp: ACP wrapper over Claude Code (per acpx README).
+  // codex-acp: ACP wrapper over the OpenAI Codex SDK. Per acpx's built-in
+  // registry (https://acpx.sh/agents.html) the codex adapter is invoked
+  // as `npx -y @agentclientprotocol/codex-acp`, so we pre-warm the same
+  // package so the first turn doesn't pay the npm fetch cost.
+  codex: 'npx --yes @agentclientprotocol/codex-acp --version',
+  // claude-agent-acp: ACP wrapper over Claude Code (also from the
+  // @agentclientprotocol scope per acpx's registry).
   claude:
     'npx --yes @agentclientprotocol/claude-agent-acp --version || npm install -g @anthropic-ai/claude-code',
   // gemini ships ACP natively (`gemini --acp`); install the CLI.

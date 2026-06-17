@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
   ACPX_CONFIG_PATH,
+  buildAcpxAuthEnv,
   buildAcpxConfigBody,
 } from '../../src/host-acpx-config.ts'
 
@@ -58,6 +59,38 @@ describe('buildAcpxConfigBody', () => {
       openai_api_key: 'sk-a',
       anthropic_api_key: 'sk-b',
       gemini_api_key: 'g-c',
+    })
+  })
+})
+
+describe('buildAcpxAuthEnv', () => {
+  test('returns an empty map when auth is undefined', () => {
+    expect(buildAcpxAuthEnv({})).toEqual({})
+  })
+
+  test('returns an empty map when auth is an empty object', () => {
+    expect(buildAcpxAuthEnv({ auth: {} })).toEqual({})
+  })
+
+  test('upper-cases the method id into ACPX_AUTH_<METHOD_ID>', () => {
+    expect(
+      buildAcpxAuthEnv({ auth: { openai_api_key: 'sk-x' } }),
+    ).toEqual({ ACPX_AUTH_OPENAI_API_KEY: 'sk-x' })
+  })
+
+  test('maps multiple auth keys independently', () => {
+    expect(
+      buildAcpxAuthEnv({
+        auth: {
+          openai_api_key: 'a',
+          anthropic_api_key: 'b',
+          gemini_api_key: 'c',
+        },
+      }),
+    ).toEqual({
+      ACPX_AUTH_OPENAI_API_KEY: 'a',
+      ACPX_AUTH_ANTHROPIC_API_KEY: 'b',
+      ACPX_AUTH_GEMINI_API_KEY: 'c',
     })
   })
 })

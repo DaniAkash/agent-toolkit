@@ -2,6 +2,25 @@ import type { Experimental_SandboxSession } from '@ai-sdk/provider-utils'
 import type { AcpxHarnessSettings } from './acpx-harness.ts'
 
 /**
+ * Translate `settings.auth` into the `ACPX_AUTH_<METHOD_ID>` env vars
+ * acpx looks at first when picking ACP authenticate credentials. Per
+ * https://acpx.sh/config.html the env-var channel takes precedence over
+ * the config file, and works without depending on filesystem layout or
+ * HOME resolution inside the sandbox. The map can be empty (returns
+ * `{}`), in which case the caller skips the env merge.
+ */
+export function buildAcpxAuthEnv(
+  settings: AcpxHarnessSettings,
+): Record<string, string> {
+  const auth = settings.auth ?? {}
+  const env: Record<string, string> = {}
+  for (const [methodId, value] of Object.entries(auth)) {
+    env[`ACPX_AUTH_${methodId.toUpperCase()}`] = value
+  }
+  return env
+}
+
+/**
  * Default location acpx reads its global config from inside the sandbox.
  * Per https://acpx.sh/config.html the runtime walks
  * `~/.acpx/config.json` then `<cwd>/.acpxrc.json`. We target the global

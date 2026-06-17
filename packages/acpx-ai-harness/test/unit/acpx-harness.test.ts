@@ -200,10 +200,10 @@ describe('getBootstrap recipe', () => {
     const { harness } = buildWithFakeAssets()
     const recipe = await harness.getBootstrap?.()
     const install = recipe?.commands.find((c) =>
-      c.command.includes('@zed-industries/codex-acp'),
+      c.command.includes('@agentclientprotocol/codex-acp'),
     )
     expect(install?.command).toBe(
-      'npx --yes @zed-industries/codex-acp --help > /dev/null',
+      'npx --yes @agentclientprotocol/codex-acp --version',
     )
   })
 
@@ -242,7 +242,7 @@ describe('getBootstrap recipe', () => {
     const commands = recipe?.commands.map((c) => c.command) ?? []
     const pnpmIdx = commands.findIndex((c) => c.includes('pnpm'))
     const installIdx = commands.findIndex((c) =>
-      c.includes('@zed-industries/codex-acp'),
+      c.includes('@agentclientprotocol/codex-acp'),
     )
     const versionIdx = commands.findIndex((c) => c.includes('acpx --version'))
     expect(pnpmIdx).toBeGreaterThan(-1)
