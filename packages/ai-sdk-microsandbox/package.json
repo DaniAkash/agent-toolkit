@@ -46,7 +46,10 @@
   "scripts": {
     "build": "bunup",
     "dev": "bunup --watch",
-    "test": "bun test",
+    "test": "bun test test/unit",
+    "test:integration": "MICROSANDBOX_INTEGRATION=1 bun test test/integration",
+    "test:e2e": "MICROSANDBOX_INTEGRATION=1 bun test test/e2e",
+    "test:all": "MICROSANDBOX_INTEGRATION=1 bun test",
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
