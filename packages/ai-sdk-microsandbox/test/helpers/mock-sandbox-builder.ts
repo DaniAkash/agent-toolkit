@@ -7,6 +7,7 @@ import type { SandboxBuilder } from 'microsandbox'
  */
 export type RecordedBuilderCall =
   | { method: 'image'; image: string }
+  | { method: 'fromSnapshot'; snapshotName: string }
   | { method: 'cpus'; cpus: number }
   | { method: 'memory'; mib: number }
   | { method: 'workdir'; path: string }
@@ -31,6 +32,11 @@ export class MockSandboxBuilder {
 
   image(image: string): this {
     this.calls.push({ method: 'image', image })
+    return this
+  }
+
+  fromSnapshot(snapshotName: string): this {
+    this.calls.push({ method: 'fromSnapshot', snapshotName })
     return this
   }
 
