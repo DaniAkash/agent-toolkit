@@ -5,7 +5,9 @@ import type { HarnessV1CallWarning } from '@ai-sdk/harness'
 import type { BridgeTurn } from '@ai-sdk/harness/bridge'
 import {
   type AcpRuntime,
+  type AcpRuntimeEvent,
   type AcpRuntimeOptions,
+  type AcpRuntimeTurnResult,
   createAcpRuntime,
   createAgentRegistry,
   createFileSessionStore,
@@ -19,6 +21,18 @@ import { harnessPermissionModeToAcpx } from '../acpx-permission.ts'
 import { toRuntimeMcpServers } from './mcp-servers.ts'
 import { createPermissionHandler } from './permission-handler.ts'
 
+/**
+ * If the underlying runtime emits an `error` event and then goes silent
+ * (no further events, no clean `result`), force-finish the turn after
+ * this much wall-clock time so the host doesn't hang forever.
+ *
+ * Bounded by reality: acpx's runtime SHOULD eventually reject the
+ * `result` promise on terminal failures, but in practice some adapters
+ * just stop emitting and leave the iterator open. The watchdog is the
+ * safety net.
+ */
+const SILENT_AFTER_ERROR_TIMEOUT_MS = 10_000
+
 export interface RunAcpxTurnOptions {
   /** The working directory the bridge was launched against. */
   readonly workdir: string
@@ -27,6 +41,10 @@ export interface RunAcpxTurnOptions {
    * from the start frame. Tests inject a `MockAcpRuntime` here.
    */
   readonly runtime?: AcpRuntime
+  /**
+   * Override the silent-after-error watchdog. Mostly for tests.
+   */
+  readonly silentAfterErrorTimeoutMs?: number
 }
 
 /**
@@ -71,13 +89,38 @@ export async function runAcpxTurn(
     signal: turn.abortSignal,
   })
 
+  const silentTimeoutMs =
+    options.silentAfterErrorTimeoutMs ?? SILENT_AFTER_ERROR_TIMEOUT_MS
+
   try {
-    for await (const event of acpTurn.events) {
-      translator.translate(event)
-    }
+    const outcome = await drainTurnWithWatchdog(acpTurn, {
+      translate: (e) => translator.translate(e),
+      silentTimeoutMs,
+    })
     translator.flush()
-    const result = await acpTurn.result
-    translator.finish(result)
+    if (outcome.kind === 'completed') {
+      translator.finish(outcome.result)
+    } else {
+      // Watchdog tripped after an error event and no follow-up activity.
+      // Cancel acpx side and synthesize a failed finish so the host's
+      // stream drains cleanly instead of hanging.
+      try {
+        await acpTurn.cancel({
+          reason: 'watchdog: agent went silent after error',
+        })
+      } catch {
+        /* idempotent */
+      }
+      translator.finish({
+        status: 'failed',
+        error: {
+          message:
+            'acpx-ai-harness: agent emitted an error and then stopped responding within ' +
+            `${silentTimeoutMs}ms. Treating the turn as failed.`,
+          code: 'agent_silent_after_error',
+        },
+      })
+    }
   } catch (err) {
     turn.emit({ type: 'error', error: serialiseError(err) })
     translator.finish({
@@ -88,6 +131,71 @@ export async function runAcpxTurn(
       },
     })
   }
+}
+
+type TurnOutcome =
+  | { kind: 'completed'; result: AcpRuntimeTurnResult }
+  | { kind: 'silent-after-error' }
+
+/**
+ * Drain `acpTurn.events` while watching for the "agent emitted an error
+ * then went silent" failure mode. On every event the watchdog timer
+ * resets. Once we've seen at least one `error` event, the timer becomes
+ * eligible to fire; if it does, we abandon the iterator.
+ *
+ * On a clean finish (iterator drains + result resolves) we return
+ * `{ kind: 'completed' }`. On watchdog fire we return
+ * `{ kind: 'silent-after-error' }`.
+ */
+async function drainTurnWithWatchdog(
+  acpTurn: {
+    events: AsyncIterable<AcpRuntimeEvent>
+    result: Promise<AcpRuntimeTurnResult>
+  },
+  opts: {
+    translate: (event: AcpRuntimeEvent) => void
+    silentTimeoutMs: number
+  },
+): Promise<TurnOutcome> {
+  const iterator = acpTurn.events[Symbol.asyncIterator]()
+  const watchdogState: { reschedule?: () => void } = {}
+  let sawError = false
+  let timer: ReturnType<typeof setTimeout> | undefined
+
+  const watchdog = new Promise<'silent-after-error'>((resolve) => {
+    watchdogState.reschedule = () => {
+      if (timer) clearTimeout(timer)
+      if (!sawError) return
+      timer = setTimeout(
+        () => resolve('silent-after-error'),
+        opts.silentTimeoutMs,
+      )
+    }
+  })
+
+  while (true) {
+    const step = await Promise.race([
+      iterator.next().then((r) => ({ tag: 'next' as const, r })),
+      watchdog.then((reason) => ({ tag: reason })),
+    ])
+    if (step.tag === 'silent-after-error') {
+      if (timer) clearTimeout(timer)
+      try {
+        await iterator.return?.()
+      } catch {
+        /* idempotent */
+      }
+      return { kind: 'silent-after-error' }
+    }
+    const { value, done } = step.r
+    if (done) break
+    opts.translate(value)
+    if (value.type === 'error') sawError = true
+    watchdogState.reschedule?.()
+  }
+  if (timer) clearTimeout(timer)
+  const result = await acpTurn.result
+  return { kind: 'completed', result }
 }
 
 function createAcpxRuntime(

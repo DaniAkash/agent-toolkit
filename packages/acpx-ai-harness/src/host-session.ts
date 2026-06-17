@@ -2,10 +2,18 @@ import { randomBytes } from 'node:crypto'
 import type { HarnessV1Session, HarnessV1StartOptions } from '@ai-sdk/harness'
 import { markBridgeStarting, waitForBridgeReady } from '@ai-sdk/harness/utils'
 import type { AcpxHarnessSettings } from './acpx-harness.ts'
+import {
+  buildAcpxAuthEnv,
+  writeAcpxConfigIfNeeded,
+} from './host-acpx-config.ts'
 import { pickResumeCoords, tryAttachToExistingBridge } from './host-attach.ts'
 import { createSession } from './host-create-session.ts'
-import { pickPort, shellQuote } from './host-session-utils.ts'
-import { type AcpxChannel, createAcpxChannel } from './sandbox-channel.ts'
+import { pickPort, shellQuote, tailStderr } from './host-session-utils.ts'
+import {
+  type AcpxChannel,
+  createAcpxChannel,
+  openAcpxChannel,
+} from './sandbox-channel.ts'
 
 const BRIDGE_BUNDLE_PATH = '/tmp/harness/acpx/bridge.mjs'
 const DEFAULT_STARTUP_TIMEOUT_MS = 120_000
@@ -52,6 +60,12 @@ export async function doStartImpl(
   const token = randomBytes(32).toString('hex')
   const bridgeStateDir = `${start.sessionWorkDir}/.bridge-state`
 
+  // Per-session auth config write. Has to happen before the bridge
+  // spawns so acpx picks the credentials up on its first session/new
+  // call. Per-session, never via the bootstrap recipe, so credentials
+  // never end up in Vercel sandbox snapshots.
+  await writeAcpxConfigIfNeeded(sandboxSession.restricted(), settings)
+
   await markBridgeStarting({
     sandbox: sandboxSession.restricted(),
     bridgeStateDir,
@@ -59,6 +73,12 @@ export async function doStartImpl(
     abortSignal: start.abortSignal,
   })
 
+  // Per acpx config docs, the env-var route (ACPX_AUTH_<METHOD_ID>) takes
+  // precedence over the config file route when picking auth credentials,
+  // and works without depending on sandbox HOME or filesystem layout.
+  // Forward both so the runtime picks one up regardless of how it
+  // resolves its config search path.
+  const authEnv = buildAcpxAuthEnv(settings)
   const proc = await sandboxSession.restricted().spawn({
     command:
       `node ${BRIDGE_BUNDLE_PATH} ` +
@@ -67,9 +87,27 @@ export async function doStartImpl(
     env: {
       BRIDGE_CHANNEL_TOKEN: token,
       BRIDGE_WS_PORT: String(port),
+      ...authEnv,
     },
     abortSignal: start.abortSignal,
   })
+
+  // Drain stderr in the background. waitForBridgeReady reads stdout only,
+  // so a bridge crash that prints to stderr (e.g. `Cannot find module`)
+  // surfaces here.
+  const stderr = tailStderr(proc)
+
+  const formatTails = (stdoutTail: ReadonlyArray<string>) => {
+    const stderrLines = stderr.read()
+    const sections: string[] = []
+    if (stdoutTail.length > 0)
+      sections.push(`stdout tail:\n${stdoutTail.join('\n')}`)
+    if (stderrLines.length > 0)
+      sections.push(`stderr tail:\n${stderrLines.join('\n')}`)
+    return sections.length > 0
+      ? `\n${sections.join('\n\n')}`
+      : '\n(no output captured)'
+  }
 
   // From this point on, anything that throws must tear the bridge process
   // down or it leaks inside the sandbox. waitForBridgeReady() can time out;
@@ -83,10 +121,18 @@ export async function doStartImpl(
       bridgeType: 'acpx',
       timeoutMs: settings.startupTimeoutMs ?? DEFAULT_STARTUP_TIMEOUT_MS,
       abortSignal: start.abortSignal,
+      createExitError: ({ stdoutTail }) =>
+        new Error(
+          `acpx-ai-harness: bridge exited before becoming ready.${formatTails(stdoutTail)}`,
+        ),
+      createTimeoutError: ({ stdoutTail }) =>
+        new Error(
+          `acpx-ai-harness: bridge did not become ready before timeout.${formatTails(stdoutTail)}`,
+        ),
     })
 
     channel = createAcpxChannel({ sandboxSession, port, token })
-    await channel.open()
+    await openAcpxChannel(channel)
   } catch (err) {
     try {
       channel?.close()

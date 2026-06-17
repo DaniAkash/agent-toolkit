@@ -1,4 +1,8 @@
 export {
+  ACPX_AGENT_INSTALL_COMMANDS,
+  installCommandForAgent,
+} from './acpx-agent-installs.ts'
+export {
   defaultReadBridgeAsset,
   type ReadBridgeAsset,
 } from './acpx-bridge-assets.ts'
@@ -30,8 +34,13 @@ export {
   harnessPermissionModeToAcpx,
 } from './acpx-permission.ts'
 export {
+  ACPX_CONFIG_PATH,
+  buildAcpxConfigBody,
+} from './host-acpx-config.ts'
+export {
   type AcpxBridgeInboundMessage,
   type AcpxChannel,
   createAcpxChannel,
   type OpenAcpxChannelOptions,
+  openAcpxChannel,
 } from './sandbox-channel.ts'

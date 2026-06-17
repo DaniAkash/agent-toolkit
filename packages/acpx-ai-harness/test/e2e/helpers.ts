@@ -1,0 +1,107 @@
+import { describe } from 'bun:test'
+import { readFile } from 'node:fs/promises'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import type { ReadBridgeAsset } from '../../src/acpx-bridge-assets.ts'
+
+/**
+ * Helpers for running e2e tests against real ACP agents through a real
+ * harness sandbox.
+ *
+ * The suite is gated by `SMOKE_AGENTS` so it doesn't run on every test
+ * invocation. Values:
+ *   - unset → suite is skipped entirely
+ *   - 'all' → every supported agent runs
+ *   - comma-separated list (e.g. 'codex,claude') → those agents run
+ *
+ * Bridge-backed harnesses also require a sandbox provider with port
+ * exposure (just-bash cannot expose ports for our WebSocket bridge), so
+ * Vercel sandbox credentials need to be present. Each ACP agent also
+ * needs its own auth env to reach its provider (codex → OPENAI_API_KEY,
+ * etc.). Without the right env, the suite skips.
+ */
+
+const AGENTS_ENV = 'SMOKE_AGENTS'
+const VERCEL_ENV_VARS = ['VERCEL_TOKEN', 'VERCEL_TEAM_ID', 'VERCEL_PROJECT_ID']
+
+const AGENT_AUTH_ENV: Record<string, ReadonlyArray<string>> = {
+  codex: ['OPENAI_API_KEY'],
+  claude: ['ANTHROPIC_API_KEY'],
+  gemini: ['GEMINI_API_KEY'],
+}
+
+export function selectedAgents(): ReadonlySet<string> {
+  const raw = process.env[AGENTS_ENV]
+  if (!raw) return new Set()
+  if (raw === 'all') return new Set(['codex', 'claude', 'gemini'])
+  return new Set(
+    raw
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
+  )
+}
+
+export function hasVercelSandboxCredentials(): boolean {
+  return VERCEL_ENV_VARS.every((k) => Boolean(process.env[k]))
+}
+
+export function hasAgentAuthCredentials(agent: string): boolean {
+  const required = AGENT_AUTH_ENV[agent] ?? []
+  return required.every((k) => Boolean(process.env[k]))
+}
+
+export function agentAuthEnvVars(agent: string): ReadonlyArray<string> {
+  return AGENT_AUTH_ENV[agent] ?? []
+}
+
+export function shouldRun(agent: string): boolean {
+  return (
+    selectedAgents().has(agent) &&
+    hasVercelSandboxCredentials() &&
+    hasAgentAuthCredentials(agent)
+  )
+}
+
+/**
+ * Skip-aware describe. When a gate doesn't pass, the describe block is
+ * registered as a skipped suite with a message naming the env var(s) the
+ * caller still needs to set.
+ */
+export const describeForAgent = (
+  agent: string,
+  name: string,
+  fn: () => void,
+): void => {
+  if (shouldRun(agent)) {
+    describe(name, fn)
+    return
+  }
+  const why = (() => {
+    if (!selectedAgents().has(agent))
+      return `set SMOKE_AGENTS=${agent} (or 'all') to enable`
+    if (!hasVercelSandboxCredentials())
+      return `set ${VERCEL_ENV_VARS.join(' / ')} to enable`
+    return `set ${agentAuthEnvVars(agent).join(' / ')} to enable`
+  })()
+  describe.skip(`${name} [${why}]`, fn)
+}
+
+const DIST_BRIDGE_DIR = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '..',
+  '..',
+  'dist',
+  'bridge',
+)
+
+/**
+ * Bridge-asset reader for the e2e suite. `defaultReadBridgeAsset` resolves
+ * paths relative to its own module — when this test imports `createAcpxHarness`
+ * from `src/`, that points at `src/bridge/` which doesn't have the bundled
+ * `index.js`. The test runs `bun run build` first via the `test:e2e` script,
+ * so we point the reader at `dist/bridge/` explicitly.
+ */
+export const readBridgeAssetFromDist: ReadBridgeAsset = async (name) => {
+  return readFile(path.join(DIST_BRIDGE_DIR, name), 'utf8')
+}

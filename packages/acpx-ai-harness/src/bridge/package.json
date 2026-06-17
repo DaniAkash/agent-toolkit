@@ -5,6 +5,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@ai-sdk/harness": "1.0.0-canary.10",
     "@modelcontextprotocol/sdk": "1.29.0",
     "acpx": "0.8.0",
     "ws": "8.21.0",

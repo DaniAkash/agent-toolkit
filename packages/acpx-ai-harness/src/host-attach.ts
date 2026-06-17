@@ -8,7 +8,11 @@ import {
   type AcpxBridgeCoords,
   acpxBridgeCoordsSchema,
 } from './acpx-lifecycle.ts'
-import { type AcpxChannel, createAcpxChannel } from './sandbox-channel.ts'
+import {
+  type AcpxChannel,
+  createAcpxChannel,
+  openAcpxChannel,
+} from './sandbox-channel.ts'
 
 export interface AttachAttempt {
   /** Open channel reconnected to the live bridge. */
@@ -73,7 +77,7 @@ export async function tryAttachToExistingBridge(input: {
     initialLastSeenEventId: input.coords.lastSeenEventId,
   })
   try {
-    await channel.open({ resume: true })
+    await openAcpxChannel(channel, { resume: true })
   } catch {
     try {
       channel.close()
