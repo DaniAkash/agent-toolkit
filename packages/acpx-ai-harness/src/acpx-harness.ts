@@ -20,6 +20,26 @@ export interface AcpxHarnessSettings {
   /** Override the sandbox port when multiple are exposed. */
   readonly port?: number
   /**
+   * Auth credentials threaded into acpx's config inside the sandbox.
+   * Keys are method ids (e.g. `openai_api_key`, `anthropic_api_key`,
+   * `gemini_api_key`) and values are the raw credentials. The harness
+   * writes these to `~/.acpx/config.json` before every session start —
+   * per-session so credentials never end up in the sandbox snapshot.
+   *
+   * Per https://acpx.sh/config.html: standard provider env vars like
+   * `OPENAI_API_KEY` reach child processes but DON'T drive acpx's own
+   * auth gate. The wrapper agents (codex-acp, claude-agent-acp) expect
+   * ACP-level authentication, which acpx only performs when these
+   * credentials are configured.
+   */
+  readonly auth?: Readonly<Record<string, string>>
+  /**
+   * Controls acpx's `authPolicy`. Defaults to `'fail'` when `auth` is
+   * non-empty (fail fast on missing credentials), `'skip'` otherwise.
+   * Override only if you know what you're doing.
+   */
+  readonly authPolicy?: 'skip' | 'fail'
+  /**
    * Test seam: override the bridge-asset reader. Defaults to reading the
    * shipped `dist/bridge/<name>` files from disk.
    */

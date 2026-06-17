@@ -72,25 +72,33 @@ Other sandbox providers conforming to `HarnessV1SandboxProvider` work as long as
 
 ### Agents
 
-The harness's bootstrap recipe installs the ACP agent CLI inside the sandbox automatically for the agents below. Vercel sandbox keys snapshots by the recipe hash, so the install cost is paid once and amortised across sessions.
+The harness's bootstrap recipe pre-warms the ACP wrapper binary acpx invokes for each known agent. Vercel sandbox keys snapshots by the recipe hash, so the install cost is paid once and amortised across sessions.
 
-| `agent` setting | Installed via | Auth env var |
+| `agent` setting | Bootstrap pre-warm | `settings.auth` key |
 |---|---|---|
-| `'codex'` (default) | `npm install -g @openai/codex` | `OPENAI_API_KEY` |
-| `'claude'` | `npm install -g @anthropic-ai/claude-code` | `ANTHROPIC_API_KEY` |
-| `'gemini'` | `npm install -g @google/gemini-cli` | `GEMINI_API_KEY` |
-| any other id | (skipped — bring your own install) | (varies) |
+| `'codex'` (default) | `npx --yes @zed-industries/codex-acp --version` | `openai_api_key` |
+| `'claude'` | `npx --yes @agentclientprotocol/claude-agent-acp --version` | `anthropic_api_key` |
+| `'gemini'` | `npm install -g @google/gemini-cli` | `gemini_api_key` |
+| any other id | (skipped, bring your own install) | (varies, see acpx config docs) |
 
-The auth env vars need to reach the sandbox at creation time, not on the host. With Vercel sandbox:
+### Auth
+
+Pass credentials via `createAcpxHarness({ auth })`. The harness writes them to `~/.acpx/config.json` inside the sandbox **per session** (never via the bootstrap recipe, so credentials never end up in a Vercel sandbox snapshot):
 
 ```ts
-const sandbox = createVercelSandbox({
-  runtime: 'node22',
-  env: { OPENAI_API_KEY: process.env.OPENAI_API_KEY! },
+const harness = createAcpxHarness({
+  agent: 'codex',
+  auth: {
+    openai_api_key: process.env.OPENAI_API_KEY!,
+  },
 })
 ```
 
-For agents the harness doesn't know about (or for custom installs), wire your own install via the framework's `onSandboxSession` hook on `HarnessAgent` and the harness will skip its own install step.
+Per [acpx config docs](https://acpx.sh/config.html), standard provider env vars like `OPENAI_API_KEY` reach child processes but **don't** drive acpx's own auth gate. The ACP wrapper agents (codex-acp, claude-agent-acp) expect ACP-level authentication, which acpx only performs when these credentials are configured in `auth`.
+
+The harness defaults `authPolicy: 'fail'` when `auth` is non-empty so a missing or invalid key surfaces immediately rather than a downstream ACP error. Override with `settings.authPolicy: 'skip'` if you want the legacy "let the adapter handle it" behaviour.
+
+For agents the harness doesn't know about (or for custom installs), wire your own install via the framework's `onSandboxSession` hook on `HarnessAgent` and the harness will skip its own install step. Auth still goes through `settings.auth` using whatever method id the agent expects.
 
 ## Lifecycle
 

@@ -34,6 +34,10 @@ export {
   harnessPermissionModeToAcpx,
 } from './acpx-permission.ts'
 export {
+  ACPX_CONFIG_PATH,
+  buildAcpxConfigBody,
+} from './host-acpx-config.ts'
+export {
   type AcpxBridgeInboundMessage,
   type AcpxChannel,
   createAcpxChannel,

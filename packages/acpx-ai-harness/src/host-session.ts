@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto'
 import type { HarnessV1Session, HarnessV1StartOptions } from '@ai-sdk/harness'
 import { markBridgeStarting, waitForBridgeReady } from '@ai-sdk/harness/utils'
 import type { AcpxHarnessSettings } from './acpx-harness.ts'
+import { writeAcpxConfigIfNeeded } from './host-acpx-config.ts'
 import { pickResumeCoords, tryAttachToExistingBridge } from './host-attach.ts'
 import { createSession } from './host-create-session.ts'
 import { pickPort, shellQuote, tailStderr } from './host-session-utils.ts'
@@ -55,6 +56,12 @@ export async function doStartImpl(
   const port = pickPort(sandboxSession, settings.port)
   const token = randomBytes(32).toString('hex')
   const bridgeStateDir = `${start.sessionWorkDir}/.bridge-state`
+
+  // Per-session auth config write. Has to happen before the bridge
+  // spawns so acpx picks the credentials up on its first session/new
+  // call. Per-session, never via the bootstrap recipe, so credentials
+  // never end up in Vercel sandbox snapshots.
+  await writeAcpxConfigIfNeeded(sandboxSession.restricted(), settings)
 
   await markBridgeStarting({
     sandbox: sandboxSession.restricted(),
