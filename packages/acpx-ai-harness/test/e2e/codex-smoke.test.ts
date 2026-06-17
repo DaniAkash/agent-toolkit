@@ -2,39 +2,37 @@ import { expect, test } from 'bun:test'
 import { HarnessAgent } from '@ai-sdk/harness/agent'
 import { createVercelSandbox } from '@ai-sdk/sandbox-vercel'
 import { createAcpxHarness } from '../../src/acpx-harness.ts'
-import {
-  collectAgentEnv,
-  describeForAgent,
-  readBridgeAssetFromDist,
-} from './helpers.ts'
+import { describeForAgent, readBridgeAssetFromDist } from './helpers.ts'
 
 const AGENT = 'codex'
-// 15 min: cold-start sandbox snapshot creation can take several minutes
-// (Vercel's `getOrCreate` builds the template from the bootstrap recipe
-// on the first run). Subsequent runs should reuse the snapshot.
-const SESSION_TIMEOUT_MS = 15 * 60 * 1000
+// Vercel sandbox boot is on the order of seconds once the bootstrap
+// snapshot exists. Five minutes is plenty of headroom for a cold-snapshot
+// first run, and short enough that a stuck bridge fails the test instead
+// of stalling CI.
+const SESSION_TIMEOUT_MS = 5 * 60 * 1000
 const BRIDGE_PORT = 4001
 
 /**
- * The harness's bootstrap recipe handles the codex install inside the
- * sandbox (via `npm install -g @openai/codex`), so the test just needs
- * to forward `OPENAI_API_KEY` into the sandbox env at creation time.
+ * The harness's bootstrap recipe pre-warms `@zed-industries/codex-acp`
+ * via `npx --yes ... --version`, so the test only needs to thread the
+ * OpenAI key through `settings.auth`. The harness writes it to
+ * `~/.acpx/config.json` per session (the only channel that drives
+ * acpx's auth gate per https://acpx.sh/config.html).
  *
- * The `readBridgeAsset` override points the bootstrap at `dist/bridge/`
- * because this test imports `createAcpxHarness` from `src/`, where
- * `defaultReadBridgeAsset` would look for the bundled `index.js` next to
- * its own module (and find only the unbuilt source). The `test:e2e`
- * script runs `bun run build` first, so `dist/bridge/` is always
- * present here.
+ * `readBridgeAsset` points the bootstrap at `dist/bridge/` because this
+ * test imports `createAcpxHarness` from `src/`, where
+ * `defaultReadBridgeAsset` would look for a bundled `index.js` next to
+ * its own module. `test:e2e` runs `bun run build` first so
+ * `dist/bridge/` is always present here.
  */
 const buildAgent = () => {
   const harness = createAcpxHarness({
     agent: 'codex',
     readBridgeAsset: readBridgeAssetFromDist,
-    // Cold-start sandboxes take a while to ship the bridge bundle
-    // through the bootstrap recipe; give the bridge plenty of headroom
-    // to come up.
-    startupTimeoutMs: 5 * 60 * 1000,
+    auth: {
+      // biome-ignore lint/style/noNonNullAssertion: the describe-gate guarantees this is set
+      openai_api_key: process.env.OPENAI_API_KEY!,
+    },
   })
   // @vercel/sandbox's getCredentials prefers an OIDC token (via
   // `npx vercel link` + `vercel env pull`) but also accepts explicit
@@ -54,7 +52,6 @@ const buildAgent = () => {
     projectId: process.env.VERCEL_PROJECT_ID!,
     runtime: 'node22',
     ports: [BRIDGE_PORT],
-    env: collectAgentEnv(AGENT),
   })
   return new HarnessAgent({ harness, sandbox })
 }

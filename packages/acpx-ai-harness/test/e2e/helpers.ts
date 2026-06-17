@@ -87,19 +87,6 @@ export const describeForAgent = (
   describe.skip(`${name} [${why}]`, fn)
 }
 
-/**
- * Collect the agent-auth env vars present in the host process so they can
- * be threaded into the sandbox at creation time.
- */
-export function collectAgentEnv(agent: string): Record<string, string> {
-  const out: Record<string, string> = {}
-  for (const key of agentAuthEnvVars(agent)) {
-    const value = process.env[key]
-    if (value) out[key] = value
-  }
-  return out
-}
-
 const DIST_BRIDGE_DIR = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
   '..',

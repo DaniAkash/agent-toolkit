@@ -161,7 +161,7 @@ SMOKE_AGENTS=codex \
   bun run test:e2e      # spawn real codex on Vercel sandbox
 ```
 
-The codex e2e suite is self-contained as long as the four env vars above are set: the harness's bootstrap recipe installs the `@openai/codex` CLI inside the sandbox, and the test forwards `OPENAI_API_KEY` into the sandbox env at creation. The first run pays the npm install cost; later runs reuse Vercel sandbox's bootstrap snapshot.
+The codex e2e suite is self-contained as long as the four env vars above are set: the harness's bootstrap recipe pre-warms the `@zed-industries/codex-acp` wrapper inside the sandbox, and the test passes `OPENAI_API_KEY` through `settings.auth` so the harness writes it into `~/.acpx/config.json` per session. The first run pays the npm install cost; later runs reuse Vercel sandbox's bootstrap snapshot.
 
 ## License
 
