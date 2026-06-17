@@ -124,4 +124,24 @@ describe('MockSandbox — runtime behaviour', () => {
     await handle.kill()
     expect(handle.killCalls).toBe(2)
   })
+
+  test('config() returns the configured object', async () => {
+    const sandbox = new MockSandbox({
+      config: { workdir: '/workspace', cpus: 2 },
+    })
+    expect(await sandbox.config()).toEqual({ workdir: '/workspace', cpus: 2 })
+  })
+
+  test('config() returns an empty object by default', async () => {
+    const sandbox = new MockSandbox()
+    expect(await sandbox.config()).toEqual({})
+  })
+
+  test('stop() records call count and throws when configured', async () => {
+    const sandbox = new MockSandbox()
+    await sandbox.stop()
+    expect(sandbox.stopCalls).toBe(1)
+    const failing = new MockSandbox({ stopError: new Error('stop failed') })
+    await expect(failing.stop()).rejects.toThrow('stop failed')
+  })
 })
