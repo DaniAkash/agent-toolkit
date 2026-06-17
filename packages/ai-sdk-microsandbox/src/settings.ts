@@ -129,45 +129,59 @@ export function validateMicrosandboxSettings(
     // bridgePorts/publicHostname are optional and have safe defaults.
     return
   }
-  if (!settings.image || typeof settings.image !== 'string') {
+  validateImage(settings.image)
+  validateName(settings.name)
+  validatePositiveInteger(settings.cpus, 'INVALID_CPUS', 'cpus')
+  validatePositiveInteger(settings.memory, 'INVALID_MEMORY', 'memory (MiB)')
+  validatePorts(settings.ports)
+}
+
+function validateImage(image: unknown): void {
+  if (!image || typeof image !== 'string') {
     throw new MicrosandboxSettingsError(
       'MISSING_IMAGE',
       'create-mode settings require a non-empty `image` field',
     )
   }
-  if (settings.name !== undefined) {
-    if (typeof settings.name !== 'string' || settings.name.length === 0) {
-      throw new MicrosandboxSettingsError(
-        'INVALID_NAME',
-        'name must be a non-empty string',
-      )
-    }
-    const byteLength = Buffer.byteLength(settings.name, 'utf8')
-    if (byteLength > MAX_SANDBOX_NAME_BYTES) {
-      throw new MicrosandboxSettingsError(
-        'INVALID_NAME',
-        `name exceeds the ${MAX_SANDBOX_NAME_BYTES} UTF-8 byte limit (got ${byteLength})`,
-      )
-    }
+}
+
+function validateName(name: string | undefined): void {
+  if (name === undefined) return
+  if (typeof name !== 'string' || name.length === 0) {
+    throw new MicrosandboxSettingsError(
+      'INVALID_NAME',
+      'name must be a non-empty string',
+    )
   }
-  if (settings.cpus !== undefined) {
-    if (!Number.isInteger(settings.cpus) || settings.cpus < 1) {
-      throw new MicrosandboxSettingsError(
-        'INVALID_CPUS',
-        `cpus must be a positive integer; got ${settings.cpus}`,
-      )
-    }
+  const byteLength = Buffer.byteLength(name, 'utf8')
+  if (byteLength > MAX_SANDBOX_NAME_BYTES) {
+    throw new MicrosandboxSettingsError(
+      'INVALID_NAME',
+      `name exceeds the ${MAX_SANDBOX_NAME_BYTES} UTF-8 byte limit (got ${byteLength})`,
+    )
   }
-  if (settings.memory !== undefined) {
-    if (!Number.isInteger(settings.memory) || settings.memory < 1) {
-      throw new MicrosandboxSettingsError(
-        'INVALID_MEMORY',
-        `memory must be a positive integer (MiB); got ${settings.memory}`,
-      )
-    }
+}
+
+function validatePositiveInteger(
+  value: number | undefined,
+  code: MicrosandboxSettingsErrorCode,
+  label: string,
+): void {
+  if (value === undefined) return
+  if (!Number.isInteger(value) || value < 1) {
+    throw new MicrosandboxSettingsError(
+      code,
+      `${label} must be a positive integer; got ${value}`,
+    )
   }
+}
+
+function validatePorts(
+  ports: ReadonlyArray<MicrosandboxPortSetting> | undefined,
+): void {
+  if (!ports) return
   const seen = new Set<number>()
-  for (const entry of settings.ports ?? []) {
+  for (const entry of ports) {
     validatePort(entry.host, 'host')
     validatePort(entry.guest, 'guest')
     if (seen.has(entry.host)) {
