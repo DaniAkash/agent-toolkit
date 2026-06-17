@@ -73,9 +73,9 @@ describe('buildAcpxAuthEnv', () => {
   })
 
   test('upper-cases the method id into ACPX_AUTH_<METHOD_ID>', () => {
-    expect(
-      buildAcpxAuthEnv({ auth: { openai_api_key: 'sk-x' } }),
-    ).toEqual({ ACPX_AUTH_OPENAI_API_KEY: 'sk-x' })
+    expect(buildAcpxAuthEnv({ auth: { openai_api_key: 'sk-x' } })).toEqual({
+      ACPX_AUTH_OPENAI_API_KEY: 'sk-x',
+    })
   })
 
   test('maps multiple auth keys independently', () => {

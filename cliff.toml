@@ -33,7 +33,7 @@ filter_commits = true
 # (`acpx-ai-provider-v…`, `agent-skills-manager-v…`). Old single-package
 # `v0.0.1` / `v0.0.2` tags also still match — they remain historically
 # valid even though new releases no longer use that scheme.
-tag_pattern = "^(acpx-ai-provider-|agent-skills-manager-|acp-probe-|)v[0-9].*"
+tag_pattern = "^(acpx-ai-provider-|acpx-ai-harness-|agent-mcp-manager-|agent-skills-manager-|acp-probe-|)v[0-9].*"
 
 # How each conventional-commit prefix maps to a section in the changelog.
 # Order matters — first match wins.
