@@ -27,6 +27,12 @@ describe('ai-sdk-microsandbox package surface', () => {
     expect(pkg.DEFAULT_PUBLIC_HOSTNAME).toBe('127.0.0.1')
   })
 
+  test('exports MicrosandboxProvider and createMicrosandbox', () => {
+    expect(pkg.MicrosandboxProvider).toBeDefined()
+    expect(typeof pkg.MicrosandboxProvider).toBe('function')
+    expect(typeof pkg.createMicrosandbox).toBe('function')
+  })
+
   test('exports VERSION sentinel', () => {
     expect(pkg.VERSION).toBe('0.0.0')
   })
