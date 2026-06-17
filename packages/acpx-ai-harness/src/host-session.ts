@@ -4,7 +4,7 @@ import { markBridgeStarting, waitForBridgeReady } from '@ai-sdk/harness/utils'
 import type { AcpxHarnessSettings } from './acpx-harness.ts'
 import { pickResumeCoords, tryAttachToExistingBridge } from './host-attach.ts'
 import { createSession } from './host-create-session.ts'
-import { pickPort, shellQuote } from './host-session-utils.ts'
+import { pickPort, shellQuote, tailStderr } from './host-session-utils.ts'
 import { type AcpxChannel, createAcpxChannel } from './sandbox-channel.ts'
 
 const BRIDGE_BUNDLE_PATH = '/tmp/harness/acpx/bridge.mjs'
@@ -71,6 +71,23 @@ export async function doStartImpl(
     abortSignal: start.abortSignal,
   })
 
+  // Drain stderr in the background. waitForBridgeReady reads stdout only,
+  // so a bridge crash that prints to stderr (e.g. `Cannot find module`)
+  // surfaces here.
+  const stderr = tailStderr(proc)
+
+  const formatTails = (stdoutTail: ReadonlyArray<string>) => {
+    const stderrLines = stderr.read()
+    const sections: string[] = []
+    if (stdoutTail.length > 0)
+      sections.push(`stdout tail:\n${stdoutTail.join('\n')}`)
+    if (stderrLines.length > 0)
+      sections.push(`stderr tail:\n${stderrLines.join('\n')}`)
+    return sections.length > 0
+      ? `\n${sections.join('\n\n')}`
+      : '\n(no output captured)'
+  }
+
   // From this point on, anything that throws must tear the bridge process
   // down or it leaks inside the sandbox. waitForBridgeReady() can time out;
   // channel.open() can fail if the WS port never becomes reachable.
@@ -83,6 +100,14 @@ export async function doStartImpl(
       bridgeType: 'acpx',
       timeoutMs: settings.startupTimeoutMs ?? DEFAULT_STARTUP_TIMEOUT_MS,
       abortSignal: start.abortSignal,
+      createExitError: ({ stdoutTail }) =>
+        new Error(
+          `acpx-ai-harness: bridge exited before becoming ready.${formatTails(stdoutTail)}`,
+        ),
+      createTimeoutError: ({ stdoutTail }) =>
+        new Error(
+          `acpx-ai-harness: bridge did not become ready before timeout.${formatTails(stdoutTail)}`,
+        ),
     })
 
     channel = createAcpxChannel({ sandboxSession, port, token })
