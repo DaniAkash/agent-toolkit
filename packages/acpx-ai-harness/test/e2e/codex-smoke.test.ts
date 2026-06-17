@@ -9,7 +9,11 @@ import {
 } from './helpers.ts'
 
 const AGENT = 'codex'
-const SESSION_TIMEOUT_MS = 5 * 60 * 1000
+// 15 min: cold-start sandbox snapshot creation can take several minutes
+// (Vercel's `getOrCreate` builds the template from the bootstrap recipe
+// on the first run). Subsequent runs should reuse the snapshot.
+const SESSION_TIMEOUT_MS = 15 * 60 * 1000
+const BRIDGE_PORT = 4001
 
 /**
  * The harness's bootstrap recipe handles the codex install inside the
@@ -27,9 +31,29 @@ const buildAgent = () => {
   const harness = createAcpxHarness({
     agent: 'codex',
     readBridgeAsset: readBridgeAssetFromDist,
+    // Cold-start sandboxes take a while to ship the bridge bundle
+    // through the bootstrap recipe; give the bridge plenty of headroom
+    // to come up.
+    startupTimeoutMs: 5 * 60 * 1000,
   })
+  // @vercel/sandbox's getCredentials prefers an OIDC token (via
+  // `npx vercel link` + `vercel env pull`) but also accepts explicit
+  // params. We pass token / teamId / projectId from env so the test
+  // doesn't depend on a local .env.local.
+  //
+  // `ports: [BRIDGE_PORT]` is required: bridge-backed harness adapters
+  // need at least one port exposed by the sandbox for the host to
+  // reach the in-sandbox bridge WebSocket. The adapter picks the
+  // first sandbox port for the bridge unless settings.port overrides.
   const sandbox = createVercelSandbox({
+    // biome-ignore lint/style/noNonNullAssertion: the describe-gate guarantees these are set
+    token: process.env.VERCEL_TOKEN!,
+    // biome-ignore lint/style/noNonNullAssertion: same
+    teamId: process.env.VERCEL_TEAM_ID!,
+    // biome-ignore lint/style/noNonNullAssertion: same
+    projectId: process.env.VERCEL_PROJECT_ID!,
     runtime: 'node22',
+    ports: [BRIDGE_PORT],
     env: collectAgentEnv(AGENT),
   })
   return new HarnessAgent({ harness, sandbox })

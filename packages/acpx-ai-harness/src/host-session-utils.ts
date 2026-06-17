@@ -26,7 +26,7 @@ export function tailStderr(proc: Experimental_SandboxProcess): {
   // structurally identical.
   const reader = (
     proc.stderr as unknown as ReadableStream<Uint8Array>
-  ).getReader()
+  ).getReader() as unknown as ReadableStreamDefaultReader<Uint8Array>
   void drainLines(reader, (line) => {
     tail.push(line)
     if (tail.length > STDERR_TAIL_LINES) tail.shift()

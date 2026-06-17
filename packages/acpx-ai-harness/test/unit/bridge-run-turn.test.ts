@@ -195,4 +195,59 @@ describe('runAcpxTurn — failure paths', () => {
     // itself.
     expect(emitted).toEqual([])
   })
+
+  test('watchdog force-finishes when the agent emits error then goes silent', async () => {
+    // A turn whose iterator yields an error event and then yields no
+    // more events (and never resolves `result`). Without the watchdog
+    // the host would hang forever; with it the bridge force-finishes
+    // after the configured timeout.
+    const neverSettles = new Promise<never>(() => {})
+    const iter: AsyncIterator<unknown> = {
+      async next() {
+        if (!emitted) {
+          emitted = true
+          return {
+            value: acpEvent.error('agent reported an error', {
+              code: 'agent_err',
+            }),
+            done: false,
+          }
+        }
+        return neverSettles
+      },
+      async return() {
+        return { value: undefined, done: true }
+      },
+    }
+    let emitted = false
+    const fakeTurn = {
+      requestId: 'req-watchdog',
+      events: { [Symbol.asyncIterator]: () => iter },
+      result: neverSettles,
+      cancel: async () => {},
+      closeStream: async () => {},
+    }
+    const runtime = {
+      ensureSession: async () => ({
+        sessionKey: 'k',
+        backend: 'mock',
+        runtimeSessionName: 'n',
+      }),
+      startTurn: () => fakeTurn,
+      runTurn: () => fakeTurn.events,
+    } as never
+    const { turn, emitted: emittedParts } = makeFakeBridgeTurn()
+    await runAcpxTurn(baseStart(), turn, {
+      workdir: '/tmp/bridge-work',
+      runtime,
+      silentAfterErrorTimeoutMs: 100,
+    })
+    const types = emittedParts.map((p) => p.type)
+    expect(types).toContain('error')
+    const finish = emittedParts.find((p) => p.type === 'finish') as Extract<
+      HarnessV1StreamPart,
+      { type: 'finish' }
+    >
+    expect(finish.finishReason.unified).toBe('error')
+  }, 10_000)
 })
