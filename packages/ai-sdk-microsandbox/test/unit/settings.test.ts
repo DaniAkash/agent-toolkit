@@ -107,6 +107,37 @@ describe('validateMicrosandboxSettings — create mode', () => {
     ).not.toThrow()
   })
 
+  test('rejects an empty name', () => {
+    expect(() =>
+      validateMicrosandboxSettings({ image: 'debian', name: '' }),
+    ).toThrow(/name/)
+  })
+
+  test('rejects a name longer than 128 UTF-8 bytes', () => {
+    expect(() =>
+      validateMicrosandboxSettings({
+        image: 'debian',
+        name: 'a'.repeat(129),
+      }),
+    ).toThrow(/128 UTF-8/)
+  })
+
+  test('rejects multi-byte names whose byte length exceeds the limit', () => {
+    // ⭐ encodes to 3 UTF-8 bytes; 50 stars = 150 bytes, exceeds 128.
+    expect(() =>
+      validateMicrosandboxSettings({
+        image: 'debian',
+        name: '⭐'.repeat(50),
+      }),
+    ).toThrow(/128 UTF-8/)
+  })
+
+  test('accepts an in-range name', () => {
+    expect(() =>
+      validateMicrosandboxSettings({ image: 'debian', name: 'short-name' }),
+    ).not.toThrow()
+  })
+
   test('error carries a typed code', () => {
     try {
       validateMicrosandboxSettings({ image: 'debian', cpus: 0 })

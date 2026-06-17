@@ -4,9 +4,7 @@ A Vercel AI SDK v7 `HarnessV1SandboxProvider` backed by [microsandbox](https://g
 
 ## Status
 
-Pre-release scaffold. The public surface is empty in `0.0.0`; the provider implementation lands in subsequent releases.
-
-See the implementation plan on the project's `control-center` for the full roadmap.
+Pre-release. The provider implementation is landing across a sequence of releases. Check the [open issues](https://github.com/DaniAkash/acpx/issues) for what's already shipping and what's coming next.
 
 ## Target adapters
 
