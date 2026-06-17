@@ -27,6 +27,10 @@ export interface MockSandboxOptions {
   readonly execResults?: readonly MockExecResult[]
   /** Queue of exec stream scripts consumed by `execStreamWith` calls in FIFO order. */
   readonly execStreams?: readonly MockExecStreamScript[]
+  /** Object returned by `config()` — matches microsandbox's camelCase shape. */
+  readonly config?: Record<string, unknown>
+  /** Throw this error from `stop()`. */
+  readonly stopError?: Error
 }
 
 export interface MockExecOptions {
@@ -254,5 +258,15 @@ export class MockSandbox {
     const script = this.opts.execStreams?.[this.execStreamIndex] ?? {}
     this.execStreamIndex += 1
     return new MockExecHandle(script)
+  }
+
+  async config(): Promise<Record<string, unknown>> {
+    return this.opts.config ?? {}
+  }
+
+  stopCalls = 0
+  async stop(): Promise<void> {
+    this.stopCalls += 1
+    if (this.opts.stopError) throw this.opts.stopError
   }
 }
