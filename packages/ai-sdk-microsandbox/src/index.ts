@@ -3,6 +3,10 @@ export {
   MICROSANDBOX_PROVIDER_ID,
   MicrosandboxNetworkSandboxSession,
 } from './microsandbox-network-sandbox-session.ts'
+export type {
+  MicrosandboxProviderInternals,
+  SandboxBuilderFactory,
+} from './microsandbox-provider.ts'
 export {
   createMicrosandbox,
   MicrosandboxProvider,

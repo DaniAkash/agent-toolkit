@@ -1,11 +1,11 @@
 import { describe, expect, test } from 'bun:test'
 import { HarnessCapabilityUnsupportedError } from '@ai-sdk/harness'
 import type { Sandbox, SandboxBuilder } from 'microsandbox'
+import { MicrosandboxNetworkSandboxSession } from '../../src/microsandbox-network-sandbox-session.ts'
 import {
   createMicrosandbox,
   MicrosandboxProvider,
 } from '../../src/microsandbox-provider.ts'
-import { MicrosandboxNetworkSandboxSession } from '../../src/microsandbox-network-sandbox-session.ts'
 import { MicrosandboxSettingsError } from '../../src/settings.ts'
 import { MockSandbox } from '../helpers/mock-sandbox.ts'
 import { MockSandboxBuilder } from '../helpers/mock-sandbox-builder.ts'
@@ -16,7 +16,11 @@ function asSandbox(mock: MockSandbox): Sandbox {
 
 interface BuilderFactoryHarness {
   factory: (name: string) => SandboxBuilder
-  history: Array<{ name: string; builder: MockSandboxBuilder; sandbox: MockSandbox }>
+  history: Array<{
+    name: string
+    builder: MockSandboxBuilder
+    sandbox: MockSandbox
+  }>
 }
 
 function newBuilderFactoryHarness(): BuilderFactoryHarness {
@@ -52,9 +56,9 @@ describe('MicrosandboxProvider — constants', () => {
 
 describe('MicrosandboxProvider — settings validation', () => {
   test('rejects invalid create-mode settings at construction', () => {
-    expect(() =>
-      createMicrosandbox({ image: 'debian', cpus: 0 }),
-    ).toThrow(MicrosandboxSettingsError)
+    expect(() => createMicrosandbox({ image: 'debian', cpus: 0 })).toThrow(
+      MicrosandboxSettingsError,
+    )
   })
 
   test('accepts valid wrap-mode settings', () => {
@@ -74,7 +78,9 @@ describe('MicrosandboxProvider — bridgePorts surface', () => {
   })
 
   test('wrap mode without bridgePorts → bridgePorts is undefined', () => {
-    const provider = createMicrosandbox({ sandbox: asSandbox(new MockSandbox()) })
+    const provider = createMicrosandbox({
+      sandbox: asSandbox(new MockSandbox()),
+    })
     expect(provider.bridgePorts).toBeUndefined()
   })
 
@@ -89,7 +95,10 @@ describe('MicrosandboxProvider — bridgePorts surface', () => {
 
 describe('MicrosandboxProvider — createSession (wrap mode)', () => {
   test('returns a network session over the supplied sandbox', async () => {
-    const mock = new MockSandbox({ name: 'caller-vm', config: { workdir: '/x' } })
+    const mock = new MockSandbox({
+      name: 'caller-vm',
+      config: { workdir: '/x' },
+    })
     const provider = createMicrosandbox({
       sandbox: asSandbox(mock),
       bridgePorts: [4000],

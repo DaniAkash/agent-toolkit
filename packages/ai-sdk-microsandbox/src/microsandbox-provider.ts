@@ -1,16 +1,13 @@
 import type {
-  HarnessV1SandboxProvider,
   HarnessV1NetworkSandboxSession as HarnessNetworkSession,
+  HarnessV1SandboxProvider,
 } from '@ai-sdk/harness'
 import { HarnessCapabilityUnsupportedError } from '@ai-sdk/harness'
 import type { Experimental_SandboxSession } from '@ai-sdk/provider-utils'
 import type { Sandbox, SandboxBuilder } from 'microsandbox'
 import { Sandbox as SandboxClass } from 'microsandbox'
 import { applyCreateSettings } from './internal/sandbox-builder-apply.ts'
-import {
-  autoSessionName,
-  sessionSandboxName,
-} from './internal/session-name.ts'
+import { autoSessionName, sessionSandboxName } from './internal/session-name.ts'
 import {
   MICROSANDBOX_PROVIDER_ID,
   MicrosandboxNetworkSandboxSession,
@@ -30,12 +27,13 @@ const DEFAULT_BIND = '127.0.0.1'
 /**
  * Test-only seam: replaces the `Sandbox.builder(name)` factory so unit tests
  * can intercept the builder chain without spinning up the NAPI binding.
- * Not part of the public type surface — passed through the `_internal` slot
- * on the constructor.
+ * Exported so the public signature of {@link createMicrosandbox} can mention
+ * it, but consumers should not pass this option in production.
  */
 export type SandboxBuilderFactory = (name: string) => SandboxBuilder
 
-interface MicrosandboxProviderInternals {
+/** Test-only seam options. See {@link SandboxBuilderFactory}. */
+export interface MicrosandboxProviderInternals {
   readonly builderFactory?: SandboxBuilderFactory
 }
 
@@ -67,8 +65,7 @@ export class MicrosandboxProvider implements HarnessV1SandboxProvider {
     validateMicrosandboxSettings(settings)
     this.settings = settings
     this.builderFactory =
-      _internal.builderFactory ??
-      ((name: string) => SandboxClass.builder(name))
+      _internal.builderFactory ?? ((name: string) => SandboxClass.builder(name))
     if (
       'sandbox' in settings &&
       settings.sandbox != null &&
@@ -132,7 +129,7 @@ export class MicrosandboxProvider implements HarnessV1SandboxProvider {
     const settings: MicrosandboxCreateSettings = this.settings
     const name = options?.sessionId
       ? sessionSandboxName(options.sessionId)
-      : settings.name ?? autoSessionName()
+      : (settings.name ?? autoSessionName())
     const builder = applyCreateSettings(this.builderFactory(name), settings)
     options?.abortSignal?.throwIfAborted()
     const sandbox = (await builder.create()) as Sandbox
