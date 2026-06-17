@@ -27,13 +27,21 @@ describeIntegration(
       await cleanupRoot()
       // Best-effort cleanup of any snapshots/sandboxes this suite produced.
       for (const name of trackedSnapshots) {
-        await Snapshot.remove(name, { force: true }).catch(() => undefined)
+        try {
+          await Snapshot.remove(name, { force: true })
+        } catch {
+          // ignore
+        }
       }
       const handles = await Sandbox.list().catch(() => [])
       for (const h of handles) {
-        const cfg = h.config()
-        if (cfg.name?.startsWith('ai-sdk-tpl-src-')) {
-          await h.kill().catch(() => undefined)
+        const cfg = h.config() as { name?: string }
+        if (typeof cfg.name === 'string' && cfg.name.startsWith('ai-sdk-tpl-src-')) {
+          try {
+            await h.kill()
+          } catch {
+            // Best-effort cleanup.
+          }
         }
       }
     }, INTEGRATION_TEST_TIMEOUT_MS)
@@ -153,7 +161,11 @@ describeIntegration(
         trackedSnapshots.push(t1.snapshotName)
 
         // Remove the snapshot out-of-band; the cache should detect and rebuild.
-        await Snapshot.remove(t1.snapshotName, { force: true })
+        try {
+          await Snapshot.remove(t1.snapshotName, { force: true })
+        } catch {
+          // ignore — snapshot may already be gone
+        }
 
         const cache2 = new TemplateCache({ cacheRoot })
         const t2 = await cache2.resolveTemplate({

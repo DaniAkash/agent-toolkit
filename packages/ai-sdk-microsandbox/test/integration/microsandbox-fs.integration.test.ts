@@ -23,7 +23,12 @@ describeIntegration('microsandbox session — fs against a real VM', () => {
   }, INTEGRATION_TEST_TIMEOUT_MS)
 
   afterAll(async () => {
-    await session?.destroy().catch(() => undefined)
+    if (!session?.destroy) return
+    try {
+      await session.destroy()
+    } catch {
+      // Best-effort cleanup.
+    }
   })
 
   test(
