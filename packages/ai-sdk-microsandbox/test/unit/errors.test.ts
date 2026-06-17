@@ -1,5 +1,8 @@
 import { describe, expect, test } from 'bun:test'
-import { isDirectoryExistsError, isFileNotFoundError } from '../../src/errors.ts'
+import {
+  isDirectoryExistsError,
+  isFileNotFoundError,
+} from '../../src/errors.ts'
 
 describe('isFileNotFoundError', () => {
   test('returns true for code "ENOENT"', () => {
@@ -11,7 +14,9 @@ describe('isFileNotFoundError', () => {
   })
 
   test('returns true for message containing "no such file"', () => {
-    expect(isFileNotFoundError(new Error('no such file or directory'))).toBe(true)
+    expect(isFileNotFoundError(new Error('no such file or directory'))).toBe(
+      true,
+    )
   })
 
   test('returns true for message containing "does not exist"', () => {
@@ -44,7 +49,9 @@ describe('isDirectoryExistsError', () => {
   })
 
   test('returns true for message containing "already exists"', () => {
-    expect(isDirectoryExistsError(new Error('directory already exists'))).toBe(true)
+    expect(isDirectoryExistsError(new Error('directory already exists'))).toBe(
+      true,
+    )
   })
 
   test('returns false for unrelated errors', () => {

@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import type { ExecHandle } from 'microsandbox'
-import { createSandboxProcess } from '../../src/process-adapter.ts'
 import { collectStream } from '../../src/internal/stream.ts'
+import { createSandboxProcess } from '../../src/process-adapter.ts'
 import { MockExecHandle } from '../helpers/mock-sandbox.ts'
 
 function asExecHandle(mock: MockExecHandle): ExecHandle {

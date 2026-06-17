@@ -47,11 +47,14 @@ export interface MockExecCall {
  * production code paths exercise the same `.args(...).cwd(...).env(...)`
  * chain shape. We only model the subset of setters the session class touches.
  */
-class MockExecOptionsBuilder {
+export class MockExecOptionsBuilder {
   private readonly state: MockExecOptions = {}
 
   args(args: readonly string[]): this {
-    Object.defineProperty(this.state, 'args', { value: [...args], enumerable: true })
+    Object.defineProperty(this.state, 'args', {
+      value: [...args],
+      enumerable: true,
+    })
     return this
   }
 
@@ -61,7 +64,10 @@ class MockExecOptionsBuilder {
   }
 
   envs(env: Record<string, string>): this {
-    Object.defineProperty(this.state, 'env', { value: { ...env }, enumerable: true })
+    Object.defineProperty(this.state, 'env', {
+      value: { ...env },
+      enumerable: true,
+    })
     return this
   }
 
@@ -97,7 +103,6 @@ export class MockExecOutput {
 export class MockExecHandle implements AsyncIterable<ExecEvent> {
   pid: number | undefined
   killCalls = 0
-  private waitResolved = false
 
   constructor(private readonly script: MockExecStreamScript) {
     const started = script.events?.find((e) => e.kind === 'started')
@@ -111,7 +116,6 @@ export class MockExecHandle implements AsyncIterable<ExecEvent> {
   }
 
   async wait(): Promise<{ code: number; success: boolean }> {
-    this.waitResolved = true
     const code = this.script.waitCode ?? 0
     return { code, success: code === 0 }
   }
@@ -122,7 +126,7 @@ export class MockExecHandle implements AsyncIterable<ExecEvent> {
   }
 }
 
-class MockSandboxFsOps {
+export class MockSandboxFsOps {
   constructor(
     private readonly opts: MockSandboxOptions,
     private readonly calls: {

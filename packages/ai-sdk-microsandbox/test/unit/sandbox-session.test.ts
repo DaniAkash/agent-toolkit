@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import type { Sandbox } from 'microsandbox'
-import { MicrosandboxSandboxSession } from '../../src/microsandbox-sandbox-session.ts'
 import { bytesToStream, collectStream } from '../../src/internal/stream.ts'
+import { MicrosandboxSandboxSession } from '../../src/microsandbox-sandbox-session.ts'
 import { MockSandbox } from '../helpers/mock-sandbox.ts'
 
 function newSession(mock: MockSandbox): MicrosandboxSandboxSession {
@@ -213,14 +213,19 @@ describe('MicrosandboxSandboxSession — writeBinaryFile', () => {
   test('skips mkdir for root-level paths', async () => {
     const mock = new MockSandbox()
     const session = newSession(mock)
-    await session.writeBinaryFile({ path: '/file.txt', content: new Uint8Array([1]) })
+    await session.writeBinaryFile({
+      path: '/file.txt',
+      content: new Uint8Array([1]),
+    })
     expect(mock.calls.fsMkdirs).toEqual([])
     expect(mock.calls.fsWrites).toEqual([{ path: '/file.txt', size: 1 }])
   })
 
   test('swallows "already exists" errors from mkdir', async () => {
     const mock = new MockSandbox({
-      fsMkdirError: Object.assign(new Error('exists'), { code: 'AlreadyExists' }),
+      fsMkdirError: Object.assign(new Error('exists'), {
+        code: 'AlreadyExists',
+      }),
     })
     const session = newSession(mock)
     await session.writeBinaryFile({
@@ -236,7 +241,10 @@ describe('MicrosandboxSandboxSession — writeBinaryFile', () => {
     })
     const session = newSession(mock)
     await expect(
-      session.writeBinaryFile({ path: '/a/b/c.txt', content: new Uint8Array([1]) }),
+      session.writeBinaryFile({
+        path: '/a/b/c.txt',
+        content: new Uint8Array([1]),
+      }),
     ).rejects.toThrow('denied')
   })
 })
@@ -247,7 +255,9 @@ describe('MicrosandboxSandboxSession — writeFile (stream)', () => {
     const session = newSession(mock)
     const bytes = new TextEncoder().encode('streamed')
     await session.writeFile({ path: '/s', content: bytesToStream(bytes) })
-    expect(mock.calls.fsWrites).toEqual([{ path: '/s', size: bytes.byteLength }])
+    expect(mock.calls.fsWrites).toEqual([
+      { path: '/s', size: bytes.byteLength },
+    ])
   })
 })
 
@@ -263,7 +273,11 @@ describe('MicrosandboxSandboxSession — writeTextFile', () => {
     const mock = new MockSandbox()
     const session = newSession(mock)
     // "h" in utf-16le is 0x68 0x00 — 2 bytes.
-    await session.writeTextFile({ path: '/t', content: 'h', encoding: 'utf16le' })
+    await session.writeTextFile({
+      path: '/t',
+      content: 'h',
+      encoding: 'utf16le',
+    })
     expect(mock.calls.fsWrites[0]?.size).toBe(2)
   })
 })

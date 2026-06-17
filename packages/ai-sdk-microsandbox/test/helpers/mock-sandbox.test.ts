@@ -50,7 +50,9 @@ describe('MockSandbox — runtime behaviour', () => {
 
   test('fs().mkdir throws the configured error', async () => {
     const sandbox = new MockSandbox({
-      fsMkdirError: Object.assign(new Error('exists'), { code: 'AlreadyExists' }),
+      fsMkdirError: Object.assign(new Error('exists'), {
+        code: 'AlreadyExists',
+      }),
     })
     await expect(sandbox.fs().mkdir('/p')).rejects.toMatchObject({
       code: 'AlreadyExists',
@@ -64,10 +66,14 @@ describe('MockSandbox — runtime behaviour', () => {
         { code: 1, stdout: '', stderr: 'second' },
       ],
     })
-    const first = await sandbox.execWith('bash', (b) => b.args(['-c', 'echo first']))
+    const first = await sandbox.execWith('bash', (b) =>
+      b.args(['-c', 'echo first']),
+    )
     expect(first.code).toBe(0)
     expect(first.stdout()).toBe('first')
-    const second = await sandbox.execWith('bash', (b) => b.args(['-c', 'echo second']))
+    const second = await sandbox.execWith('bash', (b) =>
+      b.args(['-c', 'echo second']),
+    )
     expect(second.code).toBe(1)
     expect(second.stderr()).toBe('second')
   })
@@ -95,7 +101,9 @@ describe('MockSandbox — runtime behaviour', () => {
         },
       ],
     })
-    const handle = await sandbox.execStreamWith('bash', (b) => b.args(['-c', 'x']))
+    const handle = await sandbox.execStreamWith('bash', (b) =>
+      b.args(['-c', 'x']),
+    )
     expect(handle.pid).toBe(42)
     const events = []
     for await (const event of handle) events.push(event)
@@ -109,7 +117,9 @@ describe('MockSandbox — runtime behaviour', () => {
     const sandbox = new MockSandbox({
       execStreams: [{}],
     })
-    const handle = await sandbox.execStreamWith('bash', (b) => b.args(['-c', 'x']))
+    const handle = await sandbox.execStreamWith('bash', (b) =>
+      b.args(['-c', 'x']),
+    )
     await handle.kill()
     await handle.kill()
     expect(handle.killCalls).toBe(2)

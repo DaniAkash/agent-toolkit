@@ -42,7 +42,8 @@ export class MicrosandboxSandboxSession implements Experimental_SandboxSession {
     const output = await withAbort(
       this.sandbox.execWith('bash', (b) => {
         let builder = b.args(['-c', command])
-        if (workingDirectory !== undefined) builder = builder.cwd(workingDirectory)
+        if (workingDirectory !== undefined)
+          builder = builder.cwd(workingDirectory)
         if (env !== undefined) builder = builder.envs(env)
         return builder
       }),
@@ -69,7 +70,8 @@ export class MicrosandboxSandboxSession implements Experimental_SandboxSession {
     abortSignal?.throwIfAborted()
     const handle = await this.sandbox.execStreamWith('bash', (b) => {
       let builder = b.args(['-c', command])
-      if (workingDirectory !== undefined) builder = builder.cwd(workingDirectory)
+      if (workingDirectory !== undefined)
+        builder = builder.cwd(workingDirectory)
       if (env !== undefined) builder = builder.envs(env)
       return builder
     })
