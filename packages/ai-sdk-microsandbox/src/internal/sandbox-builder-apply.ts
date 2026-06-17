@@ -15,13 +15,36 @@ const IMPLICIT_BIND = '127.0.0.1'
  * Apply create-mode settings onto a microsandbox `SandboxBuilder`. Pure
  * function — no provider state, returns the builder so the provider can chain
  * `.create()` itself. Reusable from any path that constructs a sandbox from
- * settings (including the Phase 4 snapshot-template path).
+ * settings (including the snapshot-template path).
  */
 export function applyCreateSettings(
   builder: SandboxBuilder,
   settings: MicrosandboxCreateSettings,
 ): SandboxBuilder {
   let b = builder.image(settings.image)
+  b = applyRuntimeSettings(b, settings)
+  return b
+}
+
+/**
+ * Apply settings to a fork that's being created `fromSnapshot()`. The
+ * snapshot already pins the image; calling `.image(...)` again would be
+ * rejected by microsandbox. Everything else (cpus / memory / workdir / env /
+ * ports / networkPolicy / replace) is runtime-only and re-applied at fork
+ * time so a single template can support a range of fork configurations.
+ */
+export function applyForkSettings(
+  builder: SandboxBuilder,
+  settings: MicrosandboxCreateSettings,
+): SandboxBuilder {
+  return applyRuntimeSettings(builder, settings)
+}
+
+function applyRuntimeSettings(
+  builder: SandboxBuilder,
+  settings: MicrosandboxCreateSettings,
+): SandboxBuilder {
+  let b = builder
   if (settings.cpus !== undefined) b = b.cpus(settings.cpus)
   if (settings.memory !== undefined) b = b.memory(settings.memory)
   if (settings.workdir !== undefined) b = b.workdir(settings.workdir)

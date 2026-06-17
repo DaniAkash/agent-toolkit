@@ -1,5 +1,8 @@
 import { describe, expect, test } from 'bun:test'
-import { applyCreateSettings } from '../../src/internal/sandbox-builder-apply.ts'
+import {
+  applyCreateSettings,
+  applyForkSettings,
+} from '../../src/internal/sandbox-builder-apply.ts'
 import { MockSandboxBuilder } from '../helpers/mock-sandbox-builder.ts'
 
 function newBuilder(): MockSandboxBuilder {
@@ -163,5 +166,44 @@ describe('applyCreateSettings — network policy', () => {
     const b = newBuilder()
     applyCreateSettings(b.asSandboxBuilder(), { image: 'debian' })
     expect(b.calls.some((c) => c.method === 'network')).toBe(false)
+  })
+})
+
+describe('applyForkSettings', () => {
+  test('does NOT call image() — the snapshot already pins it', () => {
+    const b = newBuilder()
+    applyForkSettings(b.asSandboxBuilder(), {
+      image: 'debian',
+      cpus: 2,
+    })
+    expect(b.calls.some((c) => c.method === 'image')).toBe(false)
+  })
+
+  test('applies runtime-only settings (cpus / memory / workdir / env)', () => {
+    const b = newBuilder()
+    applyForkSettings(b.asSandboxBuilder(), {
+      image: 'debian',
+      cpus: 4,
+      memory: 4096,
+      workdir: '/workspace',
+      env: { FOO: 'bar' },
+    })
+    const methods = b.calls.map((c) => c.method)
+    expect(methods).toContain('cpus')
+    expect(methods).toContain('memory')
+    expect(methods).toContain('workdir')
+    expect(methods).toContain('envs')
+  })
+
+  test('applies ports and networkPolicy at fork time', () => {
+    const b = newBuilder()
+    applyForkSettings(b.asSandboxBuilder(), {
+      image: 'debian',
+      ports: [{ host: 8080, guest: 80 }],
+      networkPolicy: { mode: 'allow-all' },
+    })
+    const methods = b.calls.map((c) => c.method)
+    expect(methods).toContain('port')
+    expect(methods).toContain('network')
   })
 })
