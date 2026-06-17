@@ -8,7 +8,9 @@ import {
 
 describe('resolveTemplatesDirectory', () => {
   test('honors the override env var verbatim', () => {
-    const root = resolveTemplatesDirectory({ [CACHE_DIR_ENV_VAR]: '/custom/root' })
+    const root = resolveTemplatesDirectory({
+      [CACHE_DIR_ENV_VAR]: '/custom/root',
+    })
     expect(root).toBe(join('/custom/root', 'templates'))
   })
 

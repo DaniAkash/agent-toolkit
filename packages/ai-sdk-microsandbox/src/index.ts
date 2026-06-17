@@ -27,5 +27,14 @@ export {
   MicrosandboxSettingsError,
   validateMicrosandboxSettings,
 } from './settings.ts'
+export type {
+  OnFirstCreateFn,
+  ResolveTemplateInput,
+  SnapshotApi,
+  TemplateCacheOptions,
+  TemplateMetadata,
+  TemplateRecord,
+} from './template-cache.ts'
+export { TemplateCache } from './template-cache.ts'
 
 export const VERSION = '0.0.0'

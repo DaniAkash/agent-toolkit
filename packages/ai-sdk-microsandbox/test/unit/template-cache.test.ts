@@ -15,7 +15,11 @@ import { createTmpCacheRoot } from '../helpers/tmp-cache-root.ts'
 
 interface BuilderFactoryHarness {
   factory: (name: string) => SandboxBuilder
-  history: Array<{ name: string; builder: MockSandboxBuilder; sandbox: MockSandbox }>
+  history: Array<{
+    name: string
+    builder: MockSandboxBuilder
+    sandbox: MockSandbox
+  }>
 }
 
 function newBuilderFactory(): BuilderFactoryHarness {
@@ -89,7 +93,7 @@ describe('TemplateCache — first-call materialisation', () => {
     const entries = await readdir(join(cacheRoot, 'templates'))
     expect(entries).toHaveLength(1)
     const metadataRaw = await readFile(
-      join(cacheRoot, 'templates', entries[0]!, 'metadata.json'),
+      join(cacheRoot, 'templates', entries[0] ?? '', 'metadata.json'),
       'utf8',
     )
     const metadata = JSON.parse(metadataRaw) as TemplateMetadata
@@ -314,7 +318,7 @@ describe('TemplateCache — invalidation', () => {
     const metadataPath = join(
       cacheRoot,
       'templates',
-      entries[0]!,
+      entries[0] ?? '',
       'metadata.json',
     )
     await writeFile(metadataPath, 'not valid json', 'utf8')
@@ -352,7 +356,7 @@ describe('TemplateCache — invalidation', () => {
     const metadataPath = join(
       cacheRoot,
       'templates',
-      entries[0]!,
+      entries[0] ?? '',
       'metadata.json',
     )
     const original = JSON.parse(await readFile(metadataPath, 'utf8'))

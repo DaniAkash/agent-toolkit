@@ -24,7 +24,9 @@ describe('isSnapshotSourceRunningError', () => {
 
   test('matches message containing "sandbox alive"', () => {
     expect(
-      isSnapshotSourceRunningError(new Error('sandbox alive when snapshotting')),
+      isSnapshotSourceRunningError(
+        new Error('sandbox alive when snapshotting'),
+      ),
     ).toBe(true)
   })
 

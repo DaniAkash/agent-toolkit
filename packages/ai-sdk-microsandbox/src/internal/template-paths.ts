@@ -21,8 +21,17 @@ const CACHE_SUBDIR = 'ai-sdk-microsandbox'
  *
  * `templates/` is appended for the template subdirectory.
  */
-export function resolveTemplatesDirectory(env: NodeJS.ProcessEnv = process.env): string {
+export function resolveTemplatesDirectory(
+  env: NodeJS.ProcessEnv = readProcessEnv(),
+): string {
   return join(resolveCacheRoot(env), 'templates')
+}
+
+// Indirection so the lint rule against `process.env` is suppressed in one
+// well-defined spot rather than scattered across callers.
+function readProcessEnv(): NodeJS.ProcessEnv {
+  // biome-ignore lint/style/noProcessEnv: cache-root resolution legitimately reads the user environment
+  return process.env
 }
 
 /**

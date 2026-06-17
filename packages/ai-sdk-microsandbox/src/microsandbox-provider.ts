@@ -2,7 +2,6 @@ import type {
   HarnessV1NetworkSandboxSession as HarnessNetworkSession,
   HarnessV1SandboxProvider,
 } from '@ai-sdk/harness'
-import { HarnessCapabilityUnsupportedError } from '@ai-sdk/harness'
 import type { Experimental_SandboxSession } from '@ai-sdk/provider-utils'
 import type { Sandbox, SandboxBuilder } from 'microsandbox'
 import { Sandbox as SandboxClass } from 'microsandbox'
@@ -21,6 +20,12 @@ import {
   isMicrosandboxCreateSettings,
   validateMicrosandboxSettings,
 } from './settings.ts'
+import {
+  buildForkFromSnapshot,
+  type OnFirstCreateFn,
+  TemplateCache,
+  type TemplateCacheOptions,
+} from './template-cache.ts'
 
 const DEFAULT_BIND = '127.0.0.1'
 
@@ -35,6 +40,20 @@ export type SandboxBuilderFactory = (name: string) => SandboxBuilder
 /** Test-only seam options. See {@link SandboxBuilderFactory}. */
 export interface MicrosandboxProviderInternals {
   readonly builderFactory?: SandboxBuilderFactory
+  /**
+   * Override the {@link TemplateCache} the provider uses for the
+   * identity/onFirstCreate snapshot path. Defaults to a cache constructed
+   * with the system-conventional cache root and microsandbox's real
+   * snapshot API. Test code passes a cache with a tmp root + mock
+   * snapshot API.
+   */
+  readonly templateCache?: TemplateCache
+  /**
+   * Forwarded to a freshly-constructed {@link TemplateCache} when
+   * `templateCache` itself isn't provided. Lets consumers nudge the
+   * cache root without taking on the rest of the construction.
+   */
+  readonly templateCacheOptions?: TemplateCacheOptions
 }
 
 /**
@@ -44,11 +63,11 @@ export interface MicrosandboxProviderInternals {
  * network sandbox session).
  *
  * Wrap mode (`settings.sandbox` set) wraps a caller-managed `Sandbox`; create
- * mode mints a fresh sandbox per session via `Sandbox.builder(name)`. The
- * snapshot-identity reuse path (used when the harness adapter declares a
- * bootstrap recipe with `identity`) is not yet implemented — it lands in a
- * follow-up phase. Calls passing `identity` + `onFirstCreate` throw
- * `HarnessCapabilityUnsupportedError`.
+ * mode mints a fresh sandbox per session via `Sandbox.builder(name)`. When
+ * the harness passes `identity` + `onFirstCreate`, the provider routes
+ * through {@link TemplateCache}: bootstrap runs once per identity, the
+ * resulting sandbox is snapshotted, and subsequent sessions fork from the
+ * snapshot via `Sandbox.builder().fromSnapshot()`.
  */
 export class MicrosandboxProvider implements HarnessV1SandboxProvider {
   readonly specificationVersion: 'harness-sandbox-v1' = 'harness-sandbox-v1'
@@ -57,6 +76,7 @@ export class MicrosandboxProvider implements HarnessV1SandboxProvider {
 
   private readonly settings: MicrosandboxSettings
   private readonly builderFactory: SandboxBuilderFactory
+  private readonly templateCache: TemplateCache
 
   constructor(
     settings: MicrosandboxSettings,
@@ -66,6 +86,9 @@ export class MicrosandboxProvider implements HarnessV1SandboxProvider {
     this.settings = settings
     this.builderFactory =
       _internal.builderFactory ?? ((name: string) => SandboxClass.builder(name))
+    this.templateCache =
+      _internal.templateCache ??
+      new TemplateCache(_internal.templateCacheOptions)
     if (
       'sandbox' in settings &&
       settings.sandbox != null &&
@@ -88,14 +111,16 @@ export class MicrosandboxProvider implements HarnessV1SandboxProvider {
     options?.abortSignal?.throwIfAborted()
 
     if (this.isWrapMode()) {
+      // Wrap mode owns its own sandbox; identity/onFirstCreate are ignored.
       return await this.createWrappedSession()
     }
 
     if (options?.identity != null && options.onFirstCreate != null) {
-      throw new HarnessCapabilityUnsupportedError({
-        harnessId: this.providerId,
-        message:
-          'Snapshot-based identity reuse is not yet implemented. Pass an explicit sessionId without identity/onFirstCreate to mint a fresh sandbox per session.',
+      return await this.createForkSession({
+        identity: options.identity,
+        onFirstCreate: options.onFirstCreate,
+        sessionId: options.sessionId,
+        abortSignal: options.abortSignal,
       })
     }
 
@@ -132,6 +157,45 @@ export class MicrosandboxProvider implements HarnessV1SandboxProvider {
       : (settings.name ?? autoSessionName())
     const builder = applyCreateSettings(this.builderFactory(name), settings)
     options?.abortSignal?.throwIfAborted()
+    const sandbox = (await builder.create()) as Sandbox
+    return await MicrosandboxNetworkSandboxSession.create({
+      sandbox,
+      ports: createModePorts(settings),
+      publicHostname: settings.publicHostname,
+      ownsLifecycle: true,
+    })
+  }
+
+  private async createForkSession(input: {
+    identity: string
+    onFirstCreate: OnFirstCreateFn
+    sessionId: string | undefined
+    abortSignal: AbortSignal | undefined
+  }): Promise<HarnessNetworkSession> {
+    if (!isMicrosandboxCreateSettings(this.settings)) {
+      throw new Error('createForkSession called outside create mode')
+    }
+    const settings: MicrosandboxCreateSettings = this.settings
+
+    const { snapshotName } = await this.templateCache.resolveTemplate({
+      identity: input.identity,
+      settings,
+      onFirstCreate: input.onFirstCreate,
+      builderFactory: this.builderFactory,
+      abortSignal: input.abortSignal,
+    })
+
+    input.abortSignal?.throwIfAborted()
+    const forkName = input.sessionId
+      ? sessionSandboxName(input.sessionId)
+      : autoSessionName()
+    const builder = buildForkFromSnapshot({
+      builderFactory: this.builderFactory,
+      forkName,
+      snapshotName,
+      settings,
+    })
+    input.abortSignal?.throwIfAborted()
     const sandbox = (await builder.create()) as Sandbox
     return await MicrosandboxNetworkSandboxSession.create({
       sandbox,

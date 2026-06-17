@@ -3,8 +3,6 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Experimental_SandboxSession } from '@ai-sdk/provider-utils'
 import type { Sandbox } from 'microsandbox'
-import type { SandboxBuilderFactory } from './microsandbox-provider.ts'
-import { MicrosandboxSandboxSession } from './microsandbox-sandbox-session.ts'
 import { atomicWriteIntoDirectory } from './internal/atomic-write.ts'
 import { computeOptionsHash } from './internal/options-hash.ts'
 import {
@@ -20,6 +18,8 @@ import {
   resolveTemplateDirectory,
   resolveTemplatesDirectory,
 } from './internal/template-paths.ts'
+import type { SandboxBuilderFactory } from './microsandbox-provider.ts'
+import { MicrosandboxSandboxSession } from './microsandbox-sandbox-session.ts'
 import type { MicrosandboxCreateSettings } from './settings.ts'
 
 /**
@@ -225,7 +225,9 @@ export class TemplateCache {
       // Best-effort: stop the template sandbox so it doesn't linger after
       // a failed bootstrap. The snapshot (if any) is dropped too.
       await templateSandbox?.stop().catch(() => {})
-      await this.snapshotApi.removeSnapshotIfExists(snapshotName).catch(() => {})
+      await this.snapshotApi
+        .removeSnapshotIfExists(snapshotName)
+        .catch(() => {})
       throw error
     }
   }
@@ -296,4 +298,3 @@ function isValidMetadata(value: unknown): value is TemplateMetadata {
     typeof v.createdAt === 'number'
   )
 }
-

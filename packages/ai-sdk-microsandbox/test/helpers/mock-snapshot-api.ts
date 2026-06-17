@@ -40,8 +40,7 @@ export class MockSnapshotApi implements SnapshotApi {
     this.stopAndSnapshotAttempts += 1
     if (
       this.opts.stopAndSnapshotTransientFailures &&
-      this.stopAndSnapshotAttempts <=
-        this.opts.stopAndSnapshotTransientFailures
+      this.stopAndSnapshotAttempts <= this.opts.stopAndSnapshotTransientFailures
     ) {
       throw Object.assign(new Error('snapshot source running'), {
         code: 'SnapshotSourceRunning',

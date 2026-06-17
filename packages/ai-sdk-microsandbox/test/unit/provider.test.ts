@@ -1,5 +1,4 @@
 import { describe, expect, test } from 'bun:test'
-import { HarnessCapabilityUnsupportedError } from '@ai-sdk/harness'
 import type { Sandbox, SandboxBuilder } from 'microsandbox'
 import { MicrosandboxNetworkSandboxSession } from '../../src/microsandbox-network-sandbox-session.ts'
 import {
@@ -212,13 +211,25 @@ describe('MicrosandboxProvider — createSession (create mode)', () => {
     expect(history).toHaveLength(0)
   })
 
-  test('identity + onFirstCreate throws HarnessCapabilityUnsupportedError', async () => {
+  test('identity + onFirstCreate is now supported (Phase 4)', async () => {
+    // No longer throws; the full identity-branch behavior is verified in
+    // provider-identity.test.ts which wires the TemplateCache test seam.
     const provider = createMicrosandbox({ image: 'debian' })
-    await expect(
-      provider.createSession({
-        identity: 'claude-code-v1',
-        onFirstCreate: async () => undefined,
-      }),
-    ).rejects.toThrow(HarnessCapabilityUnsupportedError)
+    // We can't run this against a real builder here, but at least confirm
+    // it doesn't synchronously reject with HarnessCapabilityUnsupportedError.
+    const promise = provider.createSession({
+      identity: 'claude-code-v1',
+      onFirstCreate: async () => undefined,
+    })
+    // Catch any error so this test focuses on the rejection *type*.
+    let rejection: unknown
+    try {
+      await promise
+    } catch (error) {
+      rejection = error
+    }
+    expect((rejection as { name?: string })?.name).not.toBe(
+      'HarnessCapabilityUnsupportedError',
+    )
   })
 })
