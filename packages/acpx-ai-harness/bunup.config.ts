@@ -7,7 +7,14 @@ export default defineConfig([
     outDir: 'dist',
     format: ['esm'],
     target: 'node',
-    dts: true,
+    // inferTypes uses the traditional tsc declaration emit instead of
+    // bunup's isolated-declarations path. Required here because we
+    // re-export several zod schemas (built-in tool descriptors, bridge
+    // protocol, lifecycle state) whose inferred types are too complex
+    // for the isolated-declarations rule to express without per-export
+    // explicit annotations. Documented bunup workaround for zod-heavy
+    // libraries: https://bunup.dev/docs/guide/typescript-declarations
+    dts: { inferTypes: true },
     clean: true,
     external: [
       'ai',
