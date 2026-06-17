@@ -76,7 +76,7 @@ The harness's bootstrap recipe pre-warms the ACP wrapper binary acpx invokes for
 
 | `agent` setting | Bootstrap pre-warm | `settings.auth` key |
 |---|---|---|
-| `'codex'` (default) | `npx --yes @zed-industries/codex-acp --version` | `openai_api_key` |
+| `'codex'` (default) | `npx --yes @zed-industries/codex-acp --help > /dev/null` | `openai_api_key` |
 | `'claude'` | `npx --yes @agentclientprotocol/claude-agent-acp --version` | `anthropic_api_key` |
 | `'gemini'` | `npm install -g @google/gemini-cli` | `gemini_api_key` |
 | any other id | (skipped, bring your own install) | (varies, see acpx config docs) |

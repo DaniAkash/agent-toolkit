@@ -203,7 +203,7 @@ describe('getBootstrap recipe', () => {
       c.command.includes('@zed-industries/codex-acp'),
     )
     expect(install?.command).toBe(
-      'npx --yes @zed-industries/codex-acp --version',
+      'npx --yes @zed-industries/codex-acp --help > /dev/null',
     )
   })
 
