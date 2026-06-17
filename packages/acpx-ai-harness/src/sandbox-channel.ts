@@ -47,11 +47,61 @@ export interface OpenAcpxChannelOptions {
   readonly initialLastSeenEventId?: number
 }
 
+/** How long `openAcpxChannel` waits for `bridge-hello` after the WS opens. */
+const BRIDGE_HELLO_TIMEOUT_MS = 30_000
+
+/**
+ * Open a channel and synchronise with the bridge's handshake before
+ * resolving. The bridge sends `bridge-hello` on every fresh WS connection
+ * to signal "I'm ready to accept commands"; sending a `start` frame
+ * before that arrives gets the frame silently dropped, which the host
+ * then experiences as a forever-hanging stream.
+ *
+ * Use this instead of calling `channel.open()` directly when the next
+ * thing you do is `channel.send(...)`.
+ */
+export async function openAcpxChannel(
+  channel: AcpxChannel,
+  opts?: { resume?: boolean; helloTimeoutMs?: number },
+): Promise<void> {
+  let resolveHello!: () => void
+  let rejectHello!: (err: unknown) => void
+  const helloP = new Promise<void>((resolve, reject) => {
+    resolveHello = resolve
+    rejectHello = reject
+  })
+  // SandboxChannel buffers inbound messages until a listener is registered,
+  // so subscribing after open() is safe: the first replayed message will
+  // be bridge-hello.
+  const unsub = channel.on('bridge-hello' as never, () => {
+    unsub()
+    resolveHello()
+  })
+  const timer = setTimeout(() => {
+    unsub()
+    rejectHello(
+      new Error(
+        `acpx-ai-harness: bridge did not send bridge-hello within ${
+          opts?.helloTimeoutMs ?? BRIDGE_HELLO_TIMEOUT_MS
+        }ms after WebSocket connect. The bridge process may have died after the WS handshake; check its stderr.`,
+      ),
+    )
+  }, opts?.helloTimeoutMs ?? BRIDGE_HELLO_TIMEOUT_MS)
+  try {
+    await channel.open(opts?.resume ? { resume: true } : undefined)
+    await helloP
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 /**
  * Build (but don't yet open) a SandboxChannel pointed at the in-sandbox
  * bridge's WebSocket endpoint. The caller decides whether to open fresh
  * (`channel.open()`) or resume against a buffered log
- * (`channel.open({ resume: true })`).
+ * (`channel.open({ resume: true })`). Prefer `openAcpxChannel(channel)`
+ * over `channel.open()` directly so the handshake is honoured before
+ * subsequent sends.
  *
  * The connect thunk re-resolves the URL on every reconnect so transient
  * sandbox-side port re-binds are tolerated by the channel's auto-reconnect

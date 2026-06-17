@@ -5,7 +5,11 @@ import type { AcpxHarnessSettings } from './acpx-harness.ts'
 import { pickResumeCoords, tryAttachToExistingBridge } from './host-attach.ts'
 import { createSession } from './host-create-session.ts'
 import { pickPort, shellQuote, tailStderr } from './host-session-utils.ts'
-import { type AcpxChannel, createAcpxChannel } from './sandbox-channel.ts'
+import {
+  type AcpxChannel,
+  createAcpxChannel,
+  openAcpxChannel,
+} from './sandbox-channel.ts'
 
 const BRIDGE_BUNDLE_PATH = '/tmp/harness/acpx/bridge.mjs'
 const DEFAULT_STARTUP_TIMEOUT_MS = 120_000
@@ -111,7 +115,7 @@ export async function doStartImpl(
     })
 
     channel = createAcpxChannel({ sandboxSession, port, token })
-    await channel.open()
+    await openAcpxChannel(channel)
   } catch (err) {
     try {
       channel?.close()

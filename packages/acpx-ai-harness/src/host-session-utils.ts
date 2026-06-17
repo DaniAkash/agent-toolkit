@@ -21,7 +21,13 @@ export function tailStderr(proc: Experimental_SandboxProcess): {
   read(): string[]
 } {
   const tail: string[] = []
-  void drainLines(proc.stderr.getReader(), (line) => {
+  // Cast through unknown: Node's `stream/web` ReadableStream and the lib.dom
+  // global one have nominally distinct types in TS even though they're
+  // structurally identical.
+  const reader = (
+    proc.stderr as unknown as ReadableStream<Uint8Array>
+  ).getReader()
+  void drainLines(reader, (line) => {
     tail.push(line)
     if (tail.length > STDERR_TAIL_LINES) tail.shift()
   })

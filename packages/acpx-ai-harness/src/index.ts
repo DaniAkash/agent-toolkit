@@ -38,4 +38,5 @@ export {
   type AcpxChannel,
   createAcpxChannel,
   type OpenAcpxChannelOptions,
+  openAcpxChannel,
 } from './sandbox-channel.ts'
