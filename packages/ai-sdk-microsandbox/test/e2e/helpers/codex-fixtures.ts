@@ -28,7 +28,7 @@ export interface SharedCodexHarness {
 
 /**
  * Build the (harness, sandbox-provider) pair the e2e suite uses everywhere.
- * Each test file gets a fresh `HarnessAgent` over the same shared snapshot —
+ * Each test file gets a fresh `HarnessAgent` over the same shared snapshot.
  * sessions are independent, but bootstrap runs once per process.
  */
 export function buildSharedCodexHarness(input?: {

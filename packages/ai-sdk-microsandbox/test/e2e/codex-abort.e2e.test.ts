@@ -5,7 +5,7 @@ import { buildSharedCodexHarness } from './helpers/codex-fixtures.ts'
 
 const describeE2e = requireE2eEnv()
 
-describeE2e('codex e2e — abort handling', () => {
+describeE2e('codex e2e: abort handling', () => {
   afterAll(async () => {
     await purgeE2eSandboxes()
   }, E2E_TEST_TIMEOUT_MS)
@@ -34,7 +34,7 @@ describeE2e('codex e2e — abort handling', () => {
           if (part.type === 'error') break
         }
       } catch {
-        // expected — abort surfaces as an error
+        // expected: abort surfaces as an error
       }
       const elapsed = Date.now() - start
       // A non-aborted 2000-word essay would take far longer than this cap.

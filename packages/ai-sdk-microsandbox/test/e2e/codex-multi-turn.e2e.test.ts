@@ -5,7 +5,7 @@ import { buildSharedCodexHarness } from './helpers/codex-fixtures.ts'
 
 const describeE2e = requireE2eEnv()
 
-describeE2e('codex e2e — multi-turn conversation state', () => {
+describeE2e('codex e2e: multi-turn conversation state', () => {
   afterAll(async () => {
     await purgeE2eSandboxes()
   }, E2E_TEST_TIMEOUT_MS)
@@ -40,7 +40,7 @@ describeE2e('codex e2e — multi-turn conversation state', () => {
       const b = await agent.createSession({ sessionId: 'twin-b' })
       try {
         expect(a.sessionId).not.toBe(b.sessionId)
-        // Touch both — proves both microVMs are independently usable.
+        // Touch both: proves both microVMs are independently usable.
         const [ra, rb] = await Promise.all([
           agent.generate({ session: a, prompt: 'Reply with "A".' }),
           agent.generate({ session: b, prompt: 'Reply with "B".' }),

@@ -11,7 +11,7 @@ import {
 const describeIntegration = requireIntegrationEnv()
 
 describeIntegration(
-  'template-cache — real microsandbox snapshot orchestration',
+  'template-cache: real microsandbox snapshot orchestration',
   () => {
     let cacheRoot = ''
     let cleanupRoot: () => Promise<void> = async () => {}
@@ -36,7 +36,10 @@ describeIntegration(
       const handles = await Sandbox.list().catch(() => [])
       for (const h of handles) {
         const cfg = h.config() as { name?: string }
-        if (typeof cfg.name === 'string' && cfg.name.startsWith('ai-sdk-tpl-src-')) {
+        if (
+          typeof cfg.name === 'string' &&
+          cfg.name.startsWith('ai-sdk-tpl-src-')
+        ) {
           try {
             await h.kill()
           } catch {
@@ -164,7 +167,7 @@ describeIntegration(
         try {
           await Snapshot.remove(t1.snapshotName, { force: true })
         } catch {
-          // ignore — snapshot may already be gone
+          // ignore: snapshot may already be gone
         }
 
         const cache2 = new TemplateCache({ cacheRoot })

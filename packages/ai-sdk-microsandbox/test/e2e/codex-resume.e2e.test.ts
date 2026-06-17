@@ -5,7 +5,7 @@ import { buildSharedCodexHarness } from './helpers/codex-fixtures.ts'
 
 const describeE2e = requireE2eEnv()
 
-describeE2e('codex e2e — cross-process resume', () => {
+describeE2e('codex e2e: cross-process resume', () => {
   afterAll(async () => {
     await purgeE2eSandboxes()
   }, E2E_TEST_TIMEOUT_MS)

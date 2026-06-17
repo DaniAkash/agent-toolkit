@@ -6,7 +6,7 @@ import { assertWithinBudget } from './helpers/cost-budget.ts'
 
 const describeE2e = requireE2eEnv()
 
-describeE2e('codex e2e — text generation', () => {
+describeE2e('codex e2e: text generation', () => {
   afterAll(async () => {
     await purgeE2eSandboxes()
   }, E2E_TEST_TIMEOUT_MS)

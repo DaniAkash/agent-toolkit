@@ -25,7 +25,7 @@ async function tcpProbe(
   return exitCode === 0
 }
 
-describeIntegration('microsandbox — network policy enforcement', () => {
+describeIntegration('microsandbox: network policy enforcement', () => {
   const sessions: HarnessV1NetworkSandboxSession[] = []
 
   afterAll(async () => {
@@ -94,7 +94,7 @@ describeIntegration('microsandbox — network policy enforcement', () => {
     async () => {
       // Pin a host that historically resolves into a known public range; the
       // deniedCIDRs rule must short-circuit even though allowedHosts covers it.
-      // We don't depend on a specific IP — we use 0.0.0.0/0 deny + a host allow
+      // We don't depend on a specific IP: we use 0.0.0.0/0 deny + a host allow
       // to force the deny to win regardless of resolution. This proves the
       // ordering, not a specific routing decision.
       const provider = createMicrosandbox({

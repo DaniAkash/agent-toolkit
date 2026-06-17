@@ -9,7 +9,7 @@ import {
 
 const describeIntegration = requireIntegrationEnv()
 
-describeIntegration('microsandbox session — fs against a real VM', () => {
+describeIntegration('microsandbox session: fs against a real VM', () => {
   let session: HarnessV1NetworkSandboxSession
 
   beforeAll(async () => {

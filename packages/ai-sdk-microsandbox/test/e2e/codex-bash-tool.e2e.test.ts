@@ -5,7 +5,7 @@ import { buildSharedCodexHarness } from './helpers/codex-fixtures.ts'
 
 const describeE2e = requireE2eEnv()
 
-describeE2e('codex e2e — bash tool through the bridge', () => {
+describeE2e('codex e2e: bash tool through the bridge', () => {
   afterAll(async () => {
     await purgeE2eSandboxes()
   }, E2E_TEST_TIMEOUT_MS)

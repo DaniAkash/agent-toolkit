@@ -8,7 +8,7 @@ function asSandbox(mock: MockSandbox): Sandbox {
   return mock as unknown as Sandbox
 }
 
-describe('MicrosandboxProvider — resumeSession (create mode)', () => {
+describe('MicrosandboxProvider: resumeSession (create mode)', () => {
   test('starts the sandbox by sessionSandboxName and returns a network session', async () => {
     const calls: string[] = []
     const target = new MockSandbox({
@@ -95,7 +95,7 @@ describe('MicrosandboxProvider — resumeSession (create mode)', () => {
   })
 })
 
-describe('MicrosandboxProvider — resumeSession (wrap mode)', () => {
+describe('MicrosandboxProvider: resumeSession (wrap mode)', () => {
   test('returns a wrapped session over the caller sandbox; sessionId ignored', async () => {
     const wrapped = new MockSandbox({
       name: 'caller-vm',

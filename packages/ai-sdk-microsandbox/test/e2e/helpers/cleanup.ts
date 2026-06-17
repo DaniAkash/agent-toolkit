@@ -3,7 +3,7 @@ import { Sandbox } from 'microsandbox'
 /**
  * Best-effort cleanup of e2e-produced sandboxes. Kills any sandbox whose
  * name starts with `ai-sdk-harness-` or `ai-sdk-tpl-src-`. Snapshot cleanup
- * is intentionally NOT done here — the snapshot is the shared bootstrap
+ * is intentionally NOT done here. The snapshot is the shared bootstrap
  * fixture every test reuses, and keeping it across runs is what makes the
  * suite fast.
  *
@@ -21,7 +21,7 @@ export async function purgeE2eSandboxes(): Promise<void> {
       try {
         await h.kill()
       } catch {
-        // ignore — sandbox may already be gone
+        // ignore; sandbox may already be gone
       }
     }
   }
