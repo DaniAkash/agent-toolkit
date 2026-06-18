@@ -41,8 +41,8 @@ export function buildSharedCodexHarness(input?: {
   const provider = createMicrosandbox(
     {
       image: CODEX_E2E_IMAGE,
-      cpus: input?.cpus ?? 2,
-      memory: input?.memory ?? 2048,
+      cpus: input?.cpus ?? 1,
+      memory: input?.memory ?? 1024,
       workdir: input?.workdir ?? '/root',
       ports: [{ host: CODEX_BRIDGE_PORT, guest: CODEX_BRIDGE_PORT }],
       env: input?.env,
