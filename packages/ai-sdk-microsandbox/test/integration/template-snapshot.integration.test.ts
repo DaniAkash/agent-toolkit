@@ -134,7 +134,9 @@ describeIntegration(
 
         const t2 = await cache.resolveTemplate({
           identity,
-          settings: { image: DEFAULT_INTEGRATION_IMAGE, workdir: '/other' },
+          // /var exists in debian:bookworm-slim. The workdir must exist
+          // in the image; microsandbox validates it at create time.
+          settings: { image: DEFAULT_INTEGRATION_IMAGE, workdir: '/var' },
           onFirstCreate: async () => {
             bootstrapCalls += 1
           },

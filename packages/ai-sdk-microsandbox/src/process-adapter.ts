@@ -16,18 +16,33 @@ export function createSandboxProcess(
   const { stdout, stderr } = demuxExecStreams(handle, (resolvedPid) => {
     pid = resolvedPid
   })
+
+  // The SDK's `handle.wait()` and `handle.kill()` don't compose: when
+  // `wait()` is awaited first, a subsequent `kill()` does not unblock
+  // it (verified empirically against microsandbox 0.5.7 — `kill()`
+  // returns instantly but `wait()` keeps blocking until the natural
+  // exit). We work around that by resolving `wait()` ourselves when
+  // abort fires, with the canonical SIGKILL exit code (128 + 9).
+  let resolveAborted: ((value: { exitCode: number }) => void) | undefined
+  const aborted = new Promise<{ exitCode: number }>((res) => {
+    resolveAborted = res
+  })
+
+  const cancelProcess = (): void => {
+    // SIGKILL via signal(9) when available; fall back to kill() for
+    // SDK revs or test doubles that don't expose signal().
+    const sig = (handle as { signal?: (n: number) => Promise<void> }).signal
+    if (typeof sig === 'function') {
+      sig.call(handle, 9).catch(() => handle.kill().catch(() => undefined))
+    } else {
+      handle.kill().catch(() => undefined)
+    }
+    resolveAborted?.({ exitCode: 137 })
+  }
   if (abortSignal && !abortSignal.aborted) {
-    abortSignal.addEventListener(
-      'abort',
-      () => {
-        handle.kill().catch(() => {
-          // Best-effort kill — the handle may already be dead.
-        })
-      },
-      { once: true },
-    )
+    abortSignal.addEventListener('abort', cancelProcess, { once: true })
   } else if (abortSignal?.aborted) {
-    handle.kill().catch(() => {})
+    cancelProcess()
   }
   return {
     get pid() {
@@ -36,8 +51,10 @@ export function createSandboxProcess(
     stdout,
     stderr,
     async wait() {
-      const result = await handle.wait()
-      return { exitCode: result.code }
+      return await Promise.race([
+        handle.wait().then((r) => ({ exitCode: r.code })),
+        aborted,
+      ])
     },
     async kill() {
       await handle.kill()

@@ -97,15 +97,13 @@ describeIntegration('microsandbox session: exec against a real VM', () => {
         command: 'sleep 30',
         abortSignal: controller.signal,
       })
-      // Abort after a small delay to let the process actually start.
       setTimeout(() => controller.abort(), 50)
-      // Either wait() rejects (abort wired) or it resolves with a non-zero
-      // exit. Both prove the process didn't run for 30s.
       const start = Date.now()
       try {
         await proc.wait()
       } catch {
-        // expected
+        // Some SDK revs surface abort as a rejection; either shape
+        // releases the wait.
       }
       const elapsed = Date.now() - start
       expect(elapsed).toBeLessThan(5_000)
