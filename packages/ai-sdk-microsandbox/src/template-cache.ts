@@ -192,12 +192,22 @@ export class TemplateCache {
     // Defensive cleanup in case a previous attempt orphaned a snapshot
     // under the same name.
     await this.snapshotApi.removeSnapshotIfExists(snapshotName)
+    // And clear any orphan source sandbox left over from a prior failed
+    // bootstrap. Source sandbox names are internal artifacts derived
+    // deterministically from (identity, optionsHash); a pre-existing one
+    // is always stale state we should replace.
+    await SandboxClass.remove(templateSandboxName).catch(() => {})
 
     let templateSandbox: Sandbox | undefined
     try {
+      // Force `.replace()` on the template-source builder regardless of
+      // the user's `settings.replace`. A stopped or running source
+      // sandbox from a prior failed run must not block the rebuild;
+      // the user's replace setting still propagates to fork builds via
+      // applyForkSettings, where it has different semantics.
       const builder = applyCreateSettings(
         input.builderFactory(templateSandboxName),
-        input.settings,
+        { ...input.settings, replace: true },
       )
       input.abortSignal?.throwIfAborted()
       templateSandbox = (await builder.create()) as Sandbox

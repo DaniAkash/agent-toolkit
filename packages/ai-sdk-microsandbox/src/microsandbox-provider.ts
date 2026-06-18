@@ -96,7 +96,18 @@ export class MicrosandboxProvider implements HarnessV1SandboxProvider {
       _internal.builderFactory ?? ((name: string) => SandboxClass.builder(name))
     this.sandboxStart =
       _internal.sandboxStart ??
-      ((name: string) => SandboxClass.start(name) as Promise<Sandbox>)
+      (async (name: string) => {
+        // Resume into the named sandbox. If it's still running (the
+        // `session.detach()` path), reattach via `handle.connect()`.
+        // Otherwise resume from stopped via `handle.start()`. Calling
+        // `Sandbox.start(name)` directly on a running sandbox rejects
+        // with `SandboxStillRunning`.
+        const handle = await SandboxClass.get(name)
+        if (handle.status === 'running') {
+          return (await handle.connect()) as Sandbox
+        }
+        return (await handle.start()) as Sandbox
+      })
     this.templateCache =
       _internal.templateCache ??
       new TemplateCache(_internal.templateCacheOptions)
