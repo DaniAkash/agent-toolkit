@@ -19,7 +19,8 @@
     "acpx-ai-provider",
     "acpx-ai-harness",
     "agent-skills-manager",
-    "acp-probe"
+    "acp-probe",
+    "ai-sdk-microsandbox"
   ],
   "overrides": [
     {
