@@ -38,8 +38,11 @@ const DEFAULT_BIND = '127.0.0.1'
 export type SandboxBuilderFactory = (name: string) => SandboxBuilder
 
 /**
- * Test-only seam: replaces `Sandbox.start(name)` so unit tests can verify
- * the resume path without touching the NAPI binding.
+ * Test-only seam: replaces the sandbox-resume entrypoint so unit tests can
+ * verify the resume path without touching the NAPI binding. The default
+ * implementation calls `Sandbox.get(name)` and then dispatches to
+ * `handle.connect()` (running sandboxes, e.g. after `session.detach()`)
+ * or `handle.start()` (stopped sandboxes).
  */
 export type SandboxStarter = (name: string) => Promise<Sandbox>
 

@@ -1,5 +1,13 @@
 import { describe } from 'bun:test'
 
+function e2eEnvSet(): boolean {
+  if (process.env.MICROSANDBOX_INTEGRATION !== '1') return false
+  if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY.length < 20) {
+    return false
+  }
+  return true
+}
+
 /**
  * Gates a describe-block on the real-Codex-e2e env. Requires both:
  *   - MICROSANDBOX_INTEGRATION=1 (real microVM platform available)
@@ -9,11 +17,7 @@ import { describe } from 'bun:test'
  * is missing, so the file's beforeAll/afterAll hooks never run.
  */
 export function requireE2eEnv(): typeof describe | typeof describe.skip {
-  if (process.env.MICROSANDBOX_INTEGRATION !== '1') return describe.skip
-  if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY.length < 20) {
-    return describe.skip
-  }
-  return describe
+  return e2eEnvSet() ? describe : describe.skip
 }
 
 /**
@@ -25,6 +29,10 @@ export function requireE2eEnv(): typeof describe | typeof describe.skip {
  * post-mortem signals; we suppress them so they don't flake unrelated
  * tests. Reachable error paths still surface through the normal
  * `result.fullStream` and `error` parts and through rejected Promises.
+ *
+ * Gated on the same env check used to register the describe blocks so
+ * `test:all` or `test:integration` runs that don't actually exercise
+ * the codex bridge leave the `uncaughtException` listener chain alone.
  */
 function installWsErrorSilencer(): void {
   const previous = process.listeners('uncaughtException').slice()
@@ -47,7 +55,7 @@ function installWsErrorSilencer(): void {
   process.on('uncaughtException', handler)
 }
 
-installWsErrorSilencer()
+if (e2eEnvSet()) installWsErrorSilencer()
 
 /** Generous per-test budget. Codex turns can take 30s+ end to end. */
 export const E2E_TEST_TIMEOUT_MS = 5 * 60 * 1000

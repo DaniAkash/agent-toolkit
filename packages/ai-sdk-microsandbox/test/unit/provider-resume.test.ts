@@ -58,7 +58,7 @@ describe('MicrosandboxProvider: resumeSession (create mode)', () => {
     expect(session.ports).toEqual([4000, 8080])
   })
 
-  test('pre-aborted signal rejects without calling Sandbox.start', async () => {
+  test('pre-aborted signal rejects without invoking the resume seam', async () => {
     let called = false
     const provider = new MicrosandboxProvider(
       { image: 'debian' },
@@ -80,7 +80,7 @@ describe('MicrosandboxProvider: resumeSession (create mode)', () => {
     expect(called).toBe(false)
   })
 
-  test('propagates errors from Sandbox.start (e.g. sandbox not found)', async () => {
+  test('propagates errors from the resume seam (e.g. sandbox not found)', async () => {
     const provider = new MicrosandboxProvider(
       { image: 'debian' },
       {

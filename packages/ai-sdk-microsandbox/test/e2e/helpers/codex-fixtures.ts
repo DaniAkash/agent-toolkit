@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { HarnessAgent } from '@ai-sdk/harness/agent'
@@ -10,13 +11,18 @@ import { CODEX_BRIDGE_PORT, CODEX_E2E_IMAGE } from '../_setup.ts'
  * in the suite share one bootstrapped snapshot: the first test pays the
  * cost of installing the Codex CLI; the rest fork from the snapshot in ~1s.
  *
- * Includes a 4-char tail of the API key so two contributors using different
- * keys do not share a snapshot, and a `v1` version marker we can bump if a
- * future change invalidates the bootstrap.
+ * Includes a non-reversible hash of the API key so two contributors using
+ * different keys do not share a snapshot. We deliberately avoid embedding
+ * any verbatim fragment of the key because the identity surfaces in
+ * snapshot names, on-disk metadata, and `msb` listings. The `v1` version
+ * marker can be bumped if a future change invalidates the bootstrap.
  */
 function codexIdentity(): string {
-  const tail = process.env.OPENAI_API_KEY?.slice(-4) ?? 'noenv'
-  return `codex-e2e-v1-${tail}`
+  const key = process.env.OPENAI_API_KEY ?? ''
+  const fingerprint = key
+    ? createHash('sha256').update(key).digest('hex').slice(0, 12)
+    : 'noenv'
+  return `codex-e2e-v1-${fingerprint}`
 }
 
 const SHARED_CACHE_ROOT = join(tmpdir(), 'ai-sdk-microsandbox-e2e-shared')
