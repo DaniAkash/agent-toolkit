@@ -51,3 +51,28 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ```
+
+## eve (vercel/eve)
+
+- Source: https://github.com/vercel/eve
+- License: Apache-2.0
+
+The template-snapshot orchestration in `src/template-cache.ts` and `src/internal/snapshot-orchestration.ts` is adapted from Eve's microsandbox runtime bindings. The patterns reused include the stop-then-snapshot retry loop with kill-on-source-running, the in-memory + filesystem two-layer cache for cross-process reuse, the atomic backup-and-rename for the metadata file, and the `TemplateMetadata` schema. No source files were copied verbatim; the implementation here is a fresh write scoped to the `HarnessV1SandboxProvider` contract.
+
+### Apache License 2.0
+
+```
+Copyright (c) Vercel, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    https://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+```
