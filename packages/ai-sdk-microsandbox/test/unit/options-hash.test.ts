@@ -55,7 +55,7 @@ describe('computeOptionsHash', () => {
   test('hash is stable across runs (snapshot value for fixed input)', () => {
     expect(computeOptionsHash({ image: 'debian', workdir: '/workspace' })).toBe(
       // Pre-computed once; bump alongside any deliberate hash-format change.
-      'a919dfda18d7b8b33b98532dc0278554921bfd2c9fa7971d35c9e2d5e1c24911',
+      'ee9dd6012ebfd9ca10cd4d8c74c9bd7a71d5cf7ddb116aac8afbe93aca6b57d8',
     )
   })
 })

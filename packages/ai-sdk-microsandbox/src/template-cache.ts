@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Experimental_SandboxSession } from '@ai-sdk/provider-utils'
 import type { Sandbox } from 'microsandbox'
+import { Sandbox as SandboxClass } from 'microsandbox'
 import { atomicWriteIntoDirectory } from './internal/atomic-write.ts'
 import { computeOptionsHash } from './internal/options-hash.ts'
 import {
@@ -191,17 +192,40 @@ export class TemplateCache {
     // Defensive cleanup in case a previous attempt orphaned a snapshot
     // under the same name.
     await this.snapshotApi.removeSnapshotIfExists(snapshotName)
+    // And clear any orphan source sandbox left over from a prior failed
+    // bootstrap. Source sandbox names are internal artifacts derived
+    // deterministically from (identity, optionsHash); a pre-existing one
+    // is always stale state we should replace.
+    await SandboxClass.remove(templateSandboxName).catch(() => {})
 
     let templateSandbox: Sandbox | undefined
     try {
+      // Force `.replace()` on the template-source builder regardless of
+      // the user's `settings.replace`. A stopped or running source
+      // sandbox from a prior failed run must not block the rebuild;
+      // the user's replace setting still propagates to fork builds via
+      // applyForkSettings, where it has different semantics.
       const builder = applyCreateSettings(
         input.builderFactory(templateSandboxName),
-        input.settings,
+        { ...input.settings, replace: true },
       )
       input.abortSignal?.throwIfAborted()
       templateSandbox = (await builder.create()) as Sandbox
 
       const restricted = new MicrosandboxSandboxSession(templateSandbox)
+      input.abortSignal?.throwIfAborted()
+      for (const command of input.settings.bootstrapPreCommands ?? []) {
+        input.abortSignal?.throwIfAborted()
+        const result = await restricted.run({
+          command,
+          abortSignal: input.abortSignal,
+        })
+        if (result.exitCode !== 0) {
+          throw new Error(
+            `bootstrapPreCommand failed (exit ${result.exitCode}): ${command}\nstderr: ${result.stderr}`,
+          )
+        }
+      }
       input.abortSignal?.throwIfAborted()
       await input.onFirstCreate(restricted, {
         abortSignal: input.abortSignal,
@@ -225,9 +249,13 @@ export class TemplateCache {
 
       return { snapshotName, optionsHash: input.optionsHash }
     } catch (error) {
-      // Best-effort: stop the template sandbox so it doesn't linger after
-      // a failed bootstrap. The snapshot (if any) is dropped too.
+      // Best-effort: stop and remove the template sandbox so it doesn't
+      // linger after a failed bootstrap. Microsandbox tracks the sandbox
+      // record even when `builder.create()` fails late (e.g. workdir
+      // validation), so a Sandbox.remove sweep is required on top of stop.
+      // The snapshot (if any) is dropped too.
       await templateSandbox?.stop().catch(() => {})
+      await SandboxClass.remove(templateSandboxName).catch(() => {})
       await this.snapshotApi
         .removeSnapshotIfExists(snapshotName)
         .catch(() => {})

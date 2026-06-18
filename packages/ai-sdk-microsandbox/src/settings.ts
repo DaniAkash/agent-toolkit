@@ -53,6 +53,16 @@ export interface MicrosandboxCreateSettings {
    * grace period; an object specifies an explicit SIGTERM-to-SIGKILL timeout.
    */
   readonly replace?: boolean | { readonly timeoutMs: number }
+  /**
+   * Bash commands to run inside the template sandbox before the harness
+   * adapter's `onFirstCreate` bootstrap. Useful when the chosen image needs
+   * preparatory steps the adapter doesn't perform itself (e.g. `corepack
+   * enable pnpm` on a slim Node image where `pnpm` is the adapter's package
+   * manager). Each command runs in sequence; a non-zero exit aborts. The
+   * post-command state is captured in the template snapshot, so these run
+   * exactly once per identity.
+   */
+  readonly bootstrapPreCommands?: ReadonlyArray<string>
 }
 
 export interface MicrosandboxWrapSettings {

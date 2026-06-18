@@ -14,6 +14,7 @@ import type { MicrosandboxCreateSettings } from '../settings.ts'
 interface SnapshotInputs {
   readonly image: string
   readonly workdir: string | null
+  readonly bootstrapPreCommands: ReadonlyArray<string>
 }
 
 /**
@@ -30,6 +31,7 @@ export function computeOptionsHash(
   const inputs: SnapshotInputs = {
     image: settings.image,
     workdir: settings.workdir ?? null,
+    bootstrapPreCommands: settings.bootstrapPreCommands ?? [],
   }
   const canonical = JSON.stringify(inputs, Object.keys(inputs).sort())
   return createHash('sha256').update(canonical).digest('hex')

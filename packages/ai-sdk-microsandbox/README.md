@@ -4,24 +4,168 @@ A Vercel AI SDK v7 `HarnessV1SandboxProvider` backed by [microsandbox](https://g
 
 ## Status
 
-Pre-release. The provider implementation is landing across a sequence of releases. Check the [open issues](https://github.com/DaniAkash/acpx/issues) for what's already shipping and what's coming next.
+Alpha. The provider runs end-to-end against the official `@ai-sdk/harness-codex` and `@ai-sdk/harness-claude-code` adapters; track issues for changes ahead of the first stable release.
 
-## Target adapters
+## Why
 
-Designed to pair with the official Vercel-shipped HarnessV1 adapters:
+`HarnessAgent` needs a sandbox provider. The official `@ai-sdk/sandbox-vercel` provider runs each session in a hosted Vercel sandbox. `ai-sdk-microsandbox` does the same job using a microVM that runs locally on your machine, so the bridge, the agent CLI, and any files the agent touches stay on-host. No external account or per-session billing; no network round trip to a provider for I/O; agents resume across processes via the same on-disk snapshot cache.
 
-- [`@ai-sdk/harness-claude-code`](https://ai-sdk.dev/v7/docs/ai-sdk-harnesses/harness-adapters#claude-code)
-- [`@ai-sdk/harness-codex`](https://ai-sdk.dev/v7/docs/ai-sdk-harnesses/harness-adapters#codex)
-- [`@ai-sdk/harness-pi`](https://ai-sdk.dev/v7/docs/ai-sdk-harnesses/harness-adapters#pi)
+## Install
+
+```bash
+npm install ai-sdk-microsandbox @ai-sdk/harness @ai-sdk/harness-codex ai
+# microsandbox is a peer dependency; install on the host:
+npm install microsandbox
+```
+
+## Quickstart
+
+```ts
+import { HarnessAgent } from '@ai-sdk/harness/agent'
+import { createCodex } from '@ai-sdk/harness-codex'
+import { createMicrosandbox } from 'ai-sdk-microsandbox'
+
+const agent = new HarnessAgent({
+  harness: createCodex({
+    auth: { openai: { apiKey: process.env.OPENAI_API_KEY } },
+  }),
+  sandbox: createMicrosandbox({
+    image: 'node:22-bookworm-slim',
+    cpus: 1,
+    memory: 1024,
+    workdir: '/root',
+    ports: [{ host: 4000, guest: 4000 }],
+    // The Codex adapter's bootstrap recipe needs pnpm and TLS to
+    // api.openai.com. Slim Node images ship corepack but not the pnpm
+    // shim, and omit ca-certificates entirely. These two commands run
+    // once per identity and are captured into the snapshot.
+    bootstrapPreCommands: [
+      'apt-get update -qq && apt-get install -y --no-install-recommends ca-certificates >/dev/null && update-ca-certificates -f >/dev/null',
+      'corepack enable pnpm',
+    ],
+  }),
+})
+
+const session = await agent.createSession()
+try {
+  const result = await agent.generate({
+    session,
+    prompt: 'Use bash to create /root/hi.txt containing "hello".',
+  })
+  console.log(result.text)
+} finally {
+  await session.destroy()
+}
+```
+
+The `workdir` must already exist in the image, and the `image` must already exist in the local microsandbox registry. Pre-pull once with `msb pull node:22-bookworm-slim`. Pick a `workdir` that's present in your chosen image (`/root`, `/tmp`, `/var`, etc. on the official Debian-based Node images).
 
 ## Requirements
 
-When the implementation lands, the host machine running the SDK consumer process will need either:
+- **Linux** with KVM enabled, **or**
+- **macOS** on Apple Silicon
 
-- Linux with KVM enabled, or
-- macOS on Apple Silicon
+Both are microsandbox's own runtime prerequisites. Run `microsandbox setup` once on the host before using the provider.
 
-These are microsandbox's own runtime requirements.
+## Settings
+
+`createMicrosandbox(settings)` accepts either create-mode settings (provider mints a fresh microVM per session) or wrap-mode settings (provider wraps a caller-owned microVM).
+
+### Create-mode settings
+
+| Field | Type | Default | Notes |
+|---|---|---|---|
+| `image` | `string` | required | OCI image reference or local path. |
+| `cpus` | `number` | microsandbox default | Guest CPU count. |
+| `memory` | `number` | microsandbox default | Guest memory in MiB. |
+| `workdir` | `string` | `/` | Default working directory inside the guest. |
+| `ports` | `MicrosandboxPortSetting[]` | `[]` | Host → guest port mappings. Bridge-backed harnesses need at least one. |
+| `env` | `Record<string,string>` | `{}` | Env vars set in the guest. |
+| `networkPolicy` | `HarnessV1NetworkPolicy` | `allow-all` | Outbound network rules. Build-time only. |
+| `name` | `string` | auto-generated | Sandbox name override. |
+| `publicHostname` | `string` | `127.0.0.1` | Hostname used by `getPortUrl` for `0.0.0.0`-bound ports. |
+| `replace` | `boolean \| { timeoutMs }` | `false` | Replace an existing sandbox of the same name on boot. |
+| `bootstrapPreCommands` | `string[]` | `[]` | Bash commands run inside the template sandbox before the harness adapter's bootstrap, captured into the snapshot. Use for image prep like `corepack enable pnpm` or `apt-get install ca-certificates` that the adapter doesn't do itself. Changes invalidate the cached snapshot. |
+
+Port settings:
+
+```ts
+{ host: 4000, guest: 4000, bind?: '127.0.0.1', protocol?: 'tcp' }
+```
+
+### Wrap-mode settings
+
+| Field | Type | Notes |
+|---|---|---|
+| `sandbox` | `microsandbox.Sandbox` | Caller-owned `Sandbox`. Lifecycle stays with the caller. |
+| `bridgePorts` | `number[]` | Port pool the provider can lease for bridge-backed harnesses. |
+| `publicHostname` | `string` | Same semantics as create mode. |
+
+In wrap mode the provider never calls `Sandbox.builder()` or `Sandbox.start()` directly. `stop()` / `destroy()` on the resulting sessions are no-ops.
+
+## Network policy
+
+The provider translates the harness `HarnessV1NetworkPolicy` into microsandbox's `NetworkPolicyBuilder` at create-time. Runtime policy updates are not supported.
+
+```ts
+createMicrosandbox({
+  image: '…',
+  networkPolicy: { mode: 'deny-all' }, // or 'allow-all'
+})
+
+createMicrosandbox({
+  image: '…',
+  networkPolicy: {
+    mode: 'custom',
+    allowedHosts: ['api.openai.com'],
+    deniedCIDRs: ['169.254.169.254/32'], // takes precedence
+  },
+})
+```
+
+## Cross-process resume
+
+Each create-mode session is backed by a named microVM. After `agent.createSession({ sessionId })`, you can later resume that exact sandbox in a new process by calling `agent.createSession({ sessionId, resumeFrom })` with the resume state returned from `session.detach()` (preferred) or `session.stop()`. The provider stores a filesystem-level snapshot cache so the bootstrap recipe is reused across processes for matching identities.
+
+`session.detach()` is the canonical cross-process-resume path: it returns resume state, keeps the sandbox and runtime running, and ends only the local handle. The provider's `resumeSession` reattaches to a still-running sandbox via `Sandbox.get(name).connect()` and falls back to `.start()` when the sandbox is stopped. Some harness adapters surface bridge cleanup errors out of `session.stop()` (the adapter kills its own bridge process and then awaits its exit code); when that matters, prefer `detach()`.
+
+Cache root resolution:
+
+1. `AI_SDK_MICROSANDBOX_CACHE_DIR` env override, if set
+2. OS-conventional cache directory (`~/.cache/ai-sdk-microsandbox` on Linux, `~/Library/Caches/ai-sdk-microsandbox` on macOS, `%LOCALAPPDATA%\ai-sdk-microsandbox` on Windows)
+
+## Comparison
+
+| Provider | Where sessions run | Best for |
+|---|---|---|
+| `@ai-sdk/sandbox-vercel` | Vercel-hosted micro-sandboxes | Hosted production; you want sandboxes to outlive your process |
+| `@ai-sdk/sandbox-just-bash` | Local host shell | Local trust boundary acceptable; no port exposure |
+| **`ai-sdk-microsandbox`** | Local microVMs (KVM / Apple Silicon) | Local isolation + cross-process resume without leaving the machine |
+
+## Limitations
+
+- KVM (Linux) or Apple Silicon required. No Windows host support; no x86 macOS support.
+- Runtime network policy updates are unavailable. Policy is sealed at create-time.
+- Snapshot pruning is manual today. Old templates accumulate under the cache root; remove the directory tree to reset.
+- Snapshots are local-machine-only. They are not synced to a registry.
+- Concurrent multi-session usage on a single provider is bounded by the host-port mapping. Each create-mode session publishes the same host port (the one declared in `ports`), so two forks cannot bind it simultaneously. Use distinct providers (or sessions one-at-a-time) when you need more than one live session.
+- The chosen `workdir` must exist in the image. Microsandbox validates the path at sandbox-create time; for slim images either pick an existing path (`/root`, `/tmp`, `/var`) or `mkdir` it via `bootstrapPreCommands` before the harness adapter's bootstrap runs.
+- This package is alpha. The exported API may change before `1.0.0`.
+
+## Testing
+
+Three suites, gated by environment:
+
+```bash
+bun test                            # unit only (default; mocked)
+MICROSANDBOX_INTEGRATION=1 \
+  bun run test:integration          # real microVM, no agent involved
+MICROSANDBOX_INTEGRATION=1 \
+  OPENAI_API_KEY=sk-… \
+  bun run test:e2e                  # real Codex agent against real OpenAI
+```
+
+The e2e suite shares one bootstrapped snapshot across files: the first test pays the cost of installing the Codex CLI in the microVM; subsequent tests fork from the snapshot in ~1s. Expected per-run OpenAI cost on `gpt-5-codex-mini` is well under one US dollar.
 
 ## License
 
