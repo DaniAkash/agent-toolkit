@@ -31,10 +31,18 @@ const agent = new HarnessAgent({
   }),
   sandbox: createMicrosandbox({
     image: 'node:22-bookworm-slim',
-    cpus: 2,
-    memory: 2048,
-    workdir: '/workspace',
+    cpus: 1,
+    memory: 1024,
+    workdir: '/root',
     ports: [{ host: 4000, guest: 4000 }],
+    // The Codex adapter's bootstrap recipe needs pnpm and TLS to
+    // api.openai.com. Slim Node images ship corepack but not the pnpm
+    // shim, and omit ca-certificates entirely. These two commands run
+    // once per identity and are captured into the snapshot.
+    bootstrapPreCommands: [
+      'apt-get update -qq && apt-get install -y --no-install-recommends ca-certificates >/dev/null && update-ca-certificates -f >/dev/null',
+      'corepack enable pnpm',
+    ],
   }),
 })
 
@@ -42,13 +50,15 @@ const session = await agent.createSession()
 try {
   const result = await agent.generate({
     session,
-    prompt: 'Use bash to create /workspace/hi.txt containing "hello".',
+    prompt: 'Use bash to create /root/hi.txt containing "hello".',
   })
   console.log(result.text)
 } finally {
   await session.destroy()
 }
 ```
+
+The `workdir` must already exist in the image, and the `image` must already exist in the local microsandbox registry. Pre-pull once with `msb pull node:22-bookworm-slim`. Pick a `workdir` that's present in your chosen image (`/root`, `/tmp`, `/var`, etc. on the official Debian-based Node images).
 
 ## Requirements
 
@@ -75,6 +85,7 @@ Both are microsandbox's own runtime prerequisites. Run `microsandbox setup` once
 | `name` | `string` | auto-generated | Sandbox name override. |
 | `publicHostname` | `string` | `127.0.0.1` | Hostname used by `getPortUrl` for `0.0.0.0`-bound ports. |
 | `replace` | `boolean \| { timeoutMs }` | `false` | Replace an existing sandbox of the same name on boot. |
+| `bootstrapPreCommands` | `string[]` | `[]` | Bash commands run inside the template sandbox before the harness adapter's bootstrap, captured into the snapshot. Use for image prep like `corepack enable pnpm` or `apt-get install ca-certificates` that the adapter doesn't do itself. Changes invalidate the cached snapshot. |
 
 Port settings:
 
@@ -114,7 +125,9 @@ createMicrosandbox({
 
 ## Cross-process resume
 
-Each create-mode session is backed by a named microVM. After `agent.createSession({ sessionId })`, you can later resume that exact sandbox in a new process by calling `agent.createSession({ sessionId, resumeFrom })` with the resume state returned from `session.stop()` or `session.detach()`. The provider stores a filesystem-level snapshot cache so the bootstrap recipe is reused across processes for matching identities.
+Each create-mode session is backed by a named microVM. After `agent.createSession({ sessionId })`, you can later resume that exact sandbox in a new process by calling `agent.createSession({ sessionId, resumeFrom })` with the resume state returned from `session.detach()` (preferred) or `session.stop()`. The provider stores a filesystem-level snapshot cache so the bootstrap recipe is reused across processes for matching identities.
+
+`session.detach()` is the canonical cross-process-resume path: it returns resume state, keeps the sandbox and runtime running, and ends only the local handle. The provider's `resumeSession` reattaches to a still-running sandbox via `Sandbox.get(name).connect()` and falls back to `.start()` when the sandbox is stopped. Some harness adapters surface bridge cleanup errors out of `session.stop()` (the adapter kills its own bridge process and then awaits its exit code); when that matters, prefer `detach()`.
 
 Cache root resolution:
 
@@ -135,6 +148,8 @@ Cache root resolution:
 - Runtime network policy updates are unavailable. Policy is sealed at create-time.
 - Snapshot pruning is manual today. Old templates accumulate under the cache root; remove the directory tree to reset.
 - Snapshots are local-machine-only. They are not synced to a registry.
+- Concurrent multi-session usage on a single provider is bounded by the host-port mapping. Each create-mode session publishes the same host port (the one declared in `ports`), so two forks cannot bind it simultaneously. Use distinct providers (or sessions one-at-a-time) when you need more than one live session.
+- The chosen `workdir` must exist in the image. Microsandbox validates the path at sandbox-create time; for slim images either pick an existing path (`/root`, `/tmp`, `/var`) or `mkdir` it via `bootstrapPreCommands` before the harness adapter's bootstrap runs.
 - This package is alpha. The exported API may change before `1.0.0`.
 
 ## Testing
