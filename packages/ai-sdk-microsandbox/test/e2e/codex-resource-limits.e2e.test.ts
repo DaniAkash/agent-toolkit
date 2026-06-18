@@ -1,11 +1,14 @@
-import { afterAll, expect, test } from 'bun:test'
+import { afterAll, afterEach, expect, test } from 'bun:test'
 import { E2E_TEST_TIMEOUT_MS, requireE2eEnv } from './_setup.ts'
-import { purgeE2eSandboxes } from './helpers/cleanup.ts'
+import { purgeE2eSandboxes, purgeHarnessForks } from './helpers/cleanup.ts'
 import { buildSharedCodexHarness } from './helpers/codex-fixtures.ts'
 
 const describeE2e = requireE2eEnv()
 
 describeE2e('codex e2e: resource limits and configuration matrix', () => {
+  afterEach(async () => {
+    await purgeHarnessForks()
+  }, E2E_TEST_TIMEOUT_MS)
   afterAll(async () => {
     await purgeE2eSandboxes()
   }, E2E_TEST_TIMEOUT_MS)
