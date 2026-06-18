@@ -19,12 +19,12 @@ describeE2e('codex e2e: file editing in the sandbox', () => {
         await agent.generate({
           session,
           prompt:
-            'Use bash to create the file /workspace/notes.txt containing exactly the text "made by codex" (no quotes, no trailing newline). Confirm the file exists.',
+            'Use bash to create the file /root/notes.txt containing exactly the text "made by codex" (no quotes, no trailing newline). Confirm the file exists.',
         })
         const readback = await agent.generate({
           session,
           prompt:
-            'Use bash to `cat /workspace/notes.txt` and reply with exactly the file contents and nothing else.',
+            'Use bash to `cat /root/notes.txt` and reply with exactly the file contents and nothing else.',
         })
         expect(readback.text).toContain('made by codex')
       } finally {
@@ -43,16 +43,16 @@ describeE2e('codex e2e: file editing in the sandbox', () => {
         await agent.generate({
           session,
           prompt:
-            'Use bash to write the JSON {"x":1} to /workspace/data.json (overwriting if present).',
+            'Use bash to write the JSON {"x":1} to /root/data.json (overwriting if present).',
         })
         await agent.generate({
           session,
           prompt:
-            'Use bash with sed or python to update /workspace/data.json so that "x" is 42 instead of 1.',
+            'Use bash with sed or python to update /root/data.json so that "x" is 42 instead of 1.',
         })
         const readback = await agent.generate({
           session,
-          prompt: 'Use bash to print the contents of /workspace/data.json.',
+          prompt: 'Use bash to print the contents of /root/data.json.',
         })
         expect(readback.text).toMatch(/"x"\s*:\s*42/)
       } finally {

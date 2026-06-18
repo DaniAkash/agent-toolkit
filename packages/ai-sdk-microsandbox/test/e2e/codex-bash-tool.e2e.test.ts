@@ -19,7 +19,7 @@ describeE2e('codex e2e: bash tool through the bridge', () => {
         const result = await agent.generate({
           session,
           prompt:
-            'Use bash to run `mkdir -p /workspace/proof && echo hello > /workspace/proof/hi.txt && ls /workspace/proof`. Then in your response include the word "hi.txt" if and only if the listing shows it.',
+            'Use bash to run `mkdir -p /root/proof && echo hello > /root/proof/hi.txt && ls /root/proof`. Then in your response include the word "hi.txt" if and only if the listing shows it.',
         })
         expect(result.text).toContain('hi.txt')
       } finally {

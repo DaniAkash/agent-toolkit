@@ -18,8 +18,7 @@ describeE2e('codex e2e: cross-process resume', () => {
       const session1 = await agent.createSession({ sessionId })
       await agent.generate({
         session: session1,
-        prompt:
-          'Use bash to write the text "persisted" to /workspace/persist.txt.',
+        prompt: 'Use bash to write the text "persisted" to /root/persist.txt.',
       })
       const resumeFrom = await session1.stop()
       expect(resumeFrom).toBeDefined()
@@ -30,7 +29,7 @@ describeE2e('codex e2e: cross-process resume', () => {
       try {
         const readback = await agent2.generate({
           session: session2,
-          prompt: 'Use bash to print the contents of /workspace/persist.txt.',
+          prompt: 'Use bash to print the contents of /root/persist.txt.',
         })
         expect(readback.text).toContain('persisted')
       } finally {

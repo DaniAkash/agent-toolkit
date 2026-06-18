@@ -17,7 +17,7 @@ describeIntegration('microsandbox session: fs against a real VM', () => {
       image: DEFAULT_INTEGRATION_IMAGE,
       cpus: 1,
       memory: 512,
-      workdir: '/workspace',
+      workdir: '/root',
     })
     session = await provider.createSession()
   }, INTEGRATION_TEST_TIMEOUT_MS)
@@ -35,10 +35,10 @@ describeIntegration('microsandbox session: fs against a real VM', () => {
     'writeTextFile then readTextFile round-trips utf-8 content',
     async () => {
       await session.writeTextFile({
-        path: '/workspace/hello.txt',
+        path: '/root/hello.txt',
         content: 'hello, world',
       })
-      const text = await session.readTextFile({ path: '/workspace/hello.txt' })
+      const text = await session.readTextFile({ path: '/root/hello.txt' })
       expect(text).toBe('hello, world')
     },
     INTEGRATION_TEST_TIMEOUT_MS,
@@ -49,11 +49,11 @@ describeIntegration('microsandbox session: fs against a real VM', () => {
     async () => {
       const payload = new TextEncoder().encode('deep nested data')
       await session.writeBinaryFile({
-        path: '/workspace/a/b/c/d.txt',
+        path: '/root/a/b/c/d.txt',
         content: payload,
       })
       const bytes = await session.readBinaryFile({
-        path: '/workspace/a/b/c/d.txt',
+        path: '/root/a/b/c/d.txt',
       })
       expect(bytes).not.toBeNull()
       expect(new TextDecoder().decode(bytes ?? new Uint8Array())).toBe(
@@ -67,7 +67,7 @@ describeIntegration('microsandbox session: fs against a real VM', () => {
     'readBinaryFile returns null for a missing file (isFileNotFoundError matched)',
     async () => {
       const bytes = await session.readBinaryFile({
-        path: '/workspace/does-not-exist.txt',
+        path: '/root/does-not-exist.txt',
       })
       expect(bytes).toBeNull()
     },
@@ -79,7 +79,7 @@ describeIntegration('microsandbox session: fs against a real VM', () => {
     async () => {
       const latin1Buf = Buffer.from('\xe9clair', 'latin1') // é + clair
       await session.writeBinaryFile({
-        path: '/workspace/latin1.txt',
+        path: '/root/latin1.txt',
         content: new Uint8Array(
           latin1Buf.buffer,
           latin1Buf.byteOffset,
@@ -87,7 +87,7 @@ describeIntegration('microsandbox session: fs against a real VM', () => {
         ),
       })
       const text = await session.readTextFile({
-        path: '/workspace/latin1.txt',
+        path: '/root/latin1.txt',
         encoding: 'latin1',
       })
       expect(text).toBe('éclair')
@@ -99,11 +99,11 @@ describeIntegration('microsandbox session: fs against a real VM', () => {
     'readTextFile line-range slicing returns the requested lines',
     async () => {
       await session.writeTextFile({
-        path: '/workspace/lines.txt',
+        path: '/root/lines.txt',
         content: 'one\ntwo\nthree\nfour\nfive',
       })
       const slice = await session.readTextFile({
-        path: '/workspace/lines.txt',
+        path: '/root/lines.txt',
         startLine: 2,
         endLine: 4,
       })
@@ -118,10 +118,10 @@ describeIntegration('microsandbox session: fs against a real VM', () => {
       const oneMb = new Uint8Array(1024 * 1024)
       for (let i = 0; i < oneMb.length; i++) oneMb[i] = i % 256
       await session.writeBinaryFile({
-        path: '/workspace/big.bin',
+        path: '/root/big.bin',
         content: oneMb,
       })
-      const back = await session.readBinaryFile({ path: '/workspace/big.bin' })
+      const back = await session.readBinaryFile({ path: '/root/big.bin' })
       expect(back).not.toBeNull()
       expect(back?.byteLength).toBe(oneMb.byteLength)
       expect(back?.[0]).toBe(0)
@@ -136,11 +136,11 @@ describeIntegration('microsandbox session: fs against a real VM', () => {
     async () => {
       const restricted = session.restricted()
       await restricted.writeTextFile({
-        path: '/workspace/restricted.txt',
+        path: '/root/restricted.txt',
         content: 'r',
       })
       const text = await restricted.readTextFile({
-        path: '/workspace/restricted.txt',
+        path: '/root/restricted.txt',
       })
       expect(text).toBe('r')
       // The restricted view has no stop/destroy surface; typecheck plus a

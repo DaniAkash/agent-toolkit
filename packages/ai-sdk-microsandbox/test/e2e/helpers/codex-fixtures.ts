@@ -43,9 +43,17 @@ export function buildSharedCodexHarness(input?: {
       image: CODEX_E2E_IMAGE,
       cpus: input?.cpus ?? 2,
       memory: input?.memory ?? 2048,
-      workdir: input?.workdir ?? '/workspace',
+      workdir: input?.workdir ?? '/root',
       ports: [{ host: CODEX_BRIDGE_PORT, guest: CODEX_BRIDGE_PORT }],
       env: input?.env,
+      // Two slim-image gotchas the codex bootstrap depends on:
+      // (1) `pnpm install` (corepack ships in the node image but the pnpm
+      //     shim is opt-in via `corepack enable pnpm`)
+      // (2) TLS to api.openai.com (slim images omit ca-certificates).
+      bootstrapPreCommands: [
+        'apt-get update -qq && apt-get install -y --no-install-recommends ca-certificates >/dev/null && update-ca-certificates -f >/dev/null',
+        'corepack enable pnpm',
+      ],
     },
     { templateCacheOptions: { cacheRoot: SHARED_CACHE_ROOT } },
   )

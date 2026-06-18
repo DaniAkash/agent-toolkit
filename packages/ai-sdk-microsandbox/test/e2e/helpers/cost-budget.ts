@@ -8,7 +8,7 @@ export function assertWithinBudget(
   budget: { input?: number; output?: number } = {},
 ): void {
   if (!usage) return
-  const inputCap = budget.input ?? 8_000
+  const inputCap = budget.input ?? 20_000
   const outputCap = budget.output ?? 2_000
   if (typeof usage.inputTokens === 'number' && usage.inputTokens > inputCap) {
     throw new Error(

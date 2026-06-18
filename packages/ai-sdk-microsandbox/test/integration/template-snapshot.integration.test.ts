@@ -57,11 +57,11 @@ describeIntegration(
         let firstCalled = 0
         const t1 = await cache.resolveTemplate({
           identity,
-          settings: { image: DEFAULT_INTEGRATION_IMAGE, workdir: '/workspace' },
+          settings: { image: DEFAULT_INTEGRATION_IMAGE, workdir: '/root' },
           onFirstCreate: async (session) => {
             firstCalled += 1
             await session.writeTextFile({
-              path: '/workspace/marker.txt',
+              path: '/root/marker.txt',
               content: 'set-during-bootstrap',
             })
           },
@@ -72,7 +72,7 @@ describeIntegration(
 
         const t2 = await cache.resolveTemplate({
           identity,
-          settings: { image: DEFAULT_INTEGRATION_IMAGE, workdir: '/workspace' },
+          settings: { image: DEFAULT_INTEGRATION_IMAGE, workdir: '/root' },
           onFirstCreate: async () => {
             firstCalled += 1
           },
@@ -92,7 +92,7 @@ describeIntegration(
         let bootstrapCalls = 0
         const t1 = await cacheA.resolveTemplate({
           identity,
-          settings: { image: DEFAULT_INTEGRATION_IMAGE, workdir: '/workspace' },
+          settings: { image: DEFAULT_INTEGRATION_IMAGE, workdir: '/root' },
           onFirstCreate: async () => {
             bootstrapCalls += 1
           },
@@ -104,7 +104,7 @@ describeIntegration(
         const cacheB = new TemplateCache({ cacheRoot })
         const t2 = await cacheB.resolveTemplate({
           identity,
-          settings: { image: DEFAULT_INTEGRATION_IMAGE, workdir: '/workspace' },
+          settings: { image: DEFAULT_INTEGRATION_IMAGE, workdir: '/root' },
           onFirstCreate: async () => {
             bootstrapCalls += 1
           },
@@ -124,7 +124,7 @@ describeIntegration(
         let bootstrapCalls = 0
         const t1 = await cache.resolveTemplate({
           identity,
-          settings: { image: DEFAULT_INTEGRATION_IMAGE, workdir: '/workspace' },
+          settings: { image: DEFAULT_INTEGRATION_IMAGE, workdir: '/root' },
           onFirstCreate: async () => {
             bootstrapCalls += 1
           },
@@ -155,7 +155,7 @@ describeIntegration(
         let bootstrapCalls = 0
         const t1 = await cache.resolveTemplate({
           identity,
-          settings: { image: DEFAULT_INTEGRATION_IMAGE, workdir: '/workspace' },
+          settings: { image: DEFAULT_INTEGRATION_IMAGE, workdir: '/root' },
           onFirstCreate: async () => {
             bootstrapCalls += 1
           },
@@ -173,7 +173,7 @@ describeIntegration(
         const cache2 = new TemplateCache({ cacheRoot })
         const t2 = await cache2.resolveTemplate({
           identity,
-          settings: { image: DEFAULT_INTEGRATION_IMAGE, workdir: '/workspace' },
+          settings: { image: DEFAULT_INTEGRATION_IMAGE, workdir: '/root' },
           onFirstCreate: async () => {
             bootstrapCalls += 1
           },
@@ -196,7 +196,7 @@ describeIntegration(
             identity,
             settings: {
               image: DEFAULT_INTEGRATION_IMAGE,
-              workdir: '/workspace',
+              workdir: '/root',
             },
             onFirstCreate: async () => {
               bootstrapCalls += 1
@@ -207,7 +207,7 @@ describeIntegration(
             identity,
             settings: {
               image: DEFAULT_INTEGRATION_IMAGE,
-              workdir: '/workspace',
+              workdir: '/root',
             },
             onFirstCreate: async () => {
               bootstrapCalls += 1

@@ -13,7 +13,7 @@ describeE2e('codex e2e: resource limits and configuration matrix', () => {
   test(
     'agent honors a non-default workdir',
     async () => {
-      const { agent } = buildSharedCodexHarness({ workdir: '/custom' })
+      const { agent } = buildSharedCodexHarness({ workdir: '/var' })
       const session = await agent.createSession()
       try {
         const result = await agent.generate({
@@ -21,7 +21,7 @@ describeE2e('codex e2e: resource limits and configuration matrix', () => {
           prompt:
             'Use bash to print the absolute path of the current working directory (pwd).',
         })
-        expect(result.text).toContain('/custom')
+        expect(result.text).toContain('/var')
       } finally {
         await session.destroy()
       }

@@ -17,7 +17,7 @@ describeIntegration('microsandbox session: exec against a real VM', () => {
       image: DEFAULT_INTEGRATION_IMAGE,
       cpus: 1,
       memory: 512,
-      workdir: '/workspace',
+      workdir: '/root',
     })
     session = await provider.createSession()
   }, INTEGRATION_TEST_TIMEOUT_MS)
@@ -116,7 +116,7 @@ describeIntegration('microsandbox session: exec against a real VM', () => {
   test(
     'defaultWorkingDirectory reflects the configured workdir',
     async () => {
-      expect(session.defaultWorkingDirectory).toBe('/workspace')
+      expect(session.defaultWorkingDirectory).toBe('/root')
     },
     INTEGRATION_TEST_TIMEOUT_MS,
   )

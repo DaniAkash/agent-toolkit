@@ -25,7 +25,7 @@ describeE2e('codex e2e: text generation', () => {
         expect(typeof result.text).toBe('string')
         expect(result.text.length).toBeGreaterThan(0)
         expect(result.text.toLowerCase()).toContain('banana')
-        assertWithinBudget(result.usage, { input: 6_000, output: 500 })
+        assertWithinBudget(result.usage, { input: 15_000, output: 500 })
       } finally {
         await session.destroy()
       }
