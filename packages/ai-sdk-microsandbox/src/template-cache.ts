@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Experimental_SandboxSession } from '@ai-sdk/provider-utils'
 import type { Sandbox } from 'microsandbox'
+import { Sandbox as SandboxClass } from 'microsandbox'
 import { atomicWriteIntoDirectory } from './internal/atomic-write.ts'
 import { computeOptionsHash } from './internal/options-hash.ts'
 import {
@@ -203,6 +204,19 @@ export class TemplateCache {
 
       const restricted = new MicrosandboxSandboxSession(templateSandbox)
       input.abortSignal?.throwIfAborted()
+      for (const command of input.settings.bootstrapPreCommands ?? []) {
+        input.abortSignal?.throwIfAborted()
+        const result = await restricted.run({
+          command,
+          abortSignal: input.abortSignal,
+        })
+        if (result.exitCode !== 0) {
+          throw new Error(
+            `bootstrapPreCommand failed (exit ${result.exitCode}): ${command}\nstderr: ${result.stderr}`,
+          )
+        }
+      }
+      input.abortSignal?.throwIfAborted()
       await input.onFirstCreate(restricted, {
         abortSignal: input.abortSignal,
       })
@@ -225,9 +239,13 @@ export class TemplateCache {
 
       return { snapshotName, optionsHash: input.optionsHash }
     } catch (error) {
-      // Best-effort: stop the template sandbox so it doesn't linger after
-      // a failed bootstrap. The snapshot (if any) is dropped too.
+      // Best-effort: stop and remove the template sandbox so it doesn't
+      // linger after a failed bootstrap. Microsandbox tracks the sandbox
+      // record even when `builder.create()` fails late (e.g. workdir
+      // validation), so a Sandbox.remove sweep is required on top of stop.
+      // The snapshot (if any) is dropped too.
       await templateSandbox?.stop().catch(() => {})
+      await SandboxClass.remove(templateSandboxName).catch(() => {})
       await this.snapshotApi
         .removeSnapshotIfExists(snapshotName)
         .catch(() => {})
