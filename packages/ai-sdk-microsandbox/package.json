@@ -47,9 +47,9 @@
     "build": "bunup",
     "dev": "bunup --watch",
     "test": "bun test test/unit",
-    "test:integration": "MICROSANDBOX_INTEGRATION=1 bun test test/integration",
-    "test:e2e": "MICROSANDBOX_INTEGRATION=1 bun test test/e2e",
-    "test:all": "MICROSANDBOX_INTEGRATION=1 bun test",
+    "test:integration": "MICROSANDBOX_INTEGRATION=1 bun test --parallel=1 test/integration",
+    "test:e2e": "MICROSANDBOX_INTEGRATION=1 bun test --parallel=1 test/e2e",
+    "test:all": "MICROSANDBOX_INTEGRATION=1 bun test --parallel=1",
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
