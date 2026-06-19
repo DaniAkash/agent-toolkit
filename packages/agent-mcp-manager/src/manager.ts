@@ -364,9 +364,11 @@ export function createMcpManager(options: McpManagerOptions = {}): McpManager {
           }
         }
 
-        // Refuse to clobber an entry the manifest didn't write: the
-        // caller (or the user) put something under this name without us.
-        if (alreadyOnDisk && !existing) {
+        // Refuse to clobber an entry the manifest didn't write unless
+        // the caller explicitly opts in via allowOverwrite. The default
+        // is a safety rail: another tool may have placed this entry
+        // and we shouldn't rewrite it silently.
+        if (alreadyOnDisk && !existing && !opts.allowOverwrite) {
           throw new ForeignEntryError(name, opts.agent, configPath)
         }
 
