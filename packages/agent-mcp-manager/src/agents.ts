@@ -7,12 +7,7 @@ import {
   type EmitterConfig,
 } from './_vendor/catalog.ts'
 import { AgentNotSupportedError, UnresolvedConfigPathError } from './errors.ts'
-import type {
-  AgentId,
-  AgentInfo,
-  AgentScope,
-  McpTransport,
-} from './types.ts'
+import type { AgentId, AgentInfo, AgentScope, McpTransport } from './types.ts'
 
 const ALL_TRANSPORTS: ReadonlyArray<McpTransport> = ['stdio', 'sse', 'http']
 

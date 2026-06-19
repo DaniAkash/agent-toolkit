@@ -1,9 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import {
-  McpManagerError,
-  UnsupportedTransportError,
-} from '../../src/errors.ts'
+import { McpManagerError, UnsupportedTransportError } from '../../src/errors.ts'
 
 describe('UnsupportedTransportError', () => {
   test('extends McpManagerError so instanceof checks compose', () => {

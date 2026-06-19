@@ -2,10 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import {
-  createMcpManager,
-  UnsupportedTransportError,
-} from '../../src/index.ts'
+import { createMcpManager, UnsupportedTransportError } from '../../src/index.ts'
 import {
   makeTmpWorkspace,
   type TmpWorkspace,

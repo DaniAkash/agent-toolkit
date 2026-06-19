@@ -7,7 +7,7 @@ import {
   resolveAgentSurface,
 } from '../../src/agents.ts'
 import { UnresolvedConfigPathError } from '../../src/errors.ts'
-import type { AgentId, McpTransport } from '../../src/types.ts'
+import type { McpTransport } from '../../src/types.ts'
 
 describe('agents catalog', () => {
   test('listSupportedAgents returns the 7 v0.1 agents', () => {
@@ -78,14 +78,16 @@ describe('agent transport-capability surface', () => {
   })
 
   test('cursor accepts all three transports', () => {
-    expect([...resolveAgentSurface('cursor').supportedTransports].sort()).toEqual(
-      ['http', 'sse', 'stdio'],
-    )
+    expect(
+      [...resolveAgentSurface('cursor').supportedTransports].sort(),
+    ).toEqual(['http', 'sse', 'stdio'])
   })
 
   test('claude-code system scope accepts all three transports', () => {
     expect(
-      [...resolveAgentSurface('claude-code', 'system').supportedTransports].sort(),
+      [
+        ...resolveAgentSurface('claude-code', 'system').supportedTransports,
+      ].sort(),
     ).toEqual(['http', 'sse', 'stdio'])
   })
 })
