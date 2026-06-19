@@ -145,13 +145,19 @@ for (const a of (await detectInstalledAgents()).filter((a) => a.installed)) {
 }
 ```
 
-Or pre-filter by reading the per-agent capability list off the catalog directly:
+Or pre-filter by reading the per-agent capability list off the catalog directly. Use `resolveAgentSurface(id, scope)` rather than `getCatalogEntry(id).supportedTransports` so the filter matches the scope you will pass to `link()` (e.g. `claude-code` is stdio-only at project scope but accepts all three at system scope):
 
 ```ts
-import { getCatalogEntry, type AgentId, type McpTransport } from 'agent-mcp-manager'
+import {
+  resolveAgentSurface,
+  type AgentId,
+  type AgentScope,
+  type McpTransport,
+} from 'agent-mcp-manager'
 
+const scope: AgentScope = 'system'
 const supports = (id: AgentId, t: McpTransport) =>
-  (getCatalogEntry(id).supportedTransports ?? ['stdio', 'sse', 'http']).includes(t)
+  resolveAgentSurface(id, scope).supportedTransports.includes(t)
 
 for (const a of (await detectInstalledAgents()).filter((a) => a.installed)) {
   if (!supports(a.id, 'http')) continue

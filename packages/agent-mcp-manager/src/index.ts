@@ -4,6 +4,7 @@ export {
   isAgentSupported,
   listSupportedAgents,
   resolveAgentMcpConfigPath,
+  resolveAgentSurface,
 } from './agents.ts'
 
 export {

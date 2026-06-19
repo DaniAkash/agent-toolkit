@@ -342,10 +342,13 @@ export function createMcpManager(options: McpManagerOptions = {}): McpManager {
         const server = manifest.servers[name]
         if (!server) throw new ServerNotFoundError(name)
 
-        // Transport-capability gate fires before any file IO so callers
-        // get a typed error before the agent's config is opened. The
-        // check uses ctx.scope so claude-code can be stdio-only on
-        // project scope and accept-all on system scope.
+        // Transport-capability gate fires before any IO on the agent's
+        // config file (the workspace manifest has already been read and
+        // the config path resolved at this point, but nothing has been
+        // read or written on the agent side). Callers get a typed
+        // error before the agent's config is opened. The check uses
+        // ctx.scope so claude-code can be stdio-only on project scope
+        // and accept-all on system scope.
         assertTransportSupported(opts.agent, ctx.scope, server.spec)
 
         const raw = await readFileOrEmpty(configPath)
