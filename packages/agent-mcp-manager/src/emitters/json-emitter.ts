@@ -10,6 +10,7 @@ const FORMATTING = {
 function specToValue(
   spec: McpServerSpec,
   inject: Record<string, unknown> | undefined,
+  transportTagKey: 'type' | 'transport' | undefined,
 ): Record<string, unknown> {
   const base: Record<string, unknown> =
     spec.transport === 'stdio'
@@ -19,7 +20,8 @@ function specToValue(
           ...(spec.env ? { env: spec.env } : {}),
         }
       : { url: spec.url, ...(spec.headers ? { headers: spec.headers } : {}) }
-  return inject ? { ...base, ...inject } : base
+  const tag = transportTagKey ? { [transportTagKey]: spec.transport } : {}
+  return inject ? { ...base, ...inject, ...tag } : { ...base, ...tag }
 }
 
 export function jsonRead(raw: string, config: JsonEmitterConfig): string[] {
@@ -43,7 +45,7 @@ export function jsonAdd(
   config: JsonEmitterConfig,
 ): string {
   const seed = raw.trim() ? raw : '{}'
-  const value = specToValue(spec, config.injectFields)
+  const value = specToValue(spec, config.injectFields, config.transportTagKey)
   const edits = modify(seed, [config.parentKey, name], value, FORMATTING)
   return applyEdits(seed, edits)
 }

@@ -164,7 +164,12 @@ export const CATALOG: readonly CatalogEntry[] = [
     },
     projectFile: '.vscode/mcp.json',
     emitterId: 'json',
-    emitterConfig: { parentKey: 'servers', injectFields: { type: 'stdio' } },
+    // VS Code's parser requires an explicit `type` tag on every entry.
+    // Track spec.transport (stdio / sse / http) instead of pinning to
+    // 'stdio'; upstream docker/mcp-gateway hardcodes 'stdio' because
+    // their write surface is stdio-only by Go type, but VS Code itself
+    // accepts all three when tagged correctly.
+    emitterConfig: { parentKey: 'servers', transportTagKey: 'type' },
   },
   {
     id: 'gemini',
