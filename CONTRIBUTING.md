@@ -18,7 +18,7 @@ on Node ≥ 20.
 
 ```bash
 git clone https://github.com/DaniAkash/agent-toolkit
-cd acpx
+cd agent-toolkit
 bun install
 
 bun run typecheck
