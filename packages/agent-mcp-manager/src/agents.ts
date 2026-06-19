@@ -1,8 +1,15 @@
 import * as path from 'node:path'
 import { anyExists, expandPaths, pickConfigPath } from './_internal/paths.ts'
-import { CATALOG, CATALOG_BY_ID, type CatalogEntry } from './_vendor/catalog.ts'
+import {
+  CATALOG,
+  CATALOG_BY_ID,
+  type CatalogEntry,
+  type EmitterConfig,
+} from './_vendor/catalog.ts'
 import { AgentNotSupportedError, UnresolvedConfigPathError } from './errors.ts'
-import type { AgentId, AgentInfo, AgentScope } from './types.ts'
+import type { AgentId, AgentInfo, AgentScope, McpTransport } from './types.ts'
+
+const ALL_TRANSPORTS: ReadonlyArray<McpTransport> = ['stdio', 'sse', 'http']
 
 const PLATFORMS = ['darwin', 'linux', 'win32'] as const
 type Platform = (typeof PLATFORMS)[number]
@@ -74,6 +81,35 @@ export async function resolveAgentMcpConfigPath(
     )
   }
   return picked
+}
+
+/**
+ * Resolve the emitter config and transport-capability set the library
+ * uses for the given agent at the given scope. Project scope falls
+ * back to system scope when the catalog entry does not declare a
+ * project-specific override.
+ */
+export function resolveAgentSurface(
+  agent: AgentId,
+  scope: AgentScope = 'system',
+): {
+  emitterConfig: EmitterConfig
+  supportedTransports: ReadonlyArray<McpTransport>
+} {
+  const entry = getCatalogEntry(agent)
+  if (scope === 'project') {
+    return {
+      emitterConfig: entry.projectEmitterConfig ?? entry.emitterConfig,
+      supportedTransports:
+        entry.projectSupportedTransports ??
+        entry.supportedTransports ??
+        ALL_TRANSPORTS,
+    }
+  }
+  return {
+    emitterConfig: entry.emitterConfig,
+    supportedTransports: entry.supportedTransports ?? ALL_TRANSPORTS,
+  }
 }
 
 export async function detectInstalledAgents(): Promise<AgentInfo[]> {

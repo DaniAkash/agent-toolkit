@@ -6,6 +6,7 @@ import {
   getCatalogEntry,
   isAgentSupported,
   resolveAgentMcpConfigPath,
+  resolveAgentSurface,
 } from './agents.ts'
 import { getEmitter } from './emitters/index.ts'
 import {
@@ -14,6 +15,7 @@ import {
   InvalidServerSpecError,
   McpManagerError,
   ServerNotFoundError,
+  UnsupportedTransportError,
 } from './errors.ts'
 import type {
   AddServerOptions,
@@ -105,6 +107,42 @@ function assertSupported(agent: string): asserts agent is AgentId {
   if (!isAgentSupported(agent)) throw new AgentNotSupportedError(agent)
 }
 
+function transportHint(agent: AgentId, scope: AgentScope): string {
+  if (agent === 'claude-desktop') {
+    return (
+      'Claude Desktop only accepts stdio MCP servers. Wrap the remote URL with ' +
+      '`npx -y mcp-remote <url>` and re-add the server as a stdio spec.'
+    )
+  }
+  if (agent === 'codex') {
+    return (
+      'Codex (~/.codex/config.toml) only accepts stdio MCP servers. Wrap the ' +
+      'remote URL with `npx -y mcp-remote <url>` and re-add the server as a ' +
+      'stdio spec.'
+    )
+  }
+  if (agent === 'claude-code' && scope === 'project') {
+    return (
+      'Claude Code .mcp.json (project scope) only accepts stdio entries. Use ' +
+      'system scope for sse/http, or wrap with `npx -y mcp-remote <url>`.'
+    )
+  }
+  return 'This agent does not accept the requested transport.'
+}
+
+function assertTransportSupported(
+  agent: AgentId,
+  scope: AgentScope,
+  spec: McpServerSpec,
+): void {
+  const { supportedTransports } = resolveAgentSurface(agent, scope)
+  if (supportedTransports.includes(spec.transport)) return
+  throw new UnsupportedTransportError(agent, spec.transport, {
+    supported: supportedTransports,
+    hint: transportHint(agent, scope),
+  })
+}
+
 function withoutAgent<T>(
   links: Partial<Record<AgentId, T>>,
   agent: AgentId,
@@ -154,7 +192,7 @@ async function unlinkImpl(
   const name = validateName(opts.serverName)
   assertSupported(opts.agent)
   const entry = getCatalogEntry(opts.agent)
-  const emitter = getEmitter(entry)
+  const emitter = getEmitter(entry, ctx.scope)
 
   const manifest = await readManifest(ctx.workspaceDir)
   const server = manifest.servers[name]
@@ -225,7 +263,7 @@ async function scanUnmanaged(
   }
   for (const agent of agents) {
     const entry = getCatalogEntry(agent)
-    const emitter = getEmitter(entry)
+    const emitter = getEmitter(entry, ctx.scope)
     let configPath: string
     try {
       configPath = await resolvePath(ctx, agent)
@@ -297,12 +335,21 @@ export function createMcpManager(options: McpManagerOptions = {}): McpManager {
       const name = validateName(opts.serverName)
       assertSupported(opts.agent)
       const entry = getCatalogEntry(opts.agent)
-      const emitter = getEmitter(entry)
+      const emitter = getEmitter(entry, ctx.scope)
       return enqueueWrite(async () => {
         const configPath = await resolvePath(ctx, opts.agent, opts.configPath)
         const manifest = await readManifest(ctx.workspaceDir)
         const server = manifest.servers[name]
         if (!server) throw new ServerNotFoundError(name)
+
+        // Transport-capability gate fires before any IO on the agent's
+        // config file (the workspace manifest has already been read and
+        // the config path resolved at this point, but nothing has been
+        // read or written on the agent side). Callers get a typed
+        // error before the agent's config is opened. The check uses
+        // ctx.scope so claude-code can be stdio-only on project scope
+        // and accept-all on system scope.
+        assertTransportSupported(opts.agent, ctx.scope, server.spec)
 
         const raw = await readFileOrEmpty(configPath)
         const existing = server.links[opts.agent]
@@ -320,9 +367,11 @@ export function createMcpManager(options: McpManagerOptions = {}): McpManager {
           }
         }
 
-        // Refuse to clobber an entry the manifest didn't write: the
-        // caller (or the user) put something under this name without us.
-        if (alreadyOnDisk && !existing) {
+        // Refuse to clobber an entry the manifest didn't write unless
+        // the caller explicitly opts in via allowOverwrite. The default
+        // is a safety rail: another tool may have placed this entry
+        // and we shouldn't rewrite it silently.
+        if (alreadyOnDisk && !existing && !opts.allowOverwrite) {
           throw new ForeignEntryError(name, opts.agent, configPath)
         }
 
@@ -442,7 +491,7 @@ export function createMcpManager(options: McpManagerOptions = {}): McpManager {
           const agent = agentRaw as AgentId
           if (!link) continue
           const entry = getCatalogEntry(agent)
-          const emitter = getEmitter(entry)
+          const emitter = getEmitter(entry, ctx.scope)
           const raw = await readFileOrEmpty(link.configPath)
           const names = raw.trim() ? emitter.read(raw) : []
           if (!names.includes(server.name)) {

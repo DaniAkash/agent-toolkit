@@ -9,7 +9,7 @@
  * via `bun run sync-catalog`. For v0.1 we hand-author the 7 most common
  * agents to keep the build pipeline simple.
  */
-import type { AgentId } from '../types.ts'
+import type { AgentId, McpTransport } from '../types.ts'
 
 export type EmitterId = 'json' | 'toml-codex'
 
@@ -17,11 +17,23 @@ export interface JsonEmitterConfig {
   /** Top-level key under which entries live. */
   parentKey: 'mcpServers' | 'servers' | 'context_servers'
   /**
-   * Fields merged into every emitted entry value. Examples:
-   * - VS Code: { type: 'stdio' }
+   * Static fields merged into every emitted entry value. Examples:
    * - Zed: { source: 'custom', enabled: true }
+   * Prefer `transportTagKey` over `injectFields` for transport-tag
+   * variants ('stdio' / 'sse' / 'http') so the tag tracks spec.transport
+   * instead of being pinned to one value.
    */
   injectFields?: Record<string, unknown>
+  /**
+   * When set, the emitter writes `{ [transportTagKey]: spec.transport }`
+   * into the entry alongside the base shape. Used by clients whose
+   * parsers require an explicit transport tag (VS Code's `type` field,
+   * Claude Code's project-scope `.mcp.json`). Independent of
+   * `supportedTransports` (a tag is still written even if only one
+   * transport is allowed; in that case the tag is always that one
+   * value).
+   */
+  transportTagKey?: 'type' | 'transport'
 }
 
 export interface TomlCodexEmitterConfig {
@@ -53,6 +65,28 @@ export interface CatalogEntry {
   projectFile?: string
   emitterId: EmitterId
   emitterConfig: EmitterConfig
+  /**
+   * Transports this agent's config file actually accepts at system
+   * scope. Omitted means the full set ['stdio', 'sse', 'http']. Agents
+   * whose parser only validates stdio (claude-desktop, codex) declare
+   * ['stdio'] and link() throws UnsupportedTransportError for non-stdio
+   * specs before any file write.
+   */
+  supportedTransports?: ReadonlyArray<McpTransport>
+  /**
+   * When project scope (`<projectRoot>/<projectFile>`) writes a different
+   * emitter config than system scope, this is the override. Today only
+   * claude-code uses this: system scope (`~/.claude.json`) accepts all
+   * three transports with no `type` tag, while project scope (`.mcp.json`)
+   * is stdio-only and writes `type: "stdio"`. When omitted, project
+   * scope reuses `emitterConfig` and `supportedTransports`.
+   */
+  projectEmitterConfig?: EmitterConfig
+  /**
+   * Same shape as `supportedTransports` but for the project scope.
+   * Omitted means inherit from `supportedTransports`.
+   */
+  projectSupportedTransports?: ReadonlyArray<McpTransport>
 }
 
 /** v0.1 catalog — seven agents. */
@@ -73,6 +107,18 @@ export const CATALOG: readonly CatalogEntry[] = [
     projectFile: '.mcp.json',
     emitterId: 'json',
     emitterConfig: { parentKey: 'mcpServers' },
+    // Newer Claude Code rejects entries in `.mcp.json` (project scope)
+    // that omit a `type: "stdio"` tag, so the project emitter writes it
+    // unconditionally and the scope is locked to stdio. Mirrors upstream
+    // docker/mcp-gateway:
+    //   set: .mcpServers[$NAME] = $JSON+{"type":"stdio"}
+    // System scope (`~/.claude.json`) keeps the looser shape because
+    // it does still accept all three transports.
+    projectEmitterConfig: {
+      parentKey: 'mcpServers',
+      transportTagKey: 'type',
+    },
+    projectSupportedTransports: ['stdio'],
   },
   {
     id: 'claude-desktop',
@@ -91,6 +137,12 @@ export const CATALOG: readonly CatalogEntry[] = [
     },
     emitterId: 'json',
     emitterConfig: { parentKey: 'mcpServers' },
+    // Claude Desktop's parser only validates stdio entries. Entries
+    // without a `command` field are reported as "not a valid MCP server
+    // configuration and were skipped" on app launch. Mirrors upstream
+    // docker/mcp-gateway, whose write path (MCPServerSTDIO) is stdio-only
+    // by Go type.
+    supportedTransports: ['stdio'],
   },
   {
     id: 'cursor',
@@ -124,7 +176,12 @@ export const CATALOG: readonly CatalogEntry[] = [
     },
     projectFile: '.vscode/mcp.json',
     emitterId: 'json',
-    emitterConfig: { parentKey: 'servers', injectFields: { type: 'stdio' } },
+    // VS Code's parser requires an explicit `type` tag on every entry.
+    // Track spec.transport (stdio / sse / http) instead of pinning to
+    // 'stdio'; upstream docker/mcp-gateway hardcodes 'stdio' because
+    // their write surface is stdio-only by Go type, but VS Code itself
+    // accepts all three when tagged correctly.
+    emitterConfig: { parentKey: 'servers', transportTagKey: 'type' },
   },
   {
     id: 'gemini',
@@ -158,6 +215,11 @@ export const CATALOG: readonly CatalogEntry[] = [
     // Codex has no project-scope file in the upstream catalog.
     emitterId: 'toml-codex',
     emitterConfig: { tableKey: 'mcp_servers' },
+    // `~/.codex/config.toml` has no schema upstream that accepts a
+    // remote-url shape for an MCP entry. The TOML emitter only knows
+    // the stdio shape (command, args, env). Reject non-stdio at link
+    // time rather than letting the serializer surprise the caller.
+    supportedTransports: ['stdio'],
   },
   {
     id: 'zed',

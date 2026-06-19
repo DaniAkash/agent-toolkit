@@ -1,4 +1,4 @@
-import type { AgentId } from './types.ts'
+import type { AgentId, McpTransport } from './types.ts'
 
 export class McpManagerError extends Error {
   constructor(message: string, options?: { cause?: unknown }) {
@@ -52,6 +52,34 @@ export class InvalidServerSpecError extends McpManagerError {
   constructor(reason: string) {
     super(`Invalid MCP server spec: ${reason}`)
     this.name = 'InvalidServerSpecError'
+  }
+}
+
+/**
+ * Raised by `link()` when the requested transport is not one this agent's
+ * config file actually accepts. The most common case is passing
+ * `transport: 'http'` (or `'sse'`) for `claude-desktop` or `codex`, both
+ * of which only parse stdio-shaped entries on disk. The `hint` field
+ * names the `mcp-remote` wrapper pattern so callers can produce a
+ * stdio-shaped spec the agent will accept.
+ */
+export class UnsupportedTransportError extends McpManagerError {
+  readonly agent: AgentId
+  readonly transport: McpTransport
+  readonly details: { supported: ReadonlyArray<McpTransport>; hint: string }
+  constructor(
+    agent: AgentId,
+    transport: McpTransport,
+    details: { supported: ReadonlyArray<McpTransport>; hint: string },
+  ) {
+    super(
+      `Agent "${agent}" does not support the "${transport}" transport ` +
+        `(supported: ${details.supported.join(', ')}). ${details.hint}`,
+    )
+    this.name = 'UnsupportedTransportError'
+    this.agent = agent
+    this.transport = transport
+    this.details = details
   }
 }
 

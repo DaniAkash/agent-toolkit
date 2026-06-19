@@ -9,6 +9,8 @@ export type AgentId =
 
 export type AgentScope = 'system' | 'project'
 
+export type McpTransport = 'stdio' | 'sse' | 'http'
+
 export interface AgentInfo {
   id: AgentId
   displayName: string
@@ -85,6 +87,20 @@ export interface LinkServerOptions {
   agent: AgentId
   /** Override the resolved config path for this agent only. */
   configPath?: string
+  /**
+   * Bypass the foreign-entry safety check. When the on-disk config
+   * already contains an entry under `serverName` that the manifest
+   * did not write, `link()` normally throws `ForeignEntryError` to
+   * protect the user from clobbering an entry another tool put
+   * there. Set this to `true` to take ownership instead: the on-disk
+   * entry is rewritten with the manifest's spec and a fresh
+   * `links[agent]` record is added. Default false.
+   *
+   * Does NOT bypass the transport-capability check. A claude-desktop
+   * link with an http spec still throws `UnsupportedTransportError`
+   * regardless of this flag.
+   */
+  allowOverwrite?: boolean
 }
 
 export interface LinkServerResult {

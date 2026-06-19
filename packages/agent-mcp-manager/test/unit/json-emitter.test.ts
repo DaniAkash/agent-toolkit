@@ -9,7 +9,7 @@ import {
 const MCP_SERVERS = { parentKey: 'mcpServers' as const }
 const VSCODE_SERVERS = {
   parentKey: 'servers' as const,
-  injectFields: { type: 'stdio' },
+  transportTagKey: 'type' as const,
 }
 const ZED_CONTEXT = {
   parentKey: 'context_servers' as const,
@@ -84,7 +84,7 @@ describe('json emitter — mcpServers variant', () => {
 })
 
 describe('json emitter — VS Code servers variant', () => {
-  test('injects type: stdio', () => {
+  test('stdio spec writes type: stdio', () => {
     const out = jsonAdd(
       '',
       'github',
@@ -93,6 +93,34 @@ describe('json emitter — VS Code servers variant', () => {
     )
     const parsed = JSON.parse(out)
     expect(parsed.servers.github).toEqual({ command: 'gh-mcp', type: 'stdio' })
+  })
+
+  test('http spec writes type: http', () => {
+    const out = jsonAdd(
+      '',
+      'remote',
+      { transport: 'http', url: 'https://example.com/mcp' },
+      VSCODE_SERVERS,
+    )
+    const parsed = JSON.parse(out)
+    expect(parsed.servers.remote).toEqual({
+      url: 'https://example.com/mcp',
+      type: 'http',
+    })
+  })
+
+  test('sse spec writes type: sse', () => {
+    const out = jsonAdd(
+      '',
+      'sse-svc',
+      { transport: 'sse', url: 'https://example.com/sse' },
+      VSCODE_SERVERS,
+    )
+    const parsed = JSON.parse(out)
+    expect(parsed.servers['sse-svc']).toEqual({
+      url: 'https://example.com/sse',
+      type: 'sse',
+    })
   })
 
   test('read finds the entry under .servers', () => {
