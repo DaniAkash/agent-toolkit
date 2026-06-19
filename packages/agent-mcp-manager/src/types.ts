@@ -9,6 +9,8 @@ export type AgentId =
 
 export type AgentScope = 'system' | 'project'
 
+export type McpTransport = 'stdio' | 'sse' | 'http'
+
 export interface AgentInfo {
   id: AgentId
   displayName: string
