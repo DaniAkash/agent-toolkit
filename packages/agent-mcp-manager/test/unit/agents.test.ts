@@ -4,8 +4,10 @@ import {
   isAgentSupported,
   listSupportedAgents,
   resolveAgentMcpConfigPath,
+  resolveAgentSurface,
 } from '../../src/agents.ts'
 import { UnresolvedConfigPathError } from '../../src/errors.ts'
+import type { AgentId, McpTransport } from '../../src/types.ts'
 
 describe('agents catalog', () => {
   test('listSupportedAgents returns the 7 v0.1 agents', () => {
@@ -49,5 +51,41 @@ describe('agents catalog', () => {
     await expect(
       resolveAgentMcpConfigPath('codex', 'project', '/tmp/proj'),
     ).rejects.toBeInstanceOf(UnresolvedConfigPathError)
+  })
+})
+
+describe('agent transport-capability surface', () => {
+  const VALID: ReadonlyArray<McpTransport> = ['stdio', 'sse', 'http']
+
+  test('every agent declares a non-empty subset of the transport union', () => {
+    for (const id of listSupportedAgents()) {
+      const { supportedTransports } = resolveAgentSurface(id)
+      expect(supportedTransports.length).toBeGreaterThan(0)
+      for (const t of supportedTransports) {
+        expect(VALID).toContain(t)
+      }
+    }
+  })
+
+  test('claude-desktop is stdio-only', () => {
+    expect(resolveAgentSurface('claude-desktop').supportedTransports).toEqual([
+      'stdio',
+    ])
+  })
+
+  test('codex is stdio-only', () => {
+    expect(resolveAgentSurface('codex').supportedTransports).toEqual(['stdio'])
+  })
+
+  test('cursor accepts all three transports', () => {
+    expect([...resolveAgentSurface('cursor').supportedTransports].sort()).toEqual(
+      ['http', 'sse', 'stdio'],
+    )
+  })
+
+  test('claude-code system scope accepts all three transports', () => {
+    expect(
+      [...resolveAgentSurface('claude-code', 'system').supportedTransports].sort(),
+    ).toEqual(['http', 'sse', 'stdio'])
   })
 })
