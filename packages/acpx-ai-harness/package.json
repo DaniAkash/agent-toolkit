@@ -4,13 +4,13 @@
   "description": "Vercel AI SDK v7 HarnessV1 adapter for acpx, bring any ACP agent (Claude, Codex, Gemini, Copilot, Cursor) to the AI SDK Harnesses ecosystem.",
   "license": "MIT",
   "author": "Dani Akash",
-  "homepage": "https://github.com/DaniAkash/acpx/tree/main/packages/acpx-ai-harness#readme",
+  "homepage": "https://github.com/DaniAkash/agent-toolkit/tree/main/packages/acpx-ai-harness#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/DaniAkash/acpx.git",
+    "url": "git+https://github.com/DaniAkash/agent-toolkit.git",
     "directory": "packages/acpx-ai-harness"
   },
-  "bugs": "https://github.com/DaniAkash/acpx/issues",
+  "bugs": "https://github.com/DaniAkash/agent-toolkit/issues",
   "keywords": [
     "ai-sdk",
     "ai-sdk-harness",

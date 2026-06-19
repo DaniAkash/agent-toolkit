@@ -4,13 +4,13 @@
   "description": "Programmatic add/link/unlink for MCP servers across AI coding agents (Claude Code, Claude Desktop, Cursor, VS Code, Codex, Gemini CLI, Zed). Manifest-driven primitives — library, not CLI.",
   "license": "MIT",
   "author": "Dani Akash",
-  "homepage": "https://github.com/DaniAkash/acpx/tree/main/packages/agent-mcp-manager#readme",
+  "homepage": "https://github.com/DaniAkash/agent-toolkit/tree/main/packages/agent-mcp-manager#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/DaniAkash/acpx.git",
+    "url": "git+https://github.com/DaniAkash/agent-toolkit.git",
     "directory": "packages/agent-mcp-manager"
   },
-  "bugs": "https://github.com/DaniAkash/acpx/issues",
+  "bugs": "https://github.com/DaniAkash/agent-toolkit/issues",
   "keywords": [
     "mcp",
     "model-context-protocol",

@@ -17,8 +17,8 @@ the toolchain is Bun-first — though the published package runs fine
 on Node ≥ 20.
 
 ```bash
-git clone https://github.com/DaniAkash/acpx
-cd acpx
+git clone https://github.com/DaniAkash/agent-toolkit
+cd agent-toolkit
 bun install
 
 bun run typecheck
@@ -178,7 +178,7 @@ one of these areas, the references will help orient you:
 
 ## Reporting issues
 
-Bugs, feature requests, and questions: <https://github.com/DaniAkash/acpx/issues>.
+Bugs, feature requests, and questions: <https://github.com/DaniAkash/agent-toolkit/issues>.
 
 When filing a bug:
 

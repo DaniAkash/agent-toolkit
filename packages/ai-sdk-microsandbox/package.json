@@ -4,13 +4,13 @@
   "description": "Vercel AI SDK v7 HarnessV1 sandbox provider backed by microsandbox: local-first microVM isolation for HarnessAgent. Drop-in replacement for @ai-sdk/sandbox-vercel.",
   "license": "MIT",
   "author": "Dani Akash",
-  "homepage": "https://github.com/DaniAkash/acpx/tree/main/packages/ai-sdk-microsandbox#readme",
+  "homepage": "https://github.com/DaniAkash/agent-toolkit/tree/main/packages/ai-sdk-microsandbox#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/DaniAkash/acpx.git",
+    "url": "git+https://github.com/DaniAkash/agent-toolkit.git",
     "directory": "packages/ai-sdk-microsandbox"
   },
-  "bugs": "https://github.com/DaniAkash/acpx/issues",
+  "bugs": "https://github.com/DaniAkash/agent-toolkit/issues",
   "keywords": [
     "ai-sdk",
     "ai-sdk-harness",
