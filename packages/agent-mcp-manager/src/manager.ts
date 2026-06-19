@@ -6,6 +6,7 @@ import {
   getCatalogEntry,
   isAgentSupported,
   resolveAgentMcpConfigPath,
+  resolveAgentSurface,
 } from './agents.ts'
 import { getEmitter } from './emitters/index.ts'
 import {
@@ -14,6 +15,7 @@ import {
   InvalidServerSpecError,
   McpManagerError,
   ServerNotFoundError,
+  UnsupportedTransportError,
 } from './errors.ts'
 import type {
   AddServerOptions,
@@ -103,6 +105,42 @@ function validateName(name: string): string {
 
 function assertSupported(agent: string): asserts agent is AgentId {
   if (!isAgentSupported(agent)) throw new AgentNotSupportedError(agent)
+}
+
+function transportHint(agent: AgentId, scope: AgentScope): string {
+  if (agent === 'claude-desktop') {
+    return (
+      'Claude Desktop only accepts stdio MCP servers. Wrap the remote URL with ' +
+      '`npx -y mcp-remote <url>` and re-add the server as a stdio spec.'
+    )
+  }
+  if (agent === 'codex') {
+    return (
+      'Codex (~/.codex/config.toml) only accepts stdio MCP servers. Wrap the ' +
+      'remote URL with `npx -y mcp-remote <url>` and re-add the server as a ' +
+      'stdio spec.'
+    )
+  }
+  if (agent === 'claude-code' && scope === 'project') {
+    return (
+      'Claude Code .mcp.json (project scope) only accepts stdio entries. Use ' +
+      'system scope for sse/http, or wrap with `npx -y mcp-remote <url>`.'
+    )
+  }
+  return 'This agent does not accept the requested transport.'
+}
+
+function assertTransportSupported(
+  agent: AgentId,
+  scope: AgentScope,
+  spec: McpServerSpec,
+): void {
+  const { supportedTransports } = resolveAgentSurface(agent, scope)
+  if (supportedTransports.includes(spec.transport)) return
+  throw new UnsupportedTransportError(agent, spec.transport, {
+    supported: supportedTransports,
+    hint: transportHint(agent, scope),
+  })
 }
 
 function withoutAgent<T>(
@@ -303,6 +341,12 @@ export function createMcpManager(options: McpManagerOptions = {}): McpManager {
         const manifest = await readManifest(ctx.workspaceDir)
         const server = manifest.servers[name]
         if (!server) throw new ServerNotFoundError(name)
+
+        // Transport-capability gate fires before any file IO so callers
+        // get a typed error before the agent's config is opened. The
+        // check uses ctx.scope so claude-code can be stdio-only on
+        // project scope and accept-all on system scope.
+        assertTransportSupported(opts.agent, ctx.scope, server.spec)
 
         const raw = await readFileOrEmpty(configPath)
         const existing = server.links[opts.agent]
