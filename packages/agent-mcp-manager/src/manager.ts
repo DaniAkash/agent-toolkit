@@ -192,7 +192,7 @@ async function unlinkImpl(
   const name = validateName(opts.serverName)
   assertSupported(opts.agent)
   const entry = getCatalogEntry(opts.agent)
-  const emitter = getEmitter(entry)
+  const emitter = getEmitter(entry, ctx.scope)
 
   const manifest = await readManifest(ctx.workspaceDir)
   const server = manifest.servers[name]
@@ -263,7 +263,7 @@ async function scanUnmanaged(
   }
   for (const agent of agents) {
     const entry = getCatalogEntry(agent)
-    const emitter = getEmitter(entry)
+    const emitter = getEmitter(entry, ctx.scope)
     let configPath: string
     try {
       configPath = await resolvePath(ctx, agent)
@@ -335,7 +335,7 @@ export function createMcpManager(options: McpManagerOptions = {}): McpManager {
       const name = validateName(opts.serverName)
       assertSupported(opts.agent)
       const entry = getCatalogEntry(opts.agent)
-      const emitter = getEmitter(entry)
+      const emitter = getEmitter(entry, ctx.scope)
       return enqueueWrite(async () => {
         const configPath = await resolvePath(ctx, opts.agent, opts.configPath)
         const manifest = await readManifest(ctx.workspaceDir)
@@ -486,7 +486,7 @@ export function createMcpManager(options: McpManagerOptions = {}): McpManager {
           const agent = agentRaw as AgentId
           if (!link) continue
           const entry = getCatalogEntry(agent)
-          const emitter = getEmitter(entry)
+          const emitter = getEmitter(entry, ctx.scope)
           const raw = await readFileOrEmpty(link.configPath)
           const names = raw.trim() ? emitter.read(raw) : []
           if (!names.includes(server.name)) {

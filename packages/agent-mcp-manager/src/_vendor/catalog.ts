@@ -107,6 +107,18 @@ export const CATALOG: readonly CatalogEntry[] = [
     projectFile: '.mcp.json',
     emitterId: 'json',
     emitterConfig: { parentKey: 'mcpServers' },
+    // Newer Claude Code rejects entries in `.mcp.json` (project scope)
+    // that omit a `type: "stdio"` tag, so the project emitter writes it
+    // unconditionally and the scope is locked to stdio. Mirrors upstream
+    // docker/mcp-gateway:
+    //   set: .mcpServers[$NAME] = $JSON+{"type":"stdio"}
+    // System scope (`~/.claude.json`) keeps the looser shape because
+    // it does still accept all three transports.
+    projectEmitterConfig: {
+      parentKey: 'mcpServers',
+      transportTagKey: 'type',
+    },
+    projectSupportedTransports: ['stdio'],
   },
   {
     id: 'claude-desktop',
