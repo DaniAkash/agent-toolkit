@@ -73,8 +73,10 @@ describe('agent transport-capability surface', () => {
     ])
   })
 
-  test('codex is stdio-only', () => {
-    expect(resolveAgentSurface('codex').supportedTransports).toEqual(['stdio'])
+  test('codex supports stdio + http (no sse)', () => {
+    expect(
+      [...resolveAgentSurface('codex').supportedTransports].sort(),
+    ).toEqual(['http', 'stdio'])
   })
 
   test('cursor accepts all three transports', () => {
