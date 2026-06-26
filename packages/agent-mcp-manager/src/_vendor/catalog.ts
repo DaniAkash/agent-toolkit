@@ -68,9 +68,11 @@ export interface CatalogEntry {
   /**
    * Transports this agent's config file actually accepts at system
    * scope. Omitted means the full set ['stdio', 'sse', 'http']. Agents
-   * whose parser only validates stdio (claude-desktop, codex) declare
-   * ['stdio'] and link() throws UnsupportedTransportError for non-stdio
-   * specs before any file write.
+   * with narrower surfaces declare the subset they accept (e.g.
+   * claude-desktop declares ['stdio']; codex declares ['stdio', 'http']
+   * because its TOML schema accepts streamable HTTP but not SSE). link()
+   * throws UnsupportedTransportError for any transport not in the
+   * declared subset before any file write.
    */
   supportedTransports?: ReadonlyArray<McpTransport>
   /**

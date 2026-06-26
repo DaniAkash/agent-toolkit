@@ -18,9 +18,11 @@ import type { McpServerSpec } from '../types.ts'
  *     through `McpHttpSpec`; consumers that need env-sourced bearer
  *     tokens hand-edit for now (see issue #61 follow-up notes).
  *
- * SSE is not part of codex's TOML schema; the emitter throws for
- * sse specs so the typed UnsupportedTransportError fires upstream in
- * `link()` instead of writing something codex would silently skip.
+ * SSE is not part of codex's TOML schema. `link()` gates on the
+ * catalog's `supportedTransports` and rejects sse with
+ * `UnsupportedTransportError` before reaching this emitter; the
+ * emitter also throws `InvalidServerSpecError` to protect direct
+ * callers (unit tests, custom orchestrators) that bypass `link()`.
  */
 
 function parseDoc(raw: string): Record<string, unknown> {
