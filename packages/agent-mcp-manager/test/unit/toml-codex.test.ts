@@ -111,7 +111,11 @@ describe('toml-codex emitter', () => {
     let raw = tomlCodexAdd(
       '',
       'context7',
-      { transport: 'stdio', command: 'npx', args: ['-y', '@upstash/context7-mcp'] },
+      {
+        transport: 'stdio',
+        command: 'npx',
+        args: ['-y', '@upstash/context7-mcp'],
+      },
       CFG,
     )
     raw = tomlCodexAdd(
