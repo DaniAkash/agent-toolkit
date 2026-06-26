@@ -1,0 +1,252 @@
+import { describe, expect, test } from 'bun:test'
+import { HARNESS_V1_BUILTIN_TOOL_NAMES } from '@ai-sdk/harness'
+import { ACPX_BUILTIN_TOOLS } from '../../src/acpx-builtin-tools.ts'
+import { acpxHarness, createAcpxHarness } from '../../src/acpx-harness.ts'
+import {
+  acpxBridgeCoordsSchema,
+  acpxLifecycleStateSchema,
+} from '../../src/acpx-lifecycle.ts'
+import {
+  type AcpxPermissionMode,
+  harnessPermissionModeToAcpx,
+} from '../../src/acpx-permission.ts'
+
+describe('acpxHarness object shape', () => {
+  test('declares the harness-v1 spec version', () => {
+    expect(acpxHarness.specificationVersion).toBe('harness-v1')
+  })
+
+  test("harnessId is the kebab-case slug 'acpx'", () => {
+    expect(acpxHarness.harnessId).toBe('acpx')
+  })
+
+  test('advertises built-in tool approval support', () => {
+    expect(acpxHarness.supportsBuiltinToolApprovals).toBe(true)
+  })
+
+  test('exposes a lifecycleStateSchema', () => {
+    expect(acpxHarness.lifecycleStateSchema).toBeDefined()
+  })
+
+  test('createAcpxHarness produces an equivalent shape', () => {
+    const fresh = createAcpxHarness({ agent: 'claude' })
+    expect(fresh.specificationVersion).toBe('harness-v1')
+    expect(fresh.harnessId).toBe('acpx')
+  })
+})
+
+describe('ACPX_BUILTIN_TOOLS', () => {
+  test('covers every standard common-tool name', () => {
+    for (const name of HARNESS_V1_BUILTIN_TOOL_NAMES) {
+      expect(ACPX_BUILTIN_TOOLS).toHaveProperty(name)
+    }
+  })
+
+  test('every entry tags its toolUseKind', () => {
+    for (const [, tool] of Object.entries(ACPX_BUILTIN_TOOLS)) {
+      expect(tool.toolUseKind).toBeDefined()
+    }
+  })
+
+  test('bash is the only `bash`-kind tool', () => {
+    const bashKind = Object.entries(ACPX_BUILTIN_TOOLS).filter(
+      ([, t]) => t.toolUseKind === 'bash',
+    )
+    expect(bashKind.map(([k]) => k)).toEqual(['bash'])
+  })
+})
+
+describe('harnessPermissionModeToAcpx', () => {
+  const cases: Array<{
+    input: Parameters<typeof harnessPermissionModeToAcpx>[0]
+    expected: AcpxPermissionMode
+  }> = [
+    { input: 'allow-all', expected: 'approve-all' },
+    { input: 'allow-edits', expected: 'approve-all' },
+    { input: 'allow-reads', expected: 'approve-reads' },
+    { input: undefined, expected: 'approve-all' },
+  ]
+
+  for (const { input, expected } of cases) {
+    test(`${String(input)} -> ${expected}`, () => {
+      expect(harnessPermissionModeToAcpx(input)).toBe(expected)
+    })
+  }
+})
+
+describe('acpxLifecycleStateSchema', () => {
+  test('parses a state with bridge coordinates', () => {
+    const parsed = acpxLifecycleStateSchema.parse({
+      bridge: { port: 4001, token: 'tok', lastSeenEventId: 7 },
+      sessionKey: 'agent-x-session-1',
+    })
+    expect(parsed.bridge?.port).toBe(4001)
+    expect(parsed.sessionKey).toBe('agent-x-session-1')
+  })
+
+  test('parses an empty state', () => {
+    expect(acpxLifecycleStateSchema.parse({})).toEqual({})
+  })
+
+  test('preserves unknown fields under passthrough', () => {
+    const parsed = acpxLifecycleStateSchema.parse({ extra: 'opaque' })
+    expect((parsed as Record<string, unknown>).extra).toBe('opaque')
+  })
+
+  test('rejects bridge coords missing required fields', () => {
+    expect(() => acpxBridgeCoordsSchema.parse({ port: 1 })).toThrow()
+  })
+})
+
+describe('doStart with a resume payload that has no bridge coords', () => {
+  test('falls through to fresh spawn (RERUN) instead of rejecting', async () => {
+    // The recovery dispatcher should pick the RERUN rung when no bridge
+    // block is present in resumeFrom. We give it a sandbox session with
+    // no ports so the fresh-spawn path errors with the "no ports" guard,
+    // which proves we got past the old "resume not implemented" reject.
+    const fakeSandbox = {
+      id: 'sbx',
+      defaultWorkingDirectory: '/sandbox',
+      ports: [],
+      getPortUrl: async () => '',
+      stop: async () => {},
+      restricted: () => ({}) as never,
+    } as never
+    await expect(
+      acpxHarness.doStart({
+        sessionId: 's',
+        sessionWorkDir: '/tmp/x',
+        sandboxSession: fakeSandbox,
+        resumeFrom: {
+          type: 'resume-session',
+          harnessId: 'acpx',
+          specificationVersion: 'harness-v1',
+          data: {},
+        },
+      } as never),
+    ).rejects.toThrow(/no ports/i)
+  })
+})
+
+describe('getBootstrap recipe', () => {
+  const PKG = '{"name":"acpx-ai-harness-bridge","version":"0.0.0"}'
+  const BUNDLE = 'console.log("bridge bundle stub")'
+
+  function buildWithFakeAssets(agent?: string) {
+    const reads: string[] = []
+    const harness = createAcpxHarness({
+      ...(agent ? { agent } : {}),
+      readBridgeAsset: async (name) => {
+        reads.push(name)
+        if (name === 'package.json') return PKG
+        if (name === 'index.js') return BUNDLE
+        throw new Error(`unexpected asset: ${name}`)
+      },
+    })
+    return { harness, reads }
+  }
+
+  test('declares the acpx harnessId on the recipe', async () => {
+    const { harness } = buildWithFakeAssets()
+    const recipe = await harness.getBootstrap?.()
+    expect(recipe?.harnessId).toBe('acpx')
+  })
+
+  test('uses an ephemeral bootstrap directory under /tmp', async () => {
+    const { harness } = buildWithFakeAssets()
+    const recipe = await harness.getBootstrap?.()
+    expect(recipe?.bootstrapDir).toBe('/tmp/harness/acpx')
+  })
+
+  test('lays down the bridge manifest + bundle under the bootstrap dir', async () => {
+    const { harness } = buildWithFakeAssets()
+    const recipe = await harness.getBootstrap?.()
+    expect(recipe?.files).toEqual([
+      { path: '/tmp/harness/acpx/package.json', content: PKG },
+      { path: '/tmp/harness/acpx/bridge.mjs', content: BUNDLE },
+    ])
+  })
+
+  test('runs install via pnpm with a local store dir', async () => {
+    const { harness } = buildWithFakeAssets()
+    const recipe = await harness.getBootstrap?.()
+    const installCmd = recipe?.commands.find((c) => c.command.includes('pnpm'))
+    expect(installCmd?.command).toContain('pnpm')
+    expect(installCmd?.command).toContain('/tmp/harness/acpx')
+    expect(installCmd?.command).toContain('--store-dir')
+  })
+
+  test('runs `acpx --version` as the post-install smoke check', async () => {
+    const { harness } = buildWithFakeAssets()
+    const recipe = await harness.getBootstrap?.()
+    const lastCmd = recipe?.commands.at(-1)?.command
+    expect(lastCmd).toContain('acpx --version')
+  })
+
+  test('reads each asset only once across repeated getBootstrap calls', async () => {
+    const { harness, reads } = buildWithFakeAssets()
+    await harness.getBootstrap?.()
+    await harness.getBootstrap?.()
+    await harness.getBootstrap?.()
+    expect(reads).toEqual(['package.json', 'index.js'])
+  })
+
+  test('default reader is wired when no override is supplied', () => {
+    const harness = createAcpxHarness()
+    expect(typeof harness.getBootstrap).toBe('function')
+  })
+
+  test('pre-warms the codex-acp wrapper on the codex agent (default)', async () => {
+    const { harness } = buildWithFakeAssets()
+    const recipe = await harness.getBootstrap?.()
+    const install = recipe?.commands.find((c) =>
+      c.command.includes('@agentclientprotocol/codex-acp'),
+    )
+    expect(install?.command).toBe(
+      'npx --yes @agentclientprotocol/codex-acp --version',
+    )
+  })
+
+  test('pre-warms the claude-agent-acp wrapper on the claude agent', async () => {
+    const { harness } = buildWithFakeAssets('claude')
+    const recipe = await harness.getBootstrap?.()
+    const install = recipe?.commands.find((c) =>
+      c.command.includes('@agentclientprotocol/claude-agent-acp'),
+    )
+    expect(install?.command).toContain(
+      'npx --yes @agentclientprotocol/claude-agent-acp --version',
+    )
+  })
+
+  test('installs the gemini CLI on the gemini agent', async () => {
+    const { harness } = buildWithFakeAssets('gemini')
+    const recipe = await harness.getBootstrap?.()
+    const install = recipe?.commands.find((c) =>
+      c.command.includes('@google/gemini-cli'),
+    )
+    expect(install?.command).toBe('npm install -g @google/gemini-cli')
+  })
+
+  test('skips the agent install step for unknown agents', async () => {
+    const { harness } = buildWithFakeAssets('some-custom-agent')
+    const recipe = await harness.getBootstrap?.()
+    const installs = recipe?.commands.filter((c) =>
+      /(?:npm install -g|npx --yes)/.test(c.command),
+    )
+    expect(installs).toEqual([])
+  })
+
+  test('agent install runs after pnpm but before the acpx smoke check', async () => {
+    const { harness } = buildWithFakeAssets('codex')
+    const recipe = await harness.getBootstrap?.()
+    const commands = recipe?.commands.map((c) => c.command) ?? []
+    const pnpmIdx = commands.findIndex((c) => c.includes('pnpm'))
+    const installIdx = commands.findIndex((c) =>
+      c.includes('@agentclientprotocol/codex-acp'),
+    )
+    const versionIdx = commands.findIndex((c) => c.includes('acpx --version'))
+    expect(pnpmIdx).toBeGreaterThan(-1)
+    expect(installIdx).toBeGreaterThan(pnpmIdx)
+    expect(versionIdx).toBeGreaterThan(installIdx)
+  })
+})

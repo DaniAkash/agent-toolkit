@@ -4,13 +4,13 @@
   "description": "Probe any ACP-compatible agent for its capabilities (models, modes, configOptions, prompt capabilities, auth methods, MCP transports). No real prompt required; no token cost.",
   "license": "MIT",
   "author": "Dani Akash",
-  "homepage": "https://github.com/DaniAkash/acpx/tree/main/packages/acp-probe#readme",
+  "homepage": "https://github.com/DaniAkash/agent-toolkit/tree/main/packages/acp-probe#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/DaniAkash/acpx.git",
+    "url": "git+https://github.com/DaniAkash/agent-toolkit.git",
     "directory": "packages/acp-probe"
   },
-  "bugs": "https://github.com/DaniAkash/acpx/issues",
+  "bugs": "https://github.com/DaniAkash/agent-toolkit/issues",
   "keywords": [
     "acp",
     "agent-client-protocol",

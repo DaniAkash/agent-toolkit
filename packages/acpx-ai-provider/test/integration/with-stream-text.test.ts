@@ -1,8 +1,7 @@
 import { describe, expect, test } from 'bun:test'
-import { stepCountIs, streamText } from 'ai'
+import { acpEvent, acpResult, MockAcpRuntime } from 'acpx-test-helpers'
+import { isStepCount, streamText } from 'ai'
 import { createAcpxProvider } from '../../src/index.ts'
-import { acpEvent, acpResult } from '../helpers/acp-event-builders.ts'
-import { MockAcpRuntime } from '../helpers/mock-acp-runtime.ts'
 
 describe('streamText — text-only turn', () => {
   test('result.text resolves to concatenated deltas', async () => {
@@ -19,7 +18,7 @@ describe('streamText — text-only turn', () => {
     const result = streamText({
       model: provider.languageModel(),
       prompt: 'say hi',
-      stopWhen: stepCountIs(1),
+      stopWhen: isStepCount(1),
     })
     expect(await result.text).toBe('hello')
   })
@@ -38,7 +37,7 @@ describe('streamText — text-only turn', () => {
     const result = streamText({
       model: provider.languageModel(),
       prompt: 'hi',
-      stopWhen: stepCountIs(1),
+      stopWhen: isStepCount(1),
     })
     expect(await result.finishReason).toBe('stop')
   })
@@ -57,13 +56,35 @@ describe('streamText — text-only turn', () => {
     const result = streamText({
       model: provider.languageModel(),
       prompt: 'hi',
-      stopWhen: stepCountIs(1),
+      stopWhen: isStepCount(1),
     })
     await result.finishReason
     const meta = (await result.providerMetadata) as
       | { acpx?: { contextWindow?: number } }
       | undefined
     expect(meta?.acpx?.contextWindow).toBe(4096)
+  })
+
+  test('usage resolves with inputTokenDetails.cacheReadTokens from the size field', async () => {
+    const runtime = new MockAcpRuntime({
+      turnScripts: [
+        {
+          events: [acpEvent.text('hi'), acpEvent.usage(75, 4096)],
+          result: acpResult.completed('end_turn'),
+        },
+      ],
+    })
+    const provider = createAcpxProvider({ agent: 'claude', runtime })
+
+    const result = streamText({
+      model: provider.languageModel(),
+      prompt: 'hi',
+      stopWhen: isStepCount(1),
+    })
+    const usage = await result.usage
+    // AI SDK v7 moved cachedInputTokens to inputTokenDetails.cacheReadTokens
+    // on the consumer-facing LanguageModelUsage.
+    expect(usage.inputTokenDetails.cacheReadTokens).toBe(4096)
   })
 
   test('textStream yields the same content', async () => {
@@ -80,7 +101,7 @@ describe('streamText — text-only turn', () => {
     const result = streamText({
       model: provider.languageModel(),
       prompt: 'hi',
-      stopWhen: stepCountIs(1),
+      stopWhen: isStepCount(1),
     })
     let acc = ''
     for await (const chunk of result.textStream) acc += chunk
@@ -110,7 +131,7 @@ describe('streamText — tool-call turn', () => {
     const result = streamText({
       model: provider.languageModel(),
       prompt: 'greet world',
-      stopWhen: stepCountIs(1),
+      stopWhen: isStepCount(1),
     })
     expect(await result.finishReason).toBe('tool-calls')
   })
@@ -131,7 +152,7 @@ describe('streamText — failure', () => {
     const result = streamText({
       model: provider.languageModel(),
       prompt: 'hi',
-      stopWhen: stepCountIs(1),
+      stopWhen: isStepCount(1),
       onError: () => {},
     })
     expect(await result.finishReason).toBe('error')
@@ -153,9 +174,13 @@ describe('streamText — fullStream shape', () => {
     const result = streamText({
       model: provider.languageModel(),
       prompt: 'hi',
-      stopWhen: stepCountIs(1),
+      stopWhen: isStepCount(1),
     })
     const types: string[] = []
+    // ai@7.0.0-beta.116 still uses `fullStream`. The migration guide
+    // notes the rename to `stream` is coming, but it has only landed
+    // on canary so far (canary.156+). Switch to `result.stream` once
+    // the rename ships in a beta release.
     for await (const part of result.fullStream) types.push(part.type)
     expect(types).toContain('text-start')
     expect(types).toContain('text-delta')

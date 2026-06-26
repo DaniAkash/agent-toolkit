@@ -1,8 +1,10 @@
 export {
   detectInstalledAgents,
+  getCatalogEntry,
   isAgentSupported,
   listSupportedAgents,
   resolveAgentMcpConfigPath,
+  resolveAgentSurface,
 } from './agents.ts'
 
 export {
@@ -12,6 +14,7 @@ export {
   McpManagerError,
   ServerNotFoundError,
   UnresolvedConfigPathError,
+  UnsupportedTransportError,
 } from './errors.ts'
 
 export type { McpManager } from './manager.ts'
@@ -36,6 +39,7 @@ export type {
   McpServerSpec,
   McpSseSpec,
   McpStdioSpec,
+  McpTransport,
   RemoveServerOptions,
   RescanOptions,
   RescanResult,

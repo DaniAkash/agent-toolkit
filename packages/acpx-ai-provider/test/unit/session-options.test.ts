@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
+import { MockAcpRuntime } from 'acpx-test-helpers'
 import { createAcpxProvider } from '../../src/index.ts'
-import { MockAcpRuntime } from '../helpers/mock-acp-runtime.ts'
 
 describe('AcpxProviderSettings.sessionOptions', () => {
   test('forwards systemPrompt string to runtime.ensureSession', async () => {

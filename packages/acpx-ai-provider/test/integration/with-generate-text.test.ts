@@ -1,9 +1,8 @@
 import { describe, expect, test } from 'bun:test'
-import { generateText, stepCountIs } from 'ai'
+import { acpEvent, acpResult, MockAcpRuntime } from 'acpx-test-helpers'
+import { generateText, isStepCount } from 'ai'
 import { AcpxError } from '../../src/errors.ts'
 import { createAcpxProvider } from '../../src/index.ts'
-import { acpEvent, acpResult } from '../helpers/acp-event-builders.ts'
-import { MockAcpRuntime } from '../helpers/mock-acp-runtime.ts'
 
 describe('generateText — text-only', () => {
   test('returns the concatenated text and a stop reason', async () => {
@@ -20,7 +19,7 @@ describe('generateText — text-only', () => {
     const { text, finishReason } = await generateText({
       model: provider.languageModel(),
       prompt: 'say hi',
-      stopWhen: stepCountIs(1),
+      stopWhen: isStepCount(1),
     })
     expect(text).toBe('hello')
     expect(finishReason).toBe('stop')
@@ -40,9 +39,32 @@ describe('generateText — text-only', () => {
     const { providerMetadata } = await generateText({
       model: provider.languageModel(),
       prompt: 'hi',
-      stopWhen: stepCountIs(1),
+      stopWhen: isStepCount(1),
     })
     expect(providerMetadata?.acpx?.contextWindow).toBe(1024)
+  })
+
+  test('exposes accumulated inputTokenDetails.cacheReadTokens from a usage_update', async () => {
+    const runtime = new MockAcpRuntime({
+      turnScripts: [
+        {
+          events: [acpEvent.text('hi'), acpEvent.usage(42, 1024)],
+          result: acpResult.completed('end_turn'),
+        },
+      ],
+    })
+    const provider = createAcpxProvider({ agent: 'claude', runtime })
+
+    const { usage } = await generateText({
+      model: provider.languageModel(),
+      prompt: 'hi',
+      stopWhen: isStepCount(1),
+    })
+    // AI SDK v7 moved cachedInputTokens to inputTokenDetails.cacheReadTokens
+    // on the consumer-facing LanguageModelUsage. The provider still emits
+    // cachedInputTokens at the top level of the underlying V2Usage, and the
+    // SDK maps it through.
+    expect(usage.inputTokenDetails.cacheReadTokens).toBe(1024)
   })
 
   test('reasoning content is preserved alongside text', async () => {
@@ -59,7 +81,7 @@ describe('generateText — text-only', () => {
     const { text, content } = await generateText({
       model: provider.languageModel(),
       prompt: 'hi',
-      stopWhen: stepCountIs(1),
+      stopWhen: isStepCount(1),
     })
     expect(text).toBe('done')
     expect(content.some((c) => c.type === 'reasoning')).toBe(true)
@@ -88,7 +110,7 @@ describe('generateText — tool-call', () => {
     const { toolCalls, toolResults, finishReason } = await generateText({
       model: provider.languageModel(),
       prompt: 'greet',
-      stopWhen: stepCountIs(1),
+      stopWhen: isStepCount(1),
     })
     expect(finishReason).toBe('tool-calls')
     expect(toolCalls).toHaveLength(1)
@@ -112,7 +134,7 @@ describe('generateText — failure', () => {
     const promise = generateText({
       model: provider.languageModel(),
       prompt: 'hi',
-      stopWhen: stepCountIs(1),
+      stopWhen: isStepCount(1),
     })
     await expect(promise).rejects.toBeInstanceOf(AcpxError)
     await expect(promise).rejects.toMatchObject({

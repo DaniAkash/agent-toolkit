@@ -1,0 +1,72 @@
+{
+  "name": "ai-sdk-microsandbox",
+  "version": "0.0.1",
+  "description": "Vercel AI SDK v7 HarnessV1 sandbox provider backed by microsandbox: local-first microVM isolation for HarnessAgent. Drop-in replacement for @ai-sdk/sandbox-vercel.",
+  "license": "MIT",
+  "author": "Dani Akash",
+  "homepage": "https://github.com/DaniAkash/agent-toolkit/tree/main/packages/ai-sdk-microsandbox#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DaniAkash/agent-toolkit.git",
+    "directory": "packages/ai-sdk-microsandbox"
+  },
+  "bugs": "https://github.com/DaniAkash/agent-toolkit/issues",
+  "keywords": [
+    "ai-sdk",
+    "ai-sdk-harness",
+    "harness-sandbox",
+    "sandbox-provider",
+    "microsandbox",
+    "microvm",
+    "firecracker",
+    "libkrun",
+    "local-first",
+    "isolation",
+    "claude-code",
+    "codex"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "scripts": {
+    "build": "bunup",
+    "dev": "bunup --watch",
+    "test": "bun test test/unit",
+    "test:integration": "MICROSANDBOX_INTEGRATION=1 bun test --parallel=1 test/integration",
+    "test:e2e": "MICROSANDBOX_INTEGRATION=1 bun test --parallel=1 test/e2e",
+    "test:all": "MICROSANDBOX_INTEGRATION=1 bun test --parallel=1",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@ai-sdk/harness": ">=1.0.0-canary.10",
+    "@ai-sdk/provider-utils": ">=5.0.0-canary.40",
+    "microsandbox": ">=0.5.7"
+  },
+  "devDependencies": {
+    "@ai-sdk/harness": "1.0.0-canary.13",
+    "@ai-sdk/harness-codex": "1.0.0-canary.9",
+    "@ai-sdk/provider-utils": "5.0.0-canary.48",
+    "bunup": "^0.16.31",
+    "microsandbox": "0.5.7",
+    "typescript": "^6.0.3"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "acpx-ai-harness-bridge",
+  "version": "0.0.0",
+  "description": "Runtime manifest for the in-sandbox acpx-ai-harness bridge process. Not published; installed by the bootstrap recipe.",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@ai-sdk/harness": "1.0.0-canary.10",
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "acpx": "0.8.0",
+    "ws": "8.21.0",
+    "zod": "3.25.76"
+  }
+}

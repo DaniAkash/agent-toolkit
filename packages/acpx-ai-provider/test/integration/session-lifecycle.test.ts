@@ -1,8 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import type { LanguageModelV2CallOptions } from '@ai-sdk/provider'
+import { acpResult, MockAcpRuntime } from 'acpx-test-helpers'
 import { createAcpxProvider } from '../../src/index.ts'
-import { acpResult } from '../helpers/acp-event-builders.ts'
-import { MockAcpRuntime } from '../helpers/mock-acp-runtime.ts'
 
 const HISTORY: LanguageModelV2CallOptions['prompt'] = [
   { role: 'system', content: 'sys' },

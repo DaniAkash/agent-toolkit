@@ -32,9 +32,11 @@ on:
   push:
     tags:
       - 'acpx-ai-provider-v[0-9]*'
+      - 'acpx-ai-harness-v[0-9]*'
       - 'agent-mcp-manager-v[0-9]*'
       - 'agent-skills-manager-v[0-9]*'
       - 'acp-probe-v[0-9]*'
+      - 'ai-sdk-microsandbox-v[0-9]*'
 
 permissions:
   contents: write
@@ -69,6 +71,11 @@ jobs:
               echo "dir=packages/acpx-ai-provider" >> "$GITHUB_OUTPUT"
               echo "match=acpx-ai-provider-v[0-9]*" >> "$GITHUB_OUTPUT"
               ;;
+            acpx-ai-harness-v*)
+              echo "name=acpx-ai-harness" >> "$GITHUB_OUTPUT"
+              echo "dir=packages/acpx-ai-harness" >> "$GITHUB_OUTPUT"
+              echo "match=acpx-ai-harness-v[0-9]*" >> "$GITHUB_OUTPUT"
+              ;;
             agent-mcp-manager-v*)
               echo "name=agent-mcp-manager" >> "$GITHUB_OUTPUT"
               echo "dir=packages/agent-mcp-manager" >> "$GITHUB_OUTPUT"
@@ -83,6 +90,11 @@ jobs:
               echo "name=acp-probe" >> "$GITHUB_OUTPUT"
               echo "dir=packages/acp-probe" >> "$GITHUB_OUTPUT"
               echo "match=acp-probe-v[0-9]*" >> "$GITHUB_OUTPUT"
+              ;;
+            ai-sdk-microsandbox-v*)
+              echo "name=ai-sdk-microsandbox" >> "$GITHUB_OUTPUT"
+              echo "dir=packages/ai-sdk-microsandbox" >> "$GITHUB_OUTPUT"
+              echo "match=ai-sdk-microsandbox-v[0-9]*" >> "$GITHUB_OUTPUT"
               ;;
             *)
               echo "Unknown tag prefix: $TAG" >&2

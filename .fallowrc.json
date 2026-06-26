@@ -1,6 +1,9 @@
 {
   "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
-  "entry": ["packages/*/src/index.ts"],
+  "entry": [
+    "packages/*/src/index.ts",
+    "packages/acpx-ai-harness/src/bridge/index.ts"
+  ],
   "ignorePatterns": [
     "**/*.generated.ts",
     "**/*.d.ts",
@@ -12,7 +15,13 @@
     "private-type-leaks": "warn",
     "unused-class-members": "off"
   },
-  "publicPackages": ["acpx-ai-provider", "agent-skills-manager", "acp-probe"],
+  "publicPackages": [
+    "acpx-ai-provider",
+    "acpx-ai-harness",
+    "agent-skills-manager",
+    "acp-probe",
+    "ai-sdk-microsandbox"
+  ],
   "overrides": [
     {
       "files": ["**/_vendor/**"],

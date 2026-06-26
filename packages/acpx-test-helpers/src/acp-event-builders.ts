@@ -27,12 +27,7 @@ type StatusOpts = {
 }
 type ErrorOpts = { code?: string; retryable?: boolean }
 
-/**
- * Compact builders for `AcpRuntimeEvent` values used in tests. Keeps
- * scripted-runtime tests readable; mirrors the role helpers in the
- * convert-events tests but lives under `test/helpers/` so integration
- * suites can import them too.
- */
+/** Compact builders for `AcpRuntimeEvent` values used in tests. */
 export const acpEvent = {
   text(delta: string, opts: TextOpts = {}): AcpRuntimeEvent {
     return { type: 'text_delta', text: delta, stream: 'output', ...opts }

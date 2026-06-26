@@ -1,8 +1,7 @@
 import { describe, expect, test } from 'bun:test'
-import { stepCountIs, streamText } from 'ai'
+import { acpEvent, acpResult, MockAcpRuntime } from 'acpx-test-helpers'
+import { isStepCount, streamText } from 'ai'
 import { createAcpxProvider } from '../../src/index.ts'
-import { acpEvent, acpResult } from '../helpers/acp-event-builders.ts'
-import { MockAcpRuntime } from '../helpers/mock-acp-runtime.ts'
 
 describe('streamText — prepare() does not consume session freshness', () => {
   test('prepare() then streamText preserves multi-turn messages on first turn', async () => {
@@ -29,7 +28,7 @@ describe('streamText — prepare() does not consume session freshness', () => {
         { role: 'assistant', content: 'The capital of France is Paris.' },
         { role: 'user', content: 'What did you just tell me?' },
       ],
-      stopWhen: stepCountIs(1),
+      stopWhen: isStepCount(1),
     })
     await result.text
 
@@ -67,12 +66,12 @@ describe('streamText — prepare() does not consume session freshness', () => {
     const first = streamText({
       model: provider.languageModel(),
       messages,
-      stopWhen: stepCountIs(1),
+      stopWhen: isStepCount(1),
     })
     const second = streamText({
       model: provider.languageModel(),
       messages,
-      stopWhen: stepCountIs(1),
+      stopWhen: isStepCount(1),
     })
     await Promise.all([first.text, second.text])
 
@@ -107,7 +106,7 @@ describe('streamText — prepare() does not consume session freshness', () => {
     const first = streamText({
       model: provider.languageModel(),
       messages: [{ role: 'user', content: 'hello first turn' }],
-      stopWhen: stepCountIs(1),
+      stopWhen: isStepCount(1),
     })
     await first.text
 
@@ -118,7 +117,7 @@ describe('streamText — prepare() does not consume session freshness', () => {
         { role: 'assistant', content: 'first' },
         { role: 'user', content: 'follow up message' },
       ],
-      stopWhen: stepCountIs(1),
+      stopWhen: isStepCount(1),
     })
     await second.text
 

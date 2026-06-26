@@ -1,9 +1,10 @@
 import type {
   CatalogEntry,
+  EmitterConfig,
   JsonEmitterConfig,
   TomlCodexEmitterConfig,
 } from '../_vendor/catalog.ts'
-import type { McpServerSpec } from '../types.ts'
+import type { AgentScope, McpServerSpec } from '../types.ts'
 import { jsonAdd, jsonRead, jsonRemove } from './json-emitter.ts'
 import {
   tomlCodexAdd,
@@ -17,9 +18,22 @@ export interface EmitterIO {
   remove(raw: string, name: string): string
 }
 
-export function getEmitter(entry: CatalogEntry): EmitterIO {
+function pickEmitterConfig(
+  entry: CatalogEntry,
+  scope: AgentScope,
+): EmitterConfig {
+  if (scope === 'project' && entry.projectEmitterConfig) {
+    return entry.projectEmitterConfig
+  }
+  return entry.emitterConfig
+}
+
+export function getEmitter(
+  entry: CatalogEntry,
+  scope: AgentScope = 'system',
+): EmitterIO {
   if (entry.emitterId === 'json') {
-    const config = entry.emitterConfig as JsonEmitterConfig
+    const config = pickEmitterConfig(entry, scope) as JsonEmitterConfig
     return {
       read: (raw) => jsonRead(raw, config),
       add: (raw, name, spec) => jsonAdd(raw, name, spec, config),
@@ -27,7 +41,7 @@ export function getEmitter(entry: CatalogEntry): EmitterIO {
     }
   }
   // toml-codex
-  const config = entry.emitterConfig as TomlCodexEmitterConfig
+  const config = pickEmitterConfig(entry, scope) as TomlCodexEmitterConfig
   return {
     read: (raw) => tomlCodexRead(raw, config),
     add: (raw, name, spec) => tomlCodexAdd(raw, name, spec, config),

@@ -4,13 +4,13 @@
   "description": "Programmatic skill workspace + agent-link manager for ACP coding agents. Wraps vercel-labs/skills for use as a library.",
   "license": "MIT",
   "author": "Dani Akash",
-  "homepage": "https://github.com/DaniAkash/acpx/tree/main/packages/agent-skills-manager#readme",
+  "homepage": "https://github.com/DaniAkash/agent-toolkit/tree/main/packages/agent-skills-manager#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/DaniAkash/acpx.git",
+    "url": "git+https://github.com/DaniAkash/agent-toolkit.git",
     "directory": "packages/agent-skills-manager"
   },
-  "bugs": "https://github.com/DaniAkash/acpx/issues",
+  "bugs": "https://github.com/DaniAkash/agent-toolkit/issues",
   "keywords": [
     "acp",
     "agent-client-protocol",
