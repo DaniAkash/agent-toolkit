@@ -116,9 +116,10 @@ function transportHint(agent: AgentId, scope: AgentScope): string {
   }
   if (agent === 'codex') {
     return (
-      'Codex (~/.codex/config.toml) only accepts stdio MCP servers. Wrap the ' +
-      'remote URL with `npx -y mcp-remote <url>` and re-add the server as a ' +
-      'stdio spec.'
+      'Codex (~/.codex/config.toml) accepts stdio and streamable-HTTP MCP ' +
+      'servers; SSE is not parsed. Re-add the server with transport: "http" ' +
+      'and the same URL, or wrap with `npx -y mcp-remote <url>` as a stdio ' +
+      'spec.'
     )
   }
   if (agent === 'claude-code' && scope === 'project') {
