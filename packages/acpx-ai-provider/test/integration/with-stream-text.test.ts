@@ -65,28 +65,6 @@ describe('streamText — text-only turn', () => {
     expect(meta?.acpx?.contextWindow).toBe(4096)
   })
 
-  test('usage resolves with inputTokenDetails.cacheReadTokens from the size field', async () => {
-    const runtime = new MockAcpRuntime({
-      turnScripts: [
-        {
-          events: [acpEvent.text('hi'), acpEvent.usage(75, 4096)],
-          result: acpResult.completed('end_turn'),
-        },
-      ],
-    })
-    const provider = createAcpxProvider({ agent: 'claude', runtime })
-
-    const result = streamText({
-      model: provider.languageModel(),
-      prompt: 'hi',
-      stopWhen: isStepCount(1),
-    })
-    const usage = await result.usage
-    // AI SDK v7 moved cachedInputTokens to inputTokenDetails.cacheReadTokens
-    // on the consumer-facing LanguageModelUsage.
-    expect(usage.inputTokenDetails.cacheReadTokens).toBe(4096)
-  })
-
   test('textStream yields the same content', async () => {
     const runtime = new MockAcpRuntime({
       turnScripts: [

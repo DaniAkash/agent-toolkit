@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'bun:test'
+import { acpEvent, acpResult, MockAcpRuntime } from 'acpx-test-helpers'
 import { createAcpxProvider } from '../../src/index.ts'
-import { acpEvent, acpResult } from '../helpers/acp-event-builders.ts'
-import { MockAcpRuntime } from '../helpers/mock-acp-runtime.ts'
 
 const userPrompt = [
   { role: 'user', content: [{ type: 'text', text: 'hi' }] },

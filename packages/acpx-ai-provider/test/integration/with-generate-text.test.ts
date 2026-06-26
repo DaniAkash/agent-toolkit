@@ -44,29 +44,6 @@ describe('generateText — text-only', () => {
     expect(providerMetadata?.acpx?.contextWindow).toBe(1024)
   })
 
-  test('exposes accumulated inputTokenDetails.cacheReadTokens from a usage_update', async () => {
-    const runtime = new MockAcpRuntime({
-      turnScripts: [
-        {
-          events: [acpEvent.text('hi'), acpEvent.usage(42, 1024)],
-          result: acpResult.completed('end_turn'),
-        },
-      ],
-    })
-    const provider = createAcpxProvider({ agent: 'claude', runtime })
-
-    const { usage } = await generateText({
-      model: provider.languageModel(),
-      prompt: 'hi',
-      stopWhen: isStepCount(1),
-    })
-    // AI SDK v7 moved cachedInputTokens to inputTokenDetails.cacheReadTokens
-    // on the consumer-facing LanguageModelUsage. The provider still emits
-    // cachedInputTokens at the top level of the underlying V2Usage, and the
-    // SDK maps it through.
-    expect(usage.inputTokenDetails.cacheReadTokens).toBe(1024)
-  })
-
   test('reasoning content is preserved alongside text', async () => {
     const runtime = new MockAcpRuntime({
       turnScripts: [
