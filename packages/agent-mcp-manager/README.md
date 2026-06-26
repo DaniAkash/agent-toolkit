@@ -88,13 +88,14 @@ await mgr.remove({ serverName: 'filesystem' })
 
 ### Wrapping a remote MCP for stdio-only agents
 
-Three of the supported agents only accept stdio entries on disk:
+Two of the supported agents only accept stdio entries on disk:
 
 - `claude-desktop` (the system `claude_desktop_config.json` parser rejects entries without a `command` field)
-- `codex` (no remote-URL schema upstream)
 - `claude-code` at project scope (`.mcp.json` requires the `type: "stdio"` tag)
 
-For these agents, wrap the URL with [`mcp-remote`](https://www.npmjs.com/package/mcp-remote) and register the wrapper as a stdio spec:
+(`codex` accepts both stdio and streamable HTTP per [the official Codex MCP docs](https://developers.openai.com/codex/mcp); pass an `http` spec directly. SSE is still rejected.)
+
+For the stdio-only agents above, wrap the URL with [`mcp-remote`](https://www.npmjs.com/package/mcp-remote) and register the wrapper as a stdio spec:
 
 ```ts
 await mgr.add({
@@ -117,7 +118,35 @@ for (const a of (await detectInstalledAgents()).filter((a) => a.installed)) {
 }
 ```
 
-`mcp-remote` translates the stdio protocol the agent speaks into the HTTP/SSE protocol the remote server speaks. The library does NOT do this translation automatically in v0.0.2; auto-shim is on the v0.2 roadmap so the manifest stays a faithful record of intent.
+`mcp-remote` translates the stdio protocol the agent speaks into the HTTP/SSE protocol the remote server speaks. The library does NOT do this translation automatically; auto-shim is on the v0.2 roadmap so the manifest stays a faithful record of intent.
+
+### Registering a remote MCP for Codex
+
+Codex parses streamable HTTP directly. Pass an `http` spec; the library writes `url` (and `http_headers` when `spec.headers` is set) into `~/.codex/config.toml`:
+
+```ts
+await mgr.add({
+  name: 'figma',
+  spec: {
+    transport: 'http',
+    url: 'https://mcp.figma.com/mcp',
+    headers: { 'X-Figma-Region': 'us-east-1' },
+  },
+})
+await mgr.link({ serverName: 'figma', agent: 'codex' })
+```
+
+On disk:
+
+```toml
+[mcp_servers.figma]
+url = "https://mcp.figma.com/mcp"
+
+[mcp_servers.figma.http_headers]
+"X-Figma-Region" = "us-east-1"
+```
+
+Note: `bearer_token_env_var` and `env_http_headers` (also accepted by codex) are not yet exposed via `McpHttpSpec`; hand-edit the TOML if you need env-sourced bearer tokens. SSE is rejected.
 
 ### Fanning out without wrapping
 
@@ -182,12 +211,11 @@ Kiro, Sema4) land in v0.2.
 
 ## Transport support
 
-`stdio` is supported by every agent in the catalog. `sse` and `http` are accepted by Claude Code (system scope only), Cursor, VS Code, Gemini, and Zed. Three agents are stdio-only because their config files only validate stdio-shaped entries:
+`stdio` is supported by every agent in the catalog. `sse` and `http` are accepted by Claude Code (system scope only), Cursor, VS Code, Gemini, and Zed. `codex` accepts `stdio` and `http` (sse is still rejected). Two agents (plus the Claude Code project scope) are stdio-only because their config files only validate stdio-shaped entries:
 
 | Agent | Why stdio-only |
 |---|---|
 | `claude-desktop` | `claude_desktop_config.json` is parsed strictly. Entries without a `command` field are reported as "not a valid MCP server configuration and were skipped" on app launch. |
-| `codex` | `~/.codex/config.toml` has no remote-URL schema upstream. Only the stdio shape (`command`, `args`, `env`) is accepted. |
 | `claude-code` project scope (`.mcp.json`) | Newer Claude Code requires `type: "stdio"` on project entries; project-scope writes inject the tag and reject non-stdio. System scope (`~/.claude.json`) still accepts all three. |
 
 Calling `link({ agent, ... })` with an `http` or `sse` spec on a stdio-only agent throws `UnsupportedTransportError` before any file write. The error message includes an `mcp-remote` shim recipe. See [Wrapping a remote MCP for stdio-only agents](#wrapping-a-remote-mcp-for-stdio-only-agents) above for the resolution.

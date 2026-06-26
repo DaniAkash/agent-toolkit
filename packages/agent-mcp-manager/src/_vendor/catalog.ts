@@ -68,9 +68,11 @@ export interface CatalogEntry {
   /**
    * Transports this agent's config file actually accepts at system
    * scope. Omitted means the full set ['stdio', 'sse', 'http']. Agents
-   * whose parser only validates stdio (claude-desktop, codex) declare
-   * ['stdio'] and link() throws UnsupportedTransportError for non-stdio
-   * specs before any file write.
+   * with narrower surfaces declare the subset they accept (e.g.
+   * claude-desktop declares ['stdio']; codex declares ['stdio', 'http']
+   * because its TOML schema accepts streamable HTTP but not SSE). link()
+   * throws UnsupportedTransportError for any transport not in the
+   * declared subset before any file write.
    */
   supportedTransports?: ReadonlyArray<McpTransport>
   /**
@@ -215,11 +217,12 @@ export const CATALOG: readonly CatalogEntry[] = [
     // Codex has no project-scope file in the upstream catalog.
     emitterId: 'toml-codex',
     emitterConfig: { tableKey: 'mcp_servers' },
-    // `~/.codex/config.toml` has no schema upstream that accepts a
-    // remote-url shape for an MCP entry. The TOML emitter only knows
-    // the stdio shape (command, args, env). Reject non-stdio at link
-    // time rather than letting the serializer surprise the caller.
-    supportedTransports: ['stdio'],
+    // `~/.codex/config.toml` accepts both stdio (`command` + `args`) and
+    // streamable-HTTP (`url`) entries per the official Codex MCP docs
+    // (https://developers.openai.com/codex/mcp). SSE is not parsed by
+    // codex, so we keep the throw for that transport. Was stdio-only in
+    // v0.0.2; flipped here for v0.0.3 to close issue #61.
+    supportedTransports: ['stdio', 'http'],
   },
   {
     id: 'zed',

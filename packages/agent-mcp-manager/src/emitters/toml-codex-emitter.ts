@@ -6,9 +6,23 @@ import type { McpServerSpec } from '../types.ts'
 
 /**
  * Codex stores MCP servers in `~/.codex/config.toml` under the
- * `mcp_servers.{NAME}` table. Per docker-mcp/pkg/client/codex_handler.go,
- * the only fields written are `command` and `args` — env is not
- * serialised. Codex's MCP support is stdio-only in upstream today.
+ * `mcp_servers.{NAME}` table. Per the official Codex MCP docs at
+ * https://developers.openai.com/codex/mcp, two transports are
+ * accepted:
+ *
+ *   - stdio: `command` (required) + `args` (optional). `env` is not
+ *     serialised here, matching docker-mcp's codex_handler.go.
+ *   - streamable-HTTP: `url` (required) + `http_headers` (optional
+ *     static header map). `bearer_token_env_var` and
+ *     `env_http_headers` are accepted by codex but not exposed
+ *     through `McpHttpSpec`; consumers that need env-sourced bearer
+ *     tokens hand-edit for now (see issue #61 follow-up notes).
+ *
+ * SSE is not part of codex's TOML schema. `link()` gates on the
+ * catalog's `supportedTransports` and rejects sse with
+ * `UnsupportedTransportError` before reaching this emitter; the
+ * emitter also throws `InvalidServerSpecError` to protect direct
+ * callers (unit tests, custom orchestrators) that bypass `link()`.
  */
 
 function parseDoc(raw: string): Record<string, unknown> {
@@ -44,16 +58,23 @@ export function tomlCodexAdd(
   spec: McpServerSpec,
   config: TomlCodexEmitterConfig,
 ): string {
-  if (spec.transport !== 'stdio') {
-    throw new InvalidServerSpecError(
-      `Codex only supports stdio MCP servers; received transport "${spec.transport}"`,
-    )
-  }
   const doc = parseDoc(raw)
   const table = ensureMap(doc, config.tableKey)
-  const value: Record<string, unknown> = { command: spec.command }
-  if (spec.args && spec.args.length > 0) value.args = spec.args
-  table[name] = value
+  if (spec.transport === 'stdio') {
+    const value: Record<string, unknown> = { command: spec.command }
+    if (spec.args && spec.args.length > 0) value.args = spec.args
+    table[name] = value
+  } else if (spec.transport === 'http') {
+    const value: Record<string, unknown> = { url: spec.url }
+    if (spec.headers && Object.keys(spec.headers).length > 0) {
+      value.http_headers = spec.headers
+    }
+    table[name] = value
+  } else {
+    throw new InvalidServerSpecError(
+      `Codex does not support the "${spec.transport}" transport (accepts stdio and http only)`,
+    )
+  }
   return TOML.stringify(doc as TOML.JsonMap)
 }
 

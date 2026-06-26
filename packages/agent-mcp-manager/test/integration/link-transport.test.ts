@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import TOML from '@iarna/toml'
 
 import { createMcpManager, UnsupportedTransportError } from '../../src/index.ts'
 import {
@@ -61,7 +62,56 @@ describe('link() transport-capability gate', () => {
     ).rejects.toBeInstanceOf(UnsupportedTransportError)
   })
 
-  test('http spec to codex throws UnsupportedTransportError', async () => {
+  test('http spec to codex succeeds and writes url-only TOML', async () => {
+    const codexPath = join(ws.configsDir, 'codex.toml')
+    const mgr = createMcpManager({
+      workspaceDir: ws.workspaceDir,
+      agentConfigPaths: { codex: codexPath },
+    })
+    await mgr.add({
+      name: 'figma',
+      spec: { transport: 'http', url: 'https://mcp.figma.com/mcp' },
+    })
+    const res = await mgr.link({ serverName: 'figma', agent: 'codex' })
+    expect(res.created).toBe(true)
+    const raw = await readFile(codexPath, 'utf8')
+    const doc = TOML.parse(raw) as {
+      mcp_servers: {
+        figma: { url: string; command?: string; args?: string[] }
+      }
+    }
+    expect(doc.mcp_servers.figma.url).toBe('https://mcp.figma.com/mcp')
+    expect(doc.mcp_servers.figma.command).toBeUndefined()
+    expect(doc.mcp_servers.figma.args).toBeUndefined()
+  })
+
+  test('http spec with headers to codex writes http_headers sub-table', async () => {
+    const codexPath = join(ws.configsDir, 'codex.toml')
+    const mgr = createMcpManager({
+      workspaceDir: ws.workspaceDir,
+      agentConfigPaths: { codex: codexPath },
+    })
+    await mgr.add({
+      name: 'figma',
+      spec: {
+        transport: 'http',
+        url: 'https://mcp.figma.com/mcp',
+        headers: { 'X-Figma-Region': 'us-east-1' },
+      },
+    })
+    await mgr.link({ serverName: 'figma', agent: 'codex' })
+    const raw = await readFile(codexPath, 'utf8')
+    const doc = TOML.parse(raw) as {
+      mcp_servers: {
+        figma: { url: string; http_headers: Record<string, string> }
+      }
+    }
+    expect(doc.mcp_servers.figma.http_headers['X-Figma-Region']).toBe(
+      'us-east-1',
+    )
+  })
+
+  test('sse spec to codex still throws UnsupportedTransportError', async () => {
     const mgr = createMcpManager({
       workspaceDir: ws.workspaceDir,
       agentConfigPaths: {
@@ -69,11 +119,11 @@ describe('link() transport-capability gate', () => {
       },
     })
     await mgr.add({
-      name: 'remote',
-      spec: { transport: 'http', url: 'https://example.com' },
+      name: 'sse-svc',
+      spec: { transport: 'sse', url: 'https://example.com/sse' },
     })
     await expect(
-      mgr.link({ serverName: 'remote', agent: 'codex' }),
+      mgr.link({ serverName: 'sse-svc', agent: 'codex' }),
     ).rejects.toBeInstanceOf(UnsupportedTransportError)
   })
 

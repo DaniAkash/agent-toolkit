@@ -58,9 +58,85 @@ describe('toml-codex emitter', () => {
     expect(after).not.toContain('mcp_servers')
   })
 
-  test('rejects non-stdio specs', () => {
+  test('http spec writes url and omits command/args', () => {
+    const out = tomlCodexAdd(
+      '',
+      'figma',
+      { transport: 'http', url: 'https://mcp.figma.com/mcp' },
+      CFG,
+    )
+    expect(out).toContain('[mcp_servers.figma]')
+    expect(out).toContain('url = "https://mcp.figma.com/mcp"')
+    expect(out).not.toContain('command =')
+    expect(out).not.toContain('args =')
+  })
+
+  test('http spec with headers serialises http_headers as a sub-table', () => {
+    const out = tomlCodexAdd(
+      '',
+      'figma',
+      {
+        transport: 'http',
+        url: 'https://mcp.figma.com/mcp',
+        headers: { 'X-Figma-Region': 'us-east-1' },
+      },
+      CFG,
+    )
+    expect(out).toContain('http_headers')
+    expect(out).toContain('X-Figma-Region')
+    expect(out).toContain('us-east-1')
+  })
+
+  test('http spec without headers omits the http_headers key entirely', () => {
+    const out = tomlCodexAdd(
+      '',
+      'remote',
+      { transport: 'http', url: 'https://example.com/mcp' },
+      CFG,
+    )
+    expect(out).not.toContain('http_headers')
+  })
+
+  test('http spec round-trips through tomlCodexRead', () => {
+    const out = tomlCodexAdd(
+      '',
+      'figma',
+      { transport: 'http', url: 'https://mcp.figma.com/mcp' },
+      CFG,
+    )
+    expect(tomlCodexRead(out, CFG)).toEqual(['figma'])
+  })
+
+  test('stdio and http entries coexist under the same mcp_servers table', () => {
+    let raw = tomlCodexAdd(
+      '',
+      'context7',
+      {
+        transport: 'stdio',
+        command: 'npx',
+        args: ['-y', '@upstash/context7-mcp'],
+      },
+      CFG,
+    )
+    raw = tomlCodexAdd(
+      raw,
+      'figma',
+      { transport: 'http', url: 'https://mcp.figma.com/mcp' },
+      CFG,
+    )
+    expect(tomlCodexRead(raw, CFG).sort()).toEqual(['context7', 'figma'])
+    expect(raw).toContain('command = "npx"')
+    expect(raw).toContain('url = "https://mcp.figma.com/mcp"')
+  })
+
+  test('sse spec still throws InvalidServerSpecError', () => {
     expect(() =>
-      tomlCodexAdd('', 'x', { transport: 'http', url: 'https://x' }, CFG),
+      tomlCodexAdd(
+        '',
+        'sse-svc',
+        { transport: 'sse', url: 'https://example.com/sse' },
+        CFG,
+      ),
     ).toThrow(InvalidServerSpecError)
   })
 })
