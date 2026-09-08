@@ -11,20 +11,37 @@
 #   3. git tag <pkg>-vX.Y.Z && git push origin main --tags
 #         e.g. acpx-ai-provider-v0.0.3
 #              agent-skills-manager-v0.1.0
-#   4. Wait for the workflow to finish, then publish the draft from the
-#      Releases page.
+#   4. Wait for the workflow to finish, then approve the staged version
+#      (`npm stage approve <stage-id>`) so it goes live on npm.
+#   5. Publish the draft from the Releases page.
 #
 # Historical tags `v0.0.1` and `v0.0.2` (acpx-ai-provider only) remain
 # as immutable history; they no longer trigger this workflow. The
 # tag-prefix scheme was adopted 2026-05-11 when agent-skills-manager landed.
 #
-# Required repo secrets (Settings → Secrets and variables → Actions):
-#   NPM_TOKEN — automation token for npmjs.com with publish access
+# Authentication: npm trusted publishing (OIDC). No npm token is
+# stored or needed. Each package on npmjs.com carries a trusted
+# publisher under Settings, pinned to:
 #
-# Required repo settings:
-#   Settings → Actions → General → Workflow permissions → Read and
-#   write permissions (so id-token: write below works for npm
-#   provenance).
+#   Organization or user   DaniAkash
+#   Repository             agent-toolkit
+#   Workflow filename      release.yml     (bare filename, not a path)
+#   Environment            (blank)         (this workflow declares none)
+#   Allowed actions        npm stage publish
+#
+# Renaming this file, or adding an `environment:` key below, breaks the
+# claim match and every publish fails. A trusted publisher cannot be
+# edited after creation; it has to be deleted and recreated.
+#
+# Because staging is the only permitted action, a release is not live
+# when this workflow finishes. Approve it with 2FA to publish:
+#
+#   npm stage list <package>
+#   npm stage approve <stage-id>
+#
+# Staged publishing requires the package to already exist on the
+# registry, so the very first release of a NEW package needs direct
+# publish access added to its trusted publisher first.
 
 name: Release (npm publish + draft GitHub release)
 
@@ -109,16 +126,33 @@ jobs:
         uses: oven-sh/setup-bun@v2
 
       - name: Install Node + npm (for the publish step)
-        # ubuntu-latest already ships npm, but `setup-node` pins the
-        # version explicitly and writes ~/.npmrc with the npmjs
-        # registry URL + `${NODE_AUTH_TOKEN}` placeholder, which is
-        # cleaner than echoing the token ourselves. All other steps
-        # use Bun — Node is here only because `bun publish`'s auth
-        # handling on Bun 1.3.x doesn't read NPM_TOKEN reliably.
-        uses: actions/setup-node@v4
+        # All other steps use Bun. Node is here only for `npm`, whose
+        # OIDC trusted-publishing support Bun does not implement.
+        # `node-version` reads from `.nvmrc` so local and CI agree.
+        uses: actions/setup-node@v6
         with:
-          node-version: '22'
+          node-version-file: '.nvmrc'
           registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
+
+      - name: Drop the _authToken line so OIDC is used
+        # `registry-url` above makes setup-node write
+        # `//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}` into the
+        # npmrc, and it does so even when no token is in the environment.
+        # npm treats the presence of that line as "credentials already
+        # configured" and never performs the OIDC exchange, then fails
+        # with ENEEDAUTH or E404. Removing the line is what lets trusted
+        # publishing engage. https://github.com/actions/setup-node/issues/1551
+        run: sed -i '/_authToken/d' "$(npm config get userconfig)"
+
+      - name: Upgrade npm
+        # Trusted publishing needs npm >= 11.5.1 and `npm stage publish`
+        # needs >= 11.15.0. No Node release line bundles a new enough npm
+        # dependably, so pin forward rather than inheriting whatever
+        # ships with Node.
+        run: |
+          npm install -g npm@latest
+          npm --version
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -189,20 +223,26 @@ jobs:
           echo "Version $VERSION -> dist-tag $TAG"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
-      - name: Publish to npm
-        env:
-          # `setup-node` writes a ~/.npmrc that interpolates
-          # `${NODE_AUTH_TOKEN}` (not NPM_TOKEN) at publish time, so
-          # this is the env-var name we have to use.
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        # `--access public` is required for unscoped or fresh-scoped
-        # packages on the free tier. `--provenance` attaches an
-        # OIDC-signed provenance attestation so npm shows the
-        # "built and signed on a cloud builder" badge. `--tag` routes
-        # pre-releases onto their own dist-tag (see previous step).
+      - name: Stage the package on npm
+        # No token. Authentication is npm trusted publishing: the
+        # `id-token: write` permission above lets the runner mint an OIDC
+        # token, which npm exchanges for a short-lived credential after
+        # matching org, repository and workflow filename against the
+        # trusted publisher configured on each package.
+        #
+        # `stage publish`, not `publish`: the trusted publisher for these
+        # packages permits staging only. A staged version is uploaded but
+        # not installable until a maintainer approves it with 2FA, via
+        # `npm stage approve <stage-id>` or the package's Versions tab.
+        # Run `npm stage list <pkg>` to find the id.
+        #
+        # `--access public` is required for unscoped packages. `--tag`
+        # routes pre-releases onto their own dist-tag (see previous step).
+        # No `--provenance`: it is automatic under trusted publishing for
+        # public packages from public repositories.
         run: |
           cd "${{ steps.pkg.outputs.dir }}"
-          npm publish --access public --provenance --tag ${{ steps.dist_tag.outputs.tag }}
+          npm stage publish --access public --tag ${{ steps.dist_tag.outputs.tag }}
 
       - name: Create draft GitHub Release
         uses: softprops/action-gh-release@v2
