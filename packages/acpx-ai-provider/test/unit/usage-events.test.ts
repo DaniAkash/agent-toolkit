@@ -395,6 +395,51 @@ describe('AcpxProvider — compact', () => {
       /does not advertise a compact command/,
     )
   })
+
+  // No `sessionKey` anywhere in this test, at settings or call level. That is
+  // what forces `resolveSessionKey` past its explicit-key short circuit and
+  // down to the agent-derived branch, where the lookup key is built.
+  test('looks the command list up under the alternate agent, not the default', async () => {
+    const runtime = new MockAcpRuntime({
+      turnScripts: [
+        {
+          events: [
+            acpEvent.availableCommands([
+              {
+                name: '/compact',
+                description: 'Compact context',
+                hasInput: false,
+              },
+            ]),
+          ],
+          result: acpResult.completed('end_turn'),
+        },
+        {
+          events: [],
+          result: acpResult.completed('end_turn'),
+        },
+      ],
+    })
+    const provider = createAcpxProvider({
+      agent: 'claude',
+      cwd: '/tmp/test',
+      runtime,
+    })
+
+    // Runs under codex, so the advertised commands are recorded against
+    // `codex::/tmp/test` rather than the default `claude::/tmp/test`.
+    const { stream } = await provider
+      .languageModel(undefined, { agent: 'codex' })
+      .doStream({ prompt: userPrompt as never })
+    const reader = stream.getReader()
+    while (true) {
+      const { done } = await reader.read()
+      if (done) break
+    }
+
+    await provider.compact({ agent: 'codex' })
+    expect(runtime.startTurnCalls.at(-1)?.text).toBe('/compact')
+  })
 })
 
 describe('AcpxProvider — multi-session isolation', () => {
