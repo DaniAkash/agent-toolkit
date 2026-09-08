@@ -39,10 +39,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      # v7 runs on the node24 Actions runtime. v4 is node20, which GitHub
+      # is retiring. Dependabot will not offer this bump: major updates
+      # are ignored for the github-actions ecosystem.
+      - uses: actions/checkout@v7
 
       - uses: oven-sh/setup-bun@v2
         # No version specified — reads `.bun-version` from the repo root.
+        # Already on the node24 runtime, so no bump needed here.
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
