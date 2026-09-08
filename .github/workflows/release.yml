@@ -67,7 +67,9 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        # v7 runs on the node24 Actions runtime; v4 is node20, which
+        # GitHub is retiring.
+        uses: actions/checkout@v7
         with:
           # Full history is required so git-cliff (and `git describe`)
           # can walk back to the previous tag and compute the changelog
@@ -129,7 +131,7 @@ jobs:
         # All other steps use Bun. Node is here only for `npm`, whose
         # OIDC trusted-publishing support Bun does not implement.
         # `node-version` reads from `.nvmrc` so local and CI agree.
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version-file: '.nvmrc'
           registry-url: 'https://registry.npmjs.org'
@@ -143,6 +145,9 @@ jobs:
         # configured" and never performs the OIDC exchange, then fails
         # with ENEEDAUTH or E404. Removing the line is what lets trusted
         # publishing engage. https://github.com/actions/setup-node/issues/1551
+        #
+        # setup-node v7 only stopped exporting a dummy NODE_AUTH_TOKEN
+        # value; it still writes the line itself, so this stays needed.
         run: sed -i '/_authToken/d' "$(npm config get userconfig)"
 
       - name: Upgrade npm
@@ -245,7 +250,8 @@ jobs:
           npm stage publish --access public --tag ${{ steps.dist_tag.outputs.tag }}
 
       - name: Create draft GitHub Release
-        uses: softprops/action-gh-release@v2
+        # v3 runs on the node24 Actions runtime; v2 is node20.
+        uses: softprops/action-gh-release@v3
         with:
           # DRAFT — never auto-publish. Review the body in the GitHub
           # UI and click Publish when ready.
