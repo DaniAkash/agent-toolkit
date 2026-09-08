@@ -100,6 +100,30 @@ describe('startTurn', () => {
     ])
   })
 
+  // Types cannot express that this promise is ALREADY settled, only that it is
+  // a promise, so the resolved-ness is asserted here. Removing the field
+  // entirely is caught by tsc, not by this test.
+  test('promptStarted is exposed and already resolved', async () => {
+    const rt = new MockAcpRuntime({ turnScripts: [{ events: [] }] })
+    const turn = rt.startTurn({
+      handle: handle(),
+      text: 'hello',
+      mode: 'prompt',
+      requestId: 'r',
+    })
+
+    // A microtask always wins against a macrotask, so an already-resolved
+    // promise settles first and a pending one loses deterministically.
+    const winner = await Promise.race([
+      turn.promptStarted.then(() => 'resolved' as const),
+      new Promise<'pending'>((resolve) => {
+        setTimeout(() => resolve('pending'), 0)
+      }),
+    ])
+    expect(winner).toBe('resolved')
+    expect(await turn.promptStarted).toBeUndefined()
+  })
+
   test('records the input on every call and increments requestId', () => {
     const rt = new MockAcpRuntime({
       turnScripts: [{ events: [] }, { events: [] }],
