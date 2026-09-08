@@ -1,11 +1,27 @@
 # git-cliff configuration — used by the release workflow to turn the
 # conventional-commit history between two tags into grouped release notes.
 #
-# Local use:
-#   git-cliff --config cliff.toml v0.1.0..v0.2.0
+# This monorepo publishes several packages from one history, so a range
+# between two of a package's tags still contains every other package's
+# commits. Two scoping flags fix that, and both live in the workflow
+# rather than here, because one config file serves every package while
+# these values differ per release:
 #
-# CI use: see .github/workflows/release.yml — the workflow runs git-cliff
-# automatically for every tag after the first one.
+#   --include-path 'packages/<pkg>/**'    only this package's commits
+#   --tag-pattern  '^<pkg>-v[0-9].*'      only this package's tags
+#
+# Without the first, notes list unrelated packages' work. Without the
+# second, other packages' tags act as release boundaries and one release
+# renders as several blocks with repeated headings.
+#
+# Local use, scoped the same way the workflow does it:
+#   git-cliff --config cliff.toml \
+#     --include-path 'packages/acp-probe/**' \
+#     --tag-pattern '^acp-probe-v[0-9].*' \
+#     acp-probe-v0.0.2..acp-probe-v1.0.0
+#
+# CI use: see .github/workflows/release.yml, which runs git-cliff for
+# every tag after a package's first.
 
 [changelog]
 header = ""
@@ -30,10 +46,24 @@ filter_commits = true
 
 # Tag pattern for git-cliff to recognize releases. This is a monorepo,
 # so each package tags under its own prefix
-# (`acpx-ai-provider-v…`, `agent-skills-manager-v…`). Old single-package
-# `v0.0.1` / `v0.0.2` tags also still match — they remain historically
-# valid even though new releases no longer use that scheme.
-tag_pattern = "^(acpx-ai-provider-|acpx-ai-harness-|agent-mcp-manager-|agent-skills-manager-|acp-probe-|)v[0-9].*"
+# (`acpx-ai-provider-v…`, `agent-skills-manager-v…`). The optional prefix
+# group also lets old single-package `v0.0.1` / `v0.0.2` tags match; they
+# remain historically valid even though new releases no longer use that
+# scheme.
+#
+# Deliberately generic rather than an explicit list of package prefixes.
+# The previous hand-maintained union had silently gone stale: it never
+# gained `ai-sdk-microsandbox-`, so that package's tags were invisible as
+# release boundaries in local runs. Matching any `<name>-v<digit>` tag
+# cannot drift when a package is added. Nothing is lost by being broad
+# here, since every tag in this repo is a release tag, and the release
+# workflow's own tag-prefix allowlist is what fails loudly on a typo.
+#
+# This union is the fallback for ad-hoc local runs. The release workflow
+# overrides it with `--tag-pattern` for the single package being released;
+# leaving the union in effect there would let a sibling package's tag
+# split one release into several sections.
+tag_pattern = "^([a-z0-9-]+-)?v[0-9].*"
 
 # How each conventional-commit prefix maps to a section in the changelog.
 # Order matters — first match wins.
