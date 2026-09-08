@@ -43,7 +43,7 @@
 # registry, so the very first release of a NEW package needs direct
 # publish access added to its trusted publisher first.
 
-name: Release (npm publish + draft GitHub release)
+name: Release (npm stage publish + draft GitHub release)
 
 on:
   push:
@@ -127,10 +127,10 @@ jobs:
         # change.
         uses: oven-sh/setup-bun@v2
 
-      - name: Install Node + npm (for the publish step)
+      - name: Install Node + npm (for the staged publish)
         # All other steps use Bun. Node is here only for `npm`, whose
         # OIDC trusted-publishing support Bun does not implement.
-        # `node-version` reads from `.nvmrc` so local and CI agree.
+        # `node-version-file` reads `.nvmrc` so local and CI agree.
         uses: actions/setup-node@v7
         with:
           node-version-file: '.nvmrc'
@@ -148,15 +148,24 @@ jobs:
         #
         # setup-node v7 only stopped exporting a dummy NODE_AUTH_TOKEN
         # value; it still writes the line itself, so this stays needed.
-        run: sed -i '/_authToken/d' "$(npm config get userconfig)"
+        run: |
+          NPMRC="$(npm config get userconfig)"
+          if [ -f "$NPMRC" ]; then
+            sed -i '/^\/\/registry\.npmjs\.org\/:_authToken=/d' "$NPMRC"
+          fi
 
       - name: Upgrade npm
         # Trusted publishing needs npm >= 11.5.1 and `npm stage publish`
         # needs >= 11.15.0. No Node release line bundles a new enough npm
-        # dependably, so pin forward rather than inheriting whatever
+        # dependably, so install one rather than inheriting whatever
         # ships with Node.
+        #
+        # Range, not `@latest`: a release must not silently adopt an npm
+        # major that changes publish behaviour or raises its Node floor.
+        # npm 12 already requires node ^22.22.2 || ^24.15.0 || >=26, which
+        # couples this pin to `.nvmrc`; bump the two together.
         run: |
-          npm install -g npm@latest
+          npm install -g npm@^12.0.2
           npm --version
 
       - name: Install dependencies
