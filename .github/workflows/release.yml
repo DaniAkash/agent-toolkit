@@ -212,10 +212,27 @@ jobs:
         # previous tag and the new tag, groups them by type per
         # cliff.toml, and exposes the rendered markdown as
         # `steps.changelog.outputs.content`.
+        #
+        # Both scoping flags are load-bearing in a monorepo, and cliff.toml
+        # cannot supply either: one config serves every package, while these
+        # values differ per release.
+        #
+        # --include-path restricts commits to the package being released.
+        # Without it the range is filtered only by DATE, so each package's
+        # notes replay every other package's commits from the same period.
+        #
+        # --tag-pattern narrows tag recognition to this package's own tags.
+        # cliff.toml's pattern matches all package prefixes, so without this
+        # git-cliff treats other packages' tags as release boundaries and
+        # splits one release into several blocks with repeated headings.
         uses: orhun/git-cliff-action@v4
         with:
           config: cliff.toml
-          args: --strip header ${{ steps.previous_tag.outputs.previous_tag }}..${{ github.ref_name }}
+          args: >-
+            --strip header
+            --include-path '${{ steps.pkg.outputs.dir }}/**'
+            --tag-pattern '^${{ steps.pkg.outputs.name }}-v[0-9].*'
+            ${{ steps.previous_tag.outputs.previous_tag }}..${{ github.ref_name }}
 
       - name: Pick npm dist-tag from version
         id: dist_tag
@@ -272,7 +289,14 @@ jobs:
           prerelease: ${{ steps.dist_tag.outputs.tag != 'latest' }}
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
-          # First release → literal "first release" body. Otherwise →
-          # the git-cliff-rendered changelog. The `||` fallback fires
-          # when the changelog step was skipped (its output is empty).
-          body: ${{ steps.changelog.outputs.content || 'first release' }}
+          # Normally the git-cliff-rendered changelog. The fallback fires
+          # in two cases the `||` alone cannot tell apart, so they are
+          # distinguished explicitly: a genuine first release (the step was
+          # skipped), and a release whose commits touched no files under
+          # this package (path filtering left nothing to report, which
+          # git-cliff reports as empty output and exit 0, not an error).
+          body: >-
+            ${{ steps.changelog.outputs.content
+                || (steps.previous_tag.outputs.first_release == 'true'
+                    && 'First release.'
+                    || 'No changes under this package since the previous release.') }}
