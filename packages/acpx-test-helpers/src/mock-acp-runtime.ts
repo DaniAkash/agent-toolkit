@@ -126,6 +126,8 @@ export class MockAcpRuntime implements AcpRuntime {
 
     return {
       requestId,
+      // No real transport, so the prompt is accepted the moment the turn exists.
+      promptStarted: Promise.resolve(),
       events: eventIterable,
       result: script?.resultError
         ? Promise.reject(script.resultError)

@@ -66,7 +66,7 @@
     "@ai-sdk/provider-utils": "5.0.27",
     "@ai-sdk/sandbox-vercel": "1.0.68",
     "@types/ws": "^8",
-    "acpx": "^0.13.0",
+    "acpx": "^0.13.2",
     "acpx-test-helpers": "workspace:*",
     "bunup": "^0.16.32",
     "typescript": "^6.0.3"
