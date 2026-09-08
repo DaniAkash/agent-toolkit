@@ -56,7 +56,7 @@
     }
   },
   "devDependencies": {
-    "acpx": "^0.13.0",
+    "acpx": "^0.13.2",
     "bunup": "^0.16.32",
     "typescript": "^6.0.3"
   },
