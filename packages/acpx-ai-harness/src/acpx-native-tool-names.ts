@@ -18,6 +18,7 @@ export const NATIVE_TO_COMMON_BY_AGENT: Readonly<
     Grep: 'grep',
     Glob: 'glob',
     WebSearch: 'webSearch',
+    AskUserQuestion: 'askUserQuestions',
   },
   codex: {
     read: 'read',

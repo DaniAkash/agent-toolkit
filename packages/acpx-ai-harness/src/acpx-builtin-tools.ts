@@ -1,4 +1,4 @@
-import { commonTool } from '@ai-sdk/harness'
+import { commonTool, harnessV1QuestionsToolInputSchema } from '@ai-sdk/harness'
 import { z } from 'zod/v4'
 
 /**
@@ -60,5 +60,16 @@ export const ACPX_BUILTIN_TOOLS = {
     toolUseKind: 'readonly',
     description: 'Search the web.',
     inputSchema: z.object({ query: z.string() }),
+  }),
+  askUserQuestions: commonTool('askUserQuestions', {
+    nativeName: 'askUserQuestions',
+    // Asking the user touches nothing in the workspace, so it carries the
+    // same permission weight as a read.
+    toolUseKind: 'readonly',
+    description: 'Ask the user one or more questions and collect the answers.',
+    // The standard schema rather than a local restatement: `commonTool`
+    // requires the adapter input to be a superset of it, and this shape is
+    // large enough that a hand-written copy would drift.
+    inputSchema: harnessV1QuestionsToolInputSchema,
   }),
 } as const

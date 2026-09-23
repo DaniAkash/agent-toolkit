@@ -1,4 +1,7 @@
-import type { HarnessV1NetworkSandboxSession } from '@ai-sdk/harness'
+import type {
+  HarnessV1NetworkSandboxSession,
+  HarnessV1PortEndpoint,
+} from '@ai-sdk/harness'
 import type { Experimental_SandboxSession } from '@ai-sdk/provider-utils'
 import type { Sandbox } from 'microsandbox'
 import { Sandbox as SandboxClass } from 'microsandbox'
@@ -64,6 +67,7 @@ export class MicrosandboxNetworkSandboxSession
       | 'id'
       | 'defaultWorkingDirectory'
       | 'ports'
+      | 'getPortEndpoint'
       | 'getPortUrl'
       | 'stop'
       | 'destroy'
@@ -124,11 +128,21 @@ export class MicrosandboxNetworkSandboxSession
     })
   }
 
+  async getPortEndpoint(options: {
+    port: number
+    protocol?: 'http' | 'https' | 'ws'
+  }): Promise<HarnessV1PortEndpoint> {
+    // No headers: a microVM port is reached directly, with no proxy
+    // credential to attach, unlike hosted providers.
+    return { url: await this.resolver.resolve(options) }
+  }
+
+  /** @deprecated Use {@link getPortEndpoint}. */
   async getPortUrl(options: {
     port: number
     protocol?: 'http' | 'https' | 'ws'
   }): Promise<string> {
-    return this.resolver.resolve(options)
+    return (await this.getPortEndpoint(options)).url
   }
 
   async stop(): Promise<void> {

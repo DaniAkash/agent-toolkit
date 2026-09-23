@@ -42,12 +42,31 @@ describe('toCommonToolName', () => {
 describe('NATIVE_TO_COMMON_BY_AGENT', () => {
   const supportedAgents = ['claude', 'codex', 'gemini'] as const
 
-  test('every supported agent covers every standard common-tool name', () => {
+  // Standard names an agent has no mapping for. Blanket coverage stopped
+  // being true once the standard grew a capability that not every agent
+  // exposes: upstream's own codex adapter declares only `bash` and
+  // `webSearch`. Listing the gaps per agent keeps the assertion sharp, since
+  // a newly standardised tool still fails this test until someone decides,
+  // agent by agent, whether it maps.
+  const UNMAPPED_BY_AGENT: Readonly<Record<string, ReadonlySet<string>>> = {
+    claude: new Set(),
+    // Codex exposes no ask-the-user tool; upstream's codex adapter does not
+    // declare one either.
+    codex: new Set(['askUserQuestions']),
+    // Gemini's equivalent, if it has one, is unconfirmed. Left unmapped
+    // rather than guessed at.
+    gemini: new Set(['askUserQuestions']),
+  }
+
+  test('every supported agent covers every standard name it maps', () => {
     for (const agent of supportedAgents) {
       const table = NATIVE_TO_COMMON_BY_AGENT[agent]
       const covered = new Set(Object.values(table ?? {}))
+      const unmapped = UNMAPPED_BY_AGENT[agent] ?? new Set<string>()
       for (const name of HARNESS_V1_BUILTIN_TOOL_NAMES) {
-        expect(covered.has(name)).toBe(true)
+        // Asserting the negative too, so the exclusion list cannot go stale:
+        // adding a mapping without removing its entry here fails loudly.
+        expect(covered.has(name)).toBe(!unmapped.has(name))
       }
     }
   })

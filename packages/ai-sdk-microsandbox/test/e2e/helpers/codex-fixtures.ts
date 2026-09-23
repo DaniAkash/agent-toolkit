@@ -64,13 +64,16 @@ export function buildSharedCodexHarness(input?: {
     { templateCacheOptions: { cacheRoot: SHARED_CACHE_ROOT } },
   )
   const harness = createCodex({
-    model: process.env.CODEX_E2E_MODEL,
+    // `model` left the harness settings and is now a per-turn setting.
+    // Routed through the codex config passthrough so the env override keeps
+    // working without threading a model through every e2e call site.
+    ...(process.env.CODEX_E2E_MODEL
+      ? { codexConfig: { model: process.env.CODEX_E2E_MODEL } }
+      : {}),
     reasoningEffort: 'low',
     auth: {
-      openai: {
-        // biome-ignore lint/style/noNonNullAssertion: the e2e gate guarantees this is set
-        apiKey: process.env.OPENAI_API_KEY!,
-      },
+      // biome-ignore lint/style/noNonNullAssertion: the e2e gate guarantees this is set
+      OPENAI_API_KEY: process.env.OPENAI_API_KEY!,
     },
     port: CODEX_BRIDGE_PORT,
   })

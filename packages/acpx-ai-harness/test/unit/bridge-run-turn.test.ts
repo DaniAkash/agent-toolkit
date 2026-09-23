@@ -18,7 +18,11 @@ function makeFakeBridgeTurn(): {
     },
     requestToolResult: async () => ({ output: null }),
     requestToolApproval: async () => ({ approved: true }),
-    pendingUserMessages: [],
+    experimental_userMessages: {
+      pendingCount: 0,
+      close: () => {},
+      [Symbol.asyncIterator]: async function* () {},
+    },
     abortSignal: controller.signal,
     firstTurn: true,
     bridgeLog: () => {},
