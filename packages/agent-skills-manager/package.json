@@ -51,7 +51,7 @@
   },
   "dependencies": {
     "xdg-basedir": "^5.1.0",
-    "yaml": "^2.8.3"
+    "yaml": "^2.9.1"
   },
   "devDependencies": {
     "bunup": "^0.16.32",

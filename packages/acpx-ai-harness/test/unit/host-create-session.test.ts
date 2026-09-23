@@ -113,9 +113,14 @@ describe('createSession.doSuspendTurn', () => {
   test('the session refuses subsequent methods after suspend', async () => {
     const session = createSession(makeInput())
     await session.doSuspendTurn()
-    expect(() => session.doPromptTurn({ prompt: 'x', emit: () => {} })).toThrow(
-      /already stopped/,
-    )
+    expect(() =>
+      session.doPromptTurn({
+        prompt: 'x',
+        emit: () => {},
+        skills: [],
+        tools: [],
+      }),
+    ).toThrow(/already stopped/)
   })
 
   test('closes the channel even when channel.suspend() throws', async () => {
@@ -189,7 +194,7 @@ describe('createSession.doContinueTurn', () => {
     const session = createSession(
       makeInput({ respawnStrategy: 'attach', isResume: true }, fake),
     )
-    await session.doContinueTurn({ emit: () => {} })
+    await session.doContinueTurn({ emit: () => {}, skills: [], tools: [] })
     expect(fake.sent).toEqual([])
   })
 
@@ -198,7 +203,7 @@ describe('createSession.doContinueTurn', () => {
     const session = createSession(
       makeInput({ respawnStrategy: 'rerun', isResume: true }, fake),
     )
-    await session.doContinueTurn({ emit: () => {} })
+    await session.doContinueTurn({ emit: () => {}, skills: [], tools: [] })
     const frame = fake.sent.find((m) => m.type === 'start')
     expect(frame).toMatchObject({
       type: 'start',
@@ -214,9 +219,9 @@ describe('createSession.doContinueTurn', () => {
     const session = createSession(
       makeInput({ respawnStrategy: 'fresh', isResume: false }),
     )
-    await expect(session.doContinueTurn({ emit: () => {} })).rejects.toThrow(
-      /requires a session created with `continueFrom`/i,
-    )
+    await expect(
+      session.doContinueTurn({ emit: () => {}, skills: [], tools: [] }),
+    ).rejects.toThrow(/requires a session created with `continueFrom`/i)
   })
 })
 

@@ -8,7 +8,12 @@ import {
 } from './host-acpx-config.ts'
 import { pickResumeCoords, tryAttachToExistingBridge } from './host-attach.ts'
 import { createSession } from './host-create-session.ts'
-import { pickPort, shellQuote, tailStderr } from './host-session-utils.ts'
+import {
+  pickPort,
+  requireNetworkSandboxSession,
+  shellQuote,
+  tailStderr,
+} from './host-session-utils.ts'
 import {
   type AcpxChannel,
   createAcpxChannel,
@@ -22,7 +27,7 @@ export async function doStartImpl(
   settings: AcpxHarnessSettings,
   start: HarnessV1StartOptions,
 ): Promise<HarnessV1Session> {
-  const sandboxSession = start.sandboxSession
+  const sandboxSession = requireNetworkSandboxSession(start.sandboxSession)
   const agent = settings.agent ?? 'codex'
   const isResumeRequest = Boolean(start.resumeFrom || start.continueFrom)
 

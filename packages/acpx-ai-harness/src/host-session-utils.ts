@@ -1,6 +1,7 @@
 import type {
   HarnessV1NetworkSandboxSession,
   HarnessV1Prompt,
+  HarnessV1StartOptions,
 } from '@ai-sdk/harness'
 import type { Experimental_SandboxProcess } from '@ai-sdk/provider-utils'
 
@@ -89,6 +90,32 @@ export async function awaitProcExit(
       /* idempotent */
     }
   }
+}
+
+/**
+ * Narrow the start option's sandbox session to the network variant.
+ *
+ * The framework may hand over a basic session that exposes only filesystem
+ * and process APIs. The acpx bridge cannot run on one: it needs a mapped
+ * port to reach the agent over a WebSocket, plus `restricted()` to write
+ * credentials inside the security boundary. Failing here names the cause,
+ * rather than letting an undefined member surface deep in bridge startup.
+ */
+export function requireNetworkSandboxSession(
+  sandboxSession: HarnessV1StartOptions['sandboxSession'],
+): HarnessV1NetworkSandboxSession {
+  if (
+    'restricted' in sandboxSession &&
+    typeof sandboxSession.restricted === 'function'
+  ) {
+    return sandboxSession
+  }
+  throw new Error(
+    'acpx-ai-harness: this harness requires a network sandbox session, but the ' +
+      'configured provider supplied a basic one (filesystem and process APIs only). ' +
+      'Use a provider that exposes port mapping, such as createVercelSandbox or ' +
+      'the microsandbox provider.',
+  )
 }
 
 export function pickPort(
