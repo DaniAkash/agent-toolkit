@@ -207,7 +207,7 @@ for (const agent of AGENTS) {
  * agent-returned JSON-RPC error arrives as a structured `acpError` with
  * its numeric code preserved rather than flattened into a message.
  */
-describe('e2e probe — gemini agent-error contract', () => {
+describe('e2e probe: gemini agent-error contract', () => {
   test.skipIf(!shouldRun('gemini'))(
     'an agent-level failure is reported, not thrown',
     async () => {
