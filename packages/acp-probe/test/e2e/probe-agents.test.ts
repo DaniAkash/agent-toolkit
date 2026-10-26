@@ -52,11 +52,14 @@ const AGENTS = ['claude', 'codex', 'gemini'] as const
 type ProbeAgent = (typeof AGENTS)[number]
 
 // Hardcoded spawn commands for the no-acpx path. These mirror acpx's
-// AGENT_REGISTRY at the time of capture (2026-05-14). Drift between
-// these and the registry is what the side-by-side assertion catches.
+// AGENT_REGISTRY at the time of capture (2026-10-26, acpx 0.21.0). Drift
+// between these and the registry is what the side-by-side assertion
+// catches, and it did: the previous capture still named
+// `@zed-industries/codex-acp`, which codex has since left for
+// `@agentclientprotocol/codex-acp`.
 const SPAWN_COMMAND: Record<ProbeAgent, string> = {
-  claude: 'npx -y @agentclientprotocol/claude-agent-acp@^0.31.0',
-  codex: 'npx @zed-industries/codex-acp@^0.12.0',
+  claude: 'npx -y @agentclientprotocol/claude-agent-acp@^0.81.2',
+  codex: 'npx -y @agentclientprotocol/codex-acp@^1.1.5',
   gemini: 'gemini --acp',
 }
 
