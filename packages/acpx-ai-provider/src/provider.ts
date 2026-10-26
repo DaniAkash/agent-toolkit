@@ -389,6 +389,28 @@ export class AcpxProvider {
       timeoutMs: this.settings.turnTimeoutMs,
       mcpServers: toRuntimeMcpServers(this.settings.mcpServers),
       onPermissionRequest: this.settings.onPermissionRequest,
+      // Pass-through embedding controls. Each is omitted rather than set to
+      // undefined when unset, because acpx treats an omitted option as
+      // "inherit the default" and the defaults differ per option.
+      ...(this.settings.agentProcessEnv
+        ? { agentProcessEnv: this.settings.agentProcessEnv }
+        : {}),
+      ...(this.settings.agentProcessEnvAllow
+        ? { agentProcessEnvAllow: this.settings.agentProcessEnvAllow }
+        : {}),
+      ...(this.settings.agentProcessEnvBlock
+        ? { agentProcessEnvBlock: this.settings.agentProcessEnvBlock }
+        : {}),
+      ...(this.settings.fs !== undefined ? { fs: this.settings.fs } : {}),
+      ...(this.settings.terminal !== undefined
+        ? { terminal: this.settings.terminal }
+        : {}),
+      ...(this.settings.processLifecycle
+        ? { processLifecycle: this.settings.processLifecycle }
+        : {}),
+      ...(this.settings.sessionPermissions
+        ? { sessionPermissions: this.settings.sessionPermissions }
+        : {}),
     }
   }
 }

@@ -1,6 +1,7 @@
 import type {
   AcpPermissionDecision,
   AcpPermissionRequest,
+  AcpProcessLifecycle,
   AcpRuntime,
   AcpRuntimeAvailableCommand,
   AcpRuntimeCapabilities,
@@ -8,7 +9,9 @@ import type {
   AcpRuntimeEvent,
   AcpRuntimeHandle,
   AcpRuntimePlanEntry,
+  AcpRuntimeSessionContext,
   AcpRuntimeSessionModels,
+  AcpRuntimeSessionPermissions,
   AcpRuntimeSessionUsage,
   AcpRuntimeStatus,
   AcpRuntimeTurnResult,
@@ -82,6 +85,33 @@ export interface AcpxProviderSettings {
    * it and re-applies the original options.
    */
   sessionOptions?: SessionAgentOptions
+  /**
+   * Environment variables handed to the agent process on top of the host's,
+   * without being persisted to the session or overriding protected auth.
+   */
+  agentProcessEnv?: Record<string, string>
+  /**
+   * Allowlist for the environment the agent, command probes and ACP terminals
+   * inherit. Off by default, so the agent otherwise inherits the host's whole
+   * environment. Set this to keep the embedder's own credentials out of it.
+   */
+  agentProcessEnvAllow?: readonly string[]
+  /** Blocklist counterpart to {@link agentProcessEnvAllow}. Also off by default. */
+  agentProcessEnvBlock?: readonly string[]
+  /**
+   * Whether the agent may call the ACP filesystem methods. Enabled when
+   * omitted. This is a protocol policy, not an OS sandbox: it decides which
+   * callbacks are registered, and does not confine the agent process itself.
+   */
+  fs?: boolean
+  /** Terminal counterpart to {@link fs}, with the same policy-not-sandbox caveat. */
+  terminal?: boolean
+  /** Correlated process launch, failure and exit observers for the agent process. */
+  processLifecycle?: AcpProcessLifecycle
+  /** Resolves per-session client permissions from the session context. */
+  sessionPermissions?: (
+    session: AcpRuntimeSessionContext,
+  ) => AcpRuntimeSessionPermissions | undefined
   _internal?: {
     generateId?: () => string
     now?: () => Date

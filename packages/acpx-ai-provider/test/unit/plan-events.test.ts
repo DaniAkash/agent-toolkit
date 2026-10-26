@@ -129,7 +129,9 @@ describe('structured plan events', () => {
     await drain(stream)
 
     const snapshot = provider.getPlan()
-    snapshot[0]!.content = 'Mutated'
+    const first = snapshot[0]
+    expect(first).toBeDefined()
+    if (first) first.content = 'Mutated'
     expect(provider.getPlan()[0]?.content).toBe('Original')
   })
 
