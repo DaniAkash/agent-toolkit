@@ -139,7 +139,11 @@ export class AcpxProvider {
     try {
       const status = await getStatusImpl.call(this.runtime, { handle })
       const commands = status.availableCommands
-      if (commands && commands.length > 0) {
+      // Record an empty list too, rather than only a populated one. The seed
+      // is guarded on the key being absent from the cache, so skipping []
+      // would leave it absent and re-run getStatus on every ensureHandle for
+      // any agent that advertises nothing. A later event still overwrites it.
+      if (commands !== undefined) {
         this.recordAvailableCommands(sessionKey, commands)
       }
     } catch {
@@ -195,7 +199,14 @@ export class AcpxProvider {
    * before acpx exposed a first-class setter. Falls back to that workaround
    * when the runtime has no `setModel`, so older acpx keeps working.
    */
-  async setModel(model: string): Promise<void> {
+  async setModel(
+    model: string,
+    opts: AcpxLanguageModelOptions = {},
+  ): Promise<void> {
+    // Establish the session first. Without this a call on a fresh provider
+    // iterates an empty handle map and silently discards the request, which
+    // is what the README's one-line example would have done.
+    await this.ensureHandle(opts)
     const setModelImpl = this.runtime.setModel
     if (!setModelImpl) {
       await this.setConfigOption('model', model)
@@ -210,11 +221,17 @@ export class AcpxProvider {
    * The session's advertised capabilities. Reads from the runtime rather than
    * spawning the CLI, so it costs nothing beyond the already-open session.
    */
-  async getCapabilities(): Promise<AcpRuntimeCapabilities | undefined> {
+  async getCapabilities(
+    opts: AcpxLanguageModelOptions = {},
+  ): Promise<AcpRuntimeCapabilities | undefined> {
     const getCapsImpl = this.runtime.getCapabilities
     if (!getCapsImpl) return undefined
-    const [first] = this.handles.values()
-    return await getCapsImpl.call(this.runtime, { handle: first?.handle })
+    // Resolve the requested session, as getModels does. Picking the first
+    // cached handle reported an arbitrary session once more than one existed,
+    // and passing no handle asks the runtime for global capabilities rather
+    // than the session's.
+    const { handle } = await this.ensureHandle(opts)
+    return await getCapsImpl.call(this.runtime, { handle })
   }
 
   async setConfigOption(key: string, value: string): Promise<void> {

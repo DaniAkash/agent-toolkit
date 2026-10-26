@@ -50,6 +50,17 @@ describe('embedding options pass-through', () => {
     expect(opts.terminal).toBe(false)
   })
 
+  // Both of these are callbacks, so assert identity: a regression that
+  // forwarded a wrapper, or dropped the branch entirely, would otherwise
+  // still satisfy a truthiness check.
+  test('forwards processLifecycle and sessionPermissions by identity', () => {
+    const processLifecycle = { onLaunch: () => {} }
+    const sessionPermissions = () => undefined
+    const opts = capture({ processLifecycle, sessionPermissions })
+    expect(opts.processLifecycle).toBe(processLifecycle)
+    expect(opts.sessionPermissions).toBe(sessionPermissions)
+  })
+
   test('forwards fs and terminal when explicitly true', () => {
     const opts = capture({ fs: true, terminal: true })
     expect(opts.fs).toBe(true)
