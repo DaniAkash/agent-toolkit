@@ -7,6 +7,7 @@ import type {
 import type {
   AcpRuntimeAvailableCommand,
   AcpRuntimeEvent,
+  AcpRuntimePlanEntry,
   AcpRuntimeTurnResult,
 } from 'acpx/runtime'
 import { fromRuntimeError } from './errors.ts'
@@ -39,6 +40,32 @@ export interface EventTranslatorOptions {
    * throw or block.
    */
   onAvailableCommands?: (commands: AcpRuntimeAvailableCommand[]) => void
+  /**
+   * Invoked with the agent's normalized plan on every `plan` event. An empty
+   * array is a real value, not an absence: acpx uses it to clear the plan.
+   * Synchronous, must not throw or block.
+   */
+  onPlan?: (entries: AcpRuntimePlanEntry[]) => void
+}
+
+const PLAN_STATUS_MARK: Record<AcpRuntimePlanEntry['status'], string> = {
+  completed: '[x]',
+  in_progress: '[~]',
+  pending: '[ ]',
+}
+
+/** Render a plan snapshot, carrying status as a mark so it survives a text stream. */
+function renderPlanEntries(entries: AcpRuntimePlanEntry[]): string {
+  const lines = entries
+    .map((entry) => {
+      const content = entry.content.trim()
+      if (content.length === 0) return ''
+      const priority = entry.priority ? ` (${entry.priority})` : ''
+      return `${PLAN_STATUS_MARK[entry.status] ?? '[ ]'} ${content}${priority}`
+    })
+    .filter((line) => line.length > 0)
+  if (lines.length === 0) return ''
+  return `[Plan]\n${lines.join('\n')}`
 }
 
 export interface FinishOptions {
@@ -77,6 +104,7 @@ const STOP_REASON_MAP: Record<string, LanguageModelV2FinishReason> = {
 export class EventTranslator {
   private readonly generateId: () => string
   private readonly onUsageUpdate?: (event: UsageUpdateEvent) => void
+  private readonly onPlan?: (entries: AcpRuntimePlanEntry[]) => void
   private readonly onAvailableCommands?: (
     commands: AcpRuntimeAvailableCommand[],
   ) => void
@@ -89,6 +117,7 @@ export class EventTranslator {
     this.generateId = opts.generateId
     this.onUsageUpdate = opts.onUsageUpdate
     this.onAvailableCommands = opts.onAvailableCommands
+    this.onPlan = opts.onPlan
   }
 
   translate(event: AcpRuntimeEvent): LanguageModelV2StreamPart[] {
@@ -297,13 +326,24 @@ export class EventTranslator {
       return []
     }
     if (event.tag === 'plan') {
-      // Emit plan as a self-contained reasoning block with its own id.
-      // Doesn't disturb the currently-open text/reasoning block — AI SDK
-      // allows multiple reasoning ids to coexist as long as each is
-      // properly start/end-paired. The `[Plan]` prefix lets consumers
-      // distinguish plan announcements from the agent's chain-of-thought.
-      // Trim because whitespace-only plan updates carry no signal — same
-      // intent as the empty-string case.
+      // acpx 0.16 added normalized entries alongside the prose. Each event
+      // carries a whole snapshot that REPLACES the previous one, and an empty
+      // array clears it, so the callback fires even for [] instead of
+      // returning early on a value that merely looks falsy.
+      if (event.entries) {
+        this.onPlan?.(event.entries)
+        const rendered = renderPlanEntries(event.entries)
+        if (rendered.length === 0) return []
+        const id = this.generateId()
+        return [
+          { type: 'reasoning-start', id },
+          { type: 'reasoning-delta', id, delta: rendered },
+          { type: 'reasoning-end', id },
+        ]
+      }
+      // Agents still sending a prose plan with no structured entries. The text
+      // cannot be parsed back into entries, so the event channel stays silent
+      // here rather than inventing a shape for it.
       const trimmed = event.text.trim()
       if (trimmed.length === 0) return []
       const id = this.generateId()

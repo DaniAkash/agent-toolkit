@@ -8,6 +8,7 @@ import type {
   AcpRuntimeEvent,
   AcpRuntimeHandle,
   AcpRuntimeOptions,
+  AcpRuntimePlanEntry,
   AcpRuntimeSessionModels,
 } from 'acpx/runtime'
 import {
@@ -44,6 +45,7 @@ export interface AcpxProviderEvents {
   availableCommands: [
     { sessionKey: string; commands: AcpRuntimeAvailableCommand[] },
   ]
+  plan: [{ sessionKey: string; entries: AcpRuntimePlanEntry[] }]
 }
 
 export class AcpxProvider {
@@ -55,6 +57,7 @@ export class AcpxProvider {
   private runtimeInstance: AcpRuntime | null
   private readonly handles = new Map<string, ResolvedHandle>()
   private readonly usedKeys = new Set<string>()
+  private readonly lastPlan = new Map<string, AcpRuntimePlanEntry[]>()
   private readonly lastUsage = new Map<string, AcpxUsageSnapshot>()
   private readonly lastCommands = new Map<
     string,
@@ -199,10 +202,28 @@ export class AcpxProvider {
     return (commands ?? []).map((c) => ({ ...c }))
   }
 
+  /**
+   * Latest plan snapshot for this session, or `[]` if the agent has not sent
+   * one. A snapshot replaces the previous one rather than adding to it, and an
+   * empty array means the agent cleared the plan, so an empty result is a real
+   * answer and not a missing one.
+   */
+  getPlan(sessionKey?: string): AcpRuntimePlanEntry[] {
+    const entries = this.lastPlan.get(sessionKey ?? this.resolveSessionKey({}))
+    // Defensive copy so callers cannot mutate the provider's stored state.
+    return (entries ?? []).map((entry) => ({ ...entry }))
+  }
+
   /** Internal: called by the language model when an event arrives. */
   recordUsage(snapshot: AcpxUsageSnapshot): void {
     this.lastUsage.set(snapshot.sessionKey, snapshot)
     this.events.emit('usage', snapshot)
+  }
+
+  /** Internal: called by the language model when an event arrives. */
+  recordPlan(sessionKey: string, entries: AcpRuntimePlanEntry[]): void {
+    this.lastPlan.set(sessionKey, entries)
+    this.events.emit('plan', { sessionKey, entries })
   }
 
   /** Internal: called by the language model when an event arrives. */
@@ -235,6 +256,8 @@ export class AcpxProvider {
       event.availableCommands
     ) {
       this.recordAvailableCommands(sessionKey, event.availableCommands)
+    } else if (event.tag === 'plan' && event.entries) {
+      this.recordPlan(sessionKey, event.entries)
     }
   }
 

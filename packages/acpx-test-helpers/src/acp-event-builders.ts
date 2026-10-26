@@ -1,6 +1,7 @@
 import type {
   AcpRuntimeAvailableCommand,
   AcpRuntimeEvent,
+  AcpRuntimePlanEntry,
   AcpRuntimeTurnResult,
   AcpRuntimeTurnResultError,
   AcpRuntimeUsageBreakdown,
@@ -24,6 +25,7 @@ type StatusOpts = {
   cost?: AcpRuntimeUsageCost
   breakdown?: AcpRuntimeUsageBreakdown
   availableCommands?: AcpRuntimeAvailableCommand[]
+  entries?: AcpRuntimePlanEntry[]
 }
 type ErrorOpts = { code?: string; retryable?: boolean }
 
@@ -58,6 +60,7 @@ export const acpEvent = {
       cost: opts.cost,
       breakdown: opts.breakdown,
       availableCommands: opts.availableCommands,
+      entries: opts.entries,
     }
   },
 
@@ -81,6 +84,11 @@ export const acpEvent = {
 
   plan(text: string): AcpRuntimeEvent {
     return acpEvent.status({ tag: 'plan', text })
+  },
+
+  /** A structured plan snapshot. `[]` is the clear signal, not an absence. */
+  planEntries(entries: AcpRuntimePlanEntry[]): AcpRuntimeEvent {
+    return acpEvent.status({ tag: 'plan', entries })
   },
 
   done(stopReason?: string): AcpRuntimeEvent {
