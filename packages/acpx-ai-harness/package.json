@@ -69,7 +69,7 @@
     "acpx": "^0.21.0",
     "acpx-test-helpers": "workspace:*",
     "bunup": "^0.16.32",
-    "typescript": "^6.0.3"
+    "typescript": "^7.0.2"
   },
   "publishConfig": {
     "access": "public",

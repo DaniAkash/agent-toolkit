@@ -26,6 +26,6 @@
   "devDependencies": {
     "@ai-sdk/provider-utils": "5.0.43",
     "acpx": "^0.21.0",
-    "typescript": "^6.0.3"
+    "typescript": "^7.0.2"
   }
 }

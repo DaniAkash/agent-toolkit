@@ -58,7 +58,7 @@
     "acpx-test-helpers": "workspace:*",
     "ai": "7.0.153",
     "bunup": "^0.16.32",
-    "typescript": "^6.0.3",
+    "typescript": "^7.0.2",
     "zod": "^4.4.3"
   },
   "publishConfig": {
