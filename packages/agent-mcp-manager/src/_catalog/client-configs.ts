@@ -615,9 +615,12 @@ export const boltai: ClientConfig = {
   supportedTransports: { system: ['stdio'] },
   stdio: { topLevelKey: 'mcpServers' },
   sources: {
-    firstParty: 'https://boltai.com',
+    firstParty: 'https://docs.boltai.com/docs/plugins/mcp-servers',
     smithery: SMITHERY_URL,
-    verified: VERIFIED,
+    notes:
+      'Verified from first-party docs: "BoltAI stores all configuration in /Users/<user>/.boltai/mcp.json" and "follows the standard MCP configuration convention". Stdio only, confirmed by the FAQ answer that a remote server needs `mcp-remote` to be converted into a local stdio server, so no http shape is declared.',
+    verified: '2026-10-26',
+    verifiedAgainst: 'boltai@docs-2026-10',
   },
 }
 
@@ -625,22 +628,29 @@ export const amazonBedrock: ClientConfig = {
   id: 'amazon-bedrock',
   displayName: 'Amazon Bedrock',
   installCheckPaths: {
-    darwin: ['$HOME/Amazon Bedrock Client'],
-    linux: ['$HOME/Amazon Bedrock Client'],
-    win32: ['$USERPROFILE\\Amazon Bedrock Client'],
+    darwin: [
+      '/Applications/Amazon Bedrock Client.app',
+      '$HOME/mcp_config.json',
+    ],
+    linux: ['$HOME/mcp_config.json'],
+    win32: ['$USERPROFILE\\mcp_config.json'],
   },
   systemPaths: {
-    darwin: ['$HOME/Amazon Bedrock Client/mcp_config.json'],
-    linux: ['$HOME/Amazon Bedrock Client/mcp_config.json'],
-    win32: ['$USERPROFILE\\Amazon Bedrock Client\\mcp_config.json'],
+    darwin: ['$HOME/mcp_config.json'],
+    linux: ['$HOME/mcp_config.json'],
+    win32: ['$USERPROFILE\\mcp_config.json'],
   },
   format: 'json',
   supportedTransports: { system: ['stdio'] },
   stdio: { topLevelKey: 'mcpServers' },
   sources: {
-    firstParty: 'https://docs.aws.amazon.com/bedrock/latest/userguide/',
+    firstParty: 'https://github.com/aws-samples/amazon-bedrock-client-for-mac',
     smithery: SMITHERY_URL,
-    verified: VERIFIED,
+    notes:
+      'PATH CORRECTED from source. Sources/Bedrock/Services/MCP/MCPClientManager.swift getConfigPath() builds `PreferencesStore.shared.defaultDirectory` (empty by default) or else `FileManager.default.homeDirectoryForCurrentUser`, then appends `mcp_config.json`. There is no "Amazon Bedrock Client" directory component anywhere in it, so the previous path was wrong; it matches Smithery\'s roster, the likely origin. A user who sets a default directory moves the file, so a caller honouring that should pass an explicit configPath. MCPConfiguration.swift confirms the root key is `mcpServers`. It also handles a `.http` transport alongside `.stdio`, discriminated by a `transportType` field, but the exact JSON spelling of that field was not established here, so no http shape is declared yet.',
+    verified: '2026-10-26',
+    verifiedAgainst:
+      'amazon-bedrock-client-for-mac@main (MCPClientManager.swift)',
   },
 }
 
@@ -759,16 +769,18 @@ export const trae: ClientConfig = {
     linux: ['$HOME/.config/Trae/User/mcp.json'],
     win32: ['$APPDATA\\Trae\\User\\mcp.json'],
   },
+  projectFile: '.trae/mcp.json',
   format: 'json',
   supportedTransports: { system: ['stdio', 'http'] },
   stdio: { topLevelKey: 'mcpServers' },
   http: { tagKey: 'type', tagValue: 'http', supportsOAuth: true },
   sources: {
-    firstParty: 'https://docs.trae.ai/ide/model-context-protocol',
+    firstParty: 'https://docs.trae.ai/ide/add-mcp-servers',
     smithery: SMITHERY_URL,
     notes:
-      'Trae is a VS Code fork with a dedicated mcp.json file under `<App Support>/Trae/User/`.',
-    verified: VERIFIED,
+      'Citation corrected: the previous URL (/ide/model-context-protocol) is a JS-rendered SPA that answers 200 for any path, so a status check could not tell it had moved; the real page is /ide/add-mcp-servers. It documents the `mcpServers` key and a project-scoped file: "Create an mcp.json file in the .trae/ directory under the project root", which is now declared as projectFile. The system path is the app-managed file behind the "Raw Config (JSON)" button.',
+    verified: '2026-10-26',
+    verifiedAgainst: 'trae@docs-2026-10',
   },
 }
 

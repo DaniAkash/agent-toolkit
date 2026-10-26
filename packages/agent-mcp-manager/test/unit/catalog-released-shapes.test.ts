@@ -4,11 +4,13 @@
  */
 import { describe, expect, test } from 'bun:test'
 import {
+  boltai,
   claudeCode,
   copilotCli,
   devinCli,
   librechat,
   opencode,
+  trae,
 } from '../../src/_catalog/client-configs.ts'
 import { getEmitter } from '../../src/emitters/index.ts'
 import type { McpServerSpec } from '../../src/types.ts'
@@ -161,5 +163,26 @@ describe('LibreChat remote transports', () => {
       url: 'https://mcp.example.com/mcp',
     })
     expect(out).toContain('type: http')
+  })
+})
+
+describe('entries verified in the final sweep', () => {
+  test('Trae declares the documented project-scope file', () => {
+    // "Create an mcp.json file in the .trae/ directory under the project
+    // root" (docs.trae.ai/ide/add-mcp-servers). The entry had no project
+    // scope at all before.
+    expect(trae.projectFile).toBe('.trae/mcp.json')
+    const io = getEmitter(trae, 'project')
+    expect(entryAt(io.add('{}', 's', STDIO), 'mcpServers', 's')?.command).toBe(
+      'npx',
+    )
+  })
+
+  test('BoltAI is stdio only, per its own FAQ', () => {
+    // Its docs say a remote server has to be converted to a local stdio
+    // server with `mcp-remote`, so no http shape is declared.
+    expect(boltai.http).toBeUndefined()
+    expect(boltai.supportedTransports.system).toEqual(['stdio'])
+    expect(() => getEmitter(boltai, 'system').add('{}', 'h', HTTP)).toThrow()
   })
 })
