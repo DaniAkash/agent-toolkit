@@ -31,6 +31,7 @@ import {
 import { agents as agentsCatalog } from './_vendor/agents.ts'
 import { parseFrontmatter } from './_vendor/frontmatter.ts'
 import { sanitizeName } from './_vendor/sanitize.ts'
+import { sanitizeMetadata } from './_vendor/strip-escapes.ts'
 import { resolveAgentSkillsDir } from './agents.ts'
 import { ForeignPathError, SkillNotFoundError } from './errors.ts'
 import { parseSourceInput } from './source.ts'
@@ -164,9 +165,15 @@ export function createSkillsManager(
       return null
     }
     const { data } = parseFrontmatter(raw)
+    // Second parse boundary (the first is in _internal/fetch-source.ts).
+    // Sanitised for the same reason: untrusted SKILL.md frontmatter that
+    // callers will print. See the note there.
     return {
-      name: typeof data.name === 'string' ? data.name : '',
-      description: typeof data.description === 'string' ? data.description : '',
+      name: typeof data.name === 'string' ? sanitizeMetadata(data.name) : '',
+      description:
+        typeof data.description === 'string'
+          ? sanitizeMetadata(data.description)
+          : '',
     }
   }
 

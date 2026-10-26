@@ -6,7 +6,7 @@
  * the refresh, so each should fail if the relevant fix is reverted.
  */
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { mkdir, readFile, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { createSkillsManager } from '../../src/index.ts'
 import {
@@ -152,5 +152,77 @@ describe('agents sharing one skills root', () => {
     const fxLink = links.find((l) => l.agent === 'fx')
     expect(fxLink).toBeDefined()
     expect(fxLink?.broken).toBe(true)
+  })
+})
+
+describe('untrusted frontmatter metadata', () => {
+  test('terminal escape sequences never reach the public result types', async () => {
+    // CWE-150. Skills come from arbitrary repositories by design, and this
+    // package hands name/description to callers that print them. A library
+    // is a worse place for this than a CLI: the caller has no reason to
+    // suspect the strings are untrusted.
+    const src = join(ws.root, 'evil-src')
+    await mkdir(src, { recursive: true })
+    const hostile = [
+      '\u001b[2J', // clear screen
+      '\u001b]0;pwned\u0007', // set window title
+      'looks ok',
+    ].join('')
+    await writeFile(
+      join(src, 'SKILL.md'),
+      `---\nname: evil\ndescription: ${hostile}\n---\n\nbody\n`,
+      'utf8',
+    )
+
+    const mgr = createSkillsManager({ workspaceDir: ws.workspaceDir })
+    const added = await mgr.add({ source: src })
+    expect(added.added).toHaveLength(1)
+
+    const addedDescription = added.added[0]?.description ?? ''
+    expect(addedDescription).not.toContain('\u001b')
+    expect(addedDescription).not.toContain('\u0007')
+    expect(addedDescription).toContain('looks ok')
+
+    // listSkills() reads the manifest, which already holds the sanitised
+    // value, so it is not a second check of the stripping itself.
+    const listed = await mgr.listSkills()
+    expect(listed[0]?.description ?? '').not.toContain('\u001b')
+  })
+
+  test('an unmanaged workspace dir is sanitised when it is read from disk', async () => {
+    // The manifest path and the disk path parse frontmatter in different
+    // modules. This covers the second one: a skill dropped into the
+    // workspace with no manifest entry is parsed on read, so stripping it
+    // at the add() boundary alone would miss it.
+    const dir = join(ws.workspaceDir, 'dropped-in')
+    await mkdir(dir, { recursive: true })
+    await writeFile(
+      join(dir, 'SKILL.md'),
+      `---\nname: dropped-in\ndescription: \u001b[2Jhidden\n---\n\nbody\n`,
+      'utf8',
+    )
+
+    const mgr = createSkillsManager({ workspaceDir: ws.workspaceDir })
+    const listed = await mgr.listSkills({ scanUnmanaged: true })
+    const found = listed.find((sk) => sk.name === 'dropped-in')
+    expect(found).toBeDefined()
+    expect(found?.unmanaged).toBe(true)
+    expect(found?.description ?? '').not.toContain('\u001b')
+    expect(found?.description).toBe('hidden')
+  })
+
+  test('a hostile name is stripped but still yields a usable skill', async () => {
+    const src = join(ws.root, 'evil-name-src')
+    await mkdir(src, { recursive: true })
+    await writeFile(
+      join(src, 'SKILL.md'),
+      `---\nname: "\u001b[31mred\u001b[0m"\ndescription: d\n---\n\nbody\n`,
+      'utf8',
+    )
+    const mgr = createSkillsManager({ workspaceDir: ws.workspaceDir })
+    const added = await mgr.add({ source: src })
+    expect(added.added).toHaveLength(1)
+    expect(added.added[0]?.name ?? '').not.toContain('\u001b')
+    expect(added.added[0]?.name).toBe('red')
   })
 })
