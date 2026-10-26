@@ -30,7 +30,11 @@ describe('AcpxProvider — getModels', () => {
         'claude-opus-4-7',
       ],
     })
-    expect(runtime.getStatusCalls).toHaveLength(1)
+    // Two calls, not one: establishing the session seeds the advertised
+    // command list from status, since acpx 0.21 no longer streams it as an
+    // event, and getModels then reads status for itself. The seed happens
+    // once per session key.
+    expect(runtime.getStatusCalls).toHaveLength(2)
   })
 
   test('returns undefined when the runtime status omits models', async () => {
@@ -40,7 +44,11 @@ describe('AcpxProvider — getModels', () => {
     const models = await provider.getModels()
 
     expect(models).toBeUndefined()
-    expect(runtime.getStatusCalls).toHaveLength(1)
+    // Two calls, not one: establishing the session seeds the advertised
+    // command list from status, since acpx 0.21 no longer streams it as an
+    // event, and getModels then reads status for itself. The seed happens
+    // once per session key.
+    expect(runtime.getStatusCalls).toHaveLength(2)
   })
 
   test('returns undefined when the runtime has no getStatus method', async () => {

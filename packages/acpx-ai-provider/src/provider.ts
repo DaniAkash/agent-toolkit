@@ -113,8 +113,38 @@ export class AcpxProvider {
       this.handles.set(sessionKey, cached)
     }
 
+    // acpx 0.21 stopped streaming `available_commands_update` for codex and
+    // surfaces the same list on `getStatus()` instead. Seed from there when
+    // nothing has arrived by event, so `getAvailableCommands` and `compact`
+    // keep working on both shapes.
+    if (!this.lastCommands.has(sessionKey)) {
+      await this.syncAvailableCommandsFromStatus(sessionKey, cached.handle)
+    }
+
     const isFresh = !this.usedKeys.has(sessionKey)
     return { handle: cached.handle, sessionKey, mode, isFresh }
+  }
+
+  /**
+   * Read the agent's advertised commands off session status. Best effort: a
+   * runtime without `getStatus`, or a status without a command list, leaves
+   * the cache untouched so the event path still wins when it fires.
+   */
+  private async syncAvailableCommandsFromStatus(
+    sessionKey: string,
+    handle: AcpRuntimeHandle,
+  ): Promise<void> {
+    const getStatusImpl = this.runtime.getStatus
+    if (!getStatusImpl) return
+    try {
+      const status = await getStatusImpl.call(this.runtime, { handle })
+      const commands = status.availableCommands
+      if (commands && commands.length > 0) {
+        this.recordAvailableCommands(sessionKey, commands)
+      }
+    } catch {
+      // Status is an optimisation here, never a precondition for a turn.
+    }
   }
 
   markSessionKeyUsed(sessionKey: string): boolean {
