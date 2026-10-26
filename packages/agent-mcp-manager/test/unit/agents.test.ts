@@ -10,7 +10,7 @@ import { UnresolvedConfigPathError } from '../../src/errors.ts'
 import type { McpTransport } from '../../src/types.ts'
 
 describe('agents catalog', () => {
-  test('listSupportedAgents returns the full 23-client roster (v0.0.4)', () => {
+  test('listSupportedAgents returns the full 25-client roster', () => {
     expect([...listSupportedAgents()].sort()).toEqual([
       'amazon-bedrock',
       'amazonq',
@@ -20,7 +20,9 @@ describe('agents catalog', () => {
       'claude-desktop',
       'cline',
       'codex',
+      'copilot-cli',
       'cursor',
+      'devin-cli',
       'enconvo',
       'gemini',
       'goose',

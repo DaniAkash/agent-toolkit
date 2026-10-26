@@ -10,6 +10,33 @@
  * Schema pattern (interfaces + shape space) is informed by Smithery's
  * `src/config/clients.ts`. Interfaces and populated data are authored
  * by us under MIT; no source code from Smithery is incorporated.
+ *
+ * Every entry is written as a config file. Smithery splits its roster in
+ * two and shells out to the client's own CLI for five of them
+ * (`claude mcp add`, `code --add-mcp`, `gemini mcp add`, `codex mcp add`).
+ * That is an attractive idea, since the client owns its own schema and
+ * can never drift from it, and it is deliberately not adopted here.
+ *
+ * The reason is structural rather than a matter of taste. `FsOp` is
+ * `writeFile | removeFile`, and the invariant stated on `planner/types.ts`
+ * is that a planner call cannot lie about what it would do: a plan is a
+ * list of file writes a caller can inspect, diff and refuse before
+ * anything happens. An `execCommand` op would put a hole in that, because
+ * the summary could no longer say what the file will contain, only which
+ * subprocess it intends to run. It would also pull process spawning, PATH
+ * resolution, exit-code handling and per-platform shell quoting into a
+ * package whose failure modes are all "which bytes go where".
+ *
+ * The cost of writing files is real: a client can change its schema under
+ * us. The answer is `sources.verified` plus `verifiedAgainst` and the
+ * validator's freshness window, which is a weaker guarantee than
+ * delegation but a far smaller blast radius. Those five CLIs are still
+ * useful as a correctness oracle; `claude mcp add --help` and
+ * `codex mcp add --help` document the accepted field names, so a
+ * re-verification pass should read them rather than a docs site.
+ *
+ * If delegation is ever wanted, it belongs behind its own entry point
+ * with its own documented caveat, not as a new arm on `FsOp`.
  */
 
 import type { McpTransport } from '../types.ts'
@@ -39,6 +66,8 @@ export type ClientId =
   | 'librechat'
   | 'antigravity'
   | 'trae'
+  | 'copilot-cli'
+  | 'devin-cli'
 
 export interface PerOsPaths {
   darwin?: string[]
@@ -108,9 +137,16 @@ export interface HttpShape {
   /** Static fields merged into every http entry. */
   injects?: Record<string, unknown>
   /**
-   * Whether the client advertises OAuth support. Recorded for future
-   * awareness; v0.1.0 does not act on it. Consumers thread bearer tokens
-   * via `spec.headers` today.
+   * Whether the client advertises OAuth support for remote servers.
+   *
+   * Catalog data for consumers to branch on, reachable through
+   * `getCatalogEntry(agent).http?.supportsOAuth`, not a feature flag this
+   * library acts on. The emitters never write OAuth fields: a caller that
+   * needs a token threads it through `spec.headers`, and the clients that
+   * do model OAuth natively each spell it differently (Codex takes
+   * `--bearer-token-env-var`, Claude Code `--client-id`, Devin
+   * `oauthClientId`, OpenCode an `oauth` object), so there is no single
+   * shape to emit.
    */
   supportsOAuth?: boolean
 }
@@ -124,6 +160,17 @@ export interface ClientConfigSources {
   notes?: string
   /** ISO date the entry was last verified against sources. Enforced by the validator (must be within 12 months). */
   verified: string
+  /**
+   * The client release the entry was verified against, e.g.
+   * `'opencode@1.19.4'`.
+   *
+   * `verified` is a date, which answers when someone last looked and not
+   * which client major they looked at. Those are different questions, and
+   * only the second catches a breaking config change: an entry can read
+   * as fresh for a year while describing a layout the current release
+   * abandoned. Set it whenever the version is known.
+   */
+  verifiedAgainst?: string
 }
 
 export interface ClientConfig {

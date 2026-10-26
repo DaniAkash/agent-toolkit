@@ -104,8 +104,9 @@ export const claudeCode: ClientConfig = {
     firstParty: 'https://docs.claude.com/en/docs/claude-code/mcp',
     smithery: SMITHERY_URL,
     notes:
-      'HTTP and SSE entries in ~/.claude.json require an explicit `type` field ("http", "sse", or "ws") or Claude Code emits a "url but no type" parse warning and skips the entry on launch. Stdio entries are accepted with or without a type tag. Project scope (.mcp.json) writes an explicit type: stdio tag per Claude Code project-scope docs.',
-    verified: '2026-07-10',
+      'HTTP and SSE entries in ~/.claude.json require an explicit `type` field ("http", "sse", or "ws") or Claude Code emits a "url but no type" parse warning and skips the entry on launch. Stdio entries are accepted with or without a type tag. Project scope (.mcp.json) writes an explicit type: stdio tag per Claude Code project-scope docs. Three scopes, two of which share ~/.claude.json: `claude mcp add -s <local|user|project>`. `system` here is what the CLI calls `user`; `local` is the CLI default and writes projects.<cwd>.mcpServers in the same file, which is why this entry declares a containerPath.',
+    verified: '2026-10-26',
+    verifiedAgainst: 'claude-code@2.0 (mcp add --help)',
   },
 }
 
@@ -395,8 +396,9 @@ export const opencode: ClientConfig = {
     firstParty: 'https://opencode.ai/docs/mcp',
     smithery: SMITHERY_URL,
     notes:
-      'Command written as a single array of [command, ...args] under `command`. `env` renamed to `environment`. Both stdio and remote entries carry a `type` field (`local` vs `remote`). OpenCode 1.x stores its global config at $XDG_CONFIG_HOME/opencode/ (falling back to ~/.config/opencode/) as `opencode.json`; installCheckPaths also list ~/.local/share/opencode (the OAuth token store, created before the config file exists) and legacy ~/.opencode/. Detection order prefers the XDG/.config locations to avoid missing fresh installs.',
-    verified: '2026-07-10',
+      'Command written as a single array of [command, ...args] under `command`. `env` renamed to `environment`. Both stdio and remote entries carry a `type` field (`local` vs `remote`). OpenCode 1.x stores its global config at $XDG_CONFIG_HOME/opencode/ (falling back to ~/.config/opencode/) as `opencode.json`; installCheckPaths also list ~/.local/share/opencode (the OAuth token store, created before the config file exists) and legacy ~/.opencode/. Detection order prefers the XDG/.config locations to avoid missing fresh installs. An unreleased V2 nests servers under `mcp.servers` and inverts `enabled` into `disabled`; V2 is not on npm, homebrew or GitHub releases, so this entry targets the released 1.x line. `mcp.servers` with `disabled` is already read by 1.19.4, so the eventual move is a one-line change to containerPath plus the injected flag.',
+    verified: '2026-10-26',
+    verifiedAgainst: 'opencode@1.19.4',
   },
 }
 
@@ -772,6 +774,104 @@ export const trae: ClientConfig = {
 // Aggregated catalog
 // -------------------------------------------------------------------
 
+export const copilotCli: ClientConfig = {
+  id: 'copilot-cli',
+  displayName: 'GitHub Copilot CLI',
+  installCheckPaths: {
+    darwin: ['$HOME/.copilot'],
+    linux: ['$HOME/.copilot'],
+    win32: ['$USERPROFILE\\.copilot'],
+  },
+  systemPaths: {
+    darwin: ['$HOME/.copilot/mcp-config.json'],
+    linux: ['$HOME/.copilot/mcp-config.json'],
+    win32: ['$USERPROFILE\\.copilot\\mcp-config.json'],
+  },
+  projectFile: '.mcp.json',
+  format: 'json',
+  supportedTransports: {
+    system: ['stdio', 'sse', 'http'],
+    project: ['stdio', 'sse', 'http'],
+  },
+  stdio: { topLevelKey: 'mcpServers', tagKey: 'type', tagValue: 'local' },
+  http: {
+    tagKey: 'type',
+    tagValue: 'http',
+    sseTagValue: 'sse',
+    supportsOAuth: false,
+  },
+  project: {
+    stdio: { topLevelKey: 'mcpServers', tagKey: 'type', tagValue: 'local' },
+    http: {
+      tagKey: 'type',
+      tagValue: 'http',
+      sseTagValue: 'sse',
+      supportsOAuth: false,
+    },
+  },
+  sources: {
+    firstParty:
+      'https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-mcp-servers',
+    notes:
+      'Stdio entries carry `type: "local"`; the docs note "stdio" is accepted as the standard spelling. Remote entries use `type: "http"` (Streamable HTTP) or the deprecated `"sse"`. Project scope reads `.mcp.json` in preference to `.github/mcp.json` when both sit in one directory, so `.mcp.json` is the write target. Entries also accept a `tools` allowlist, which this library does not emit.',
+    verified: '2026-10-26',
+    verifiedAgainst: 'copilot-cli@docs-2026-10',
+  },
+}
+
+export const devinCli: ClientConfig = {
+  id: 'devin-cli',
+  displayName: 'Devin CLI',
+  installCheckPaths: {
+    darwin: ['$HOME/.config/devin', '$XDG_CONFIG_HOME/devin'],
+    linux: ['$XDG_CONFIG_HOME/devin', '$HOME/.config/devin'],
+    win32: ['$APPDATA\\devin'],
+  },
+  systemPaths: {
+    darwin: [
+      '$XDG_CONFIG_HOME/devin/mcp_config.json',
+      '$HOME/.config/devin/mcp_config.json',
+    ],
+    linux: [
+      '$XDG_CONFIG_HOME/devin/mcp_config.json',
+      '$HOME/.config/devin/mcp_config.json',
+    ],
+    win32: ['$APPDATA\\devin\\mcp_config.json'],
+  },
+  projectFile: '.devin/mcp_config.json',
+  format: 'json',
+  supportedTransports: {
+    system: ['stdio', 'sse', 'http'],
+    project: ['stdio', 'sse', 'http'],
+  },
+  // No type tag on stdio entries: the documented shape is bare
+  // command/args/env.
+  stdio: { topLevelKey: 'mcpServers' },
+  // Devin spells the transport discriminator `transport`, not `type`.
+  http: {
+    tagKey: 'transport',
+    tagValue: 'http',
+    sseTagValue: 'sse',
+    supportsOAuth: true,
+  },
+  project: {
+    stdio: { topLevelKey: 'mcpServers' },
+    http: {
+      tagKey: 'transport',
+      tagValue: 'http',
+      sseTagValue: 'sse',
+      supportsOAuth: true,
+    },
+  },
+  sources: {
+    firstParty: 'https://docs.devin.ai/cli/extensibility/mcp/configuration',
+    notes:
+      'Stdio entries are bare command/args/env with no type tag. Remote entries use `transport` ("http" default, or "sse") rather than `type`, plus `headers` and oauthClientId / oauthClientSecret / oauthResource. A `disabled` boolean skips a server. `.devin/mcp_config.local.json` is a gitignored personal override this library does not write.',
+    verified: '2026-10-26',
+    verifiedAgainst: 'devin-cli@docs-2026-10',
+  },
+}
+
 export const CATALOG: ReadonlyArray<ClientConfig> = [
   amazonBedrock,
   amazonq,
@@ -781,7 +881,9 @@ export const CATALOG: ReadonlyArray<ClientConfig> = [
   claudeDesktop,
   cline,
   codex,
+  copilotCli,
   cursor,
+  devinCli,
   enconvo,
   gemini,
   goose,
