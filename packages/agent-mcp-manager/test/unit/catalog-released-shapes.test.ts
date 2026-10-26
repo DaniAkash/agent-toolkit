@@ -75,6 +75,21 @@ describe('OpenCode, released 1.x shape', () => {
 })
 
 describe('newly catalogued CLIs', () => {
+  test('Copilot CLI emits the tools allowlist every doc example carries', () => {
+    const io = getEmitter(copilotCli, 'system')
+    expect(entryAt(io.add('{}', 's', STDIO), 'mcpServers', 's')?.tools).toEqual(
+      ['*'],
+    )
+    expect(entryAt(io.add('{}', 'h', HTTP), 'mcpServers', 'h')?.tools).toEqual([
+      '*',
+    ])
+    // Project scope writes the same shape.
+    const proj = getEmitter(copilotCli, 'project')
+    expect(
+      entryAt(proj.add('{}', 's', STDIO), 'mcpServers', 's')?.tools,
+    ).toEqual(['*'])
+  })
+
   test('Copilot CLI tags stdio as local and http as http', () => {
     const io = getEmitter(copilotCli, 'system')
     const stdio = io.add('{}', 's', STDIO)

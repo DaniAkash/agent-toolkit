@@ -18,7 +18,7 @@
  */
 
 import { PROJECT_ROOT_TOKEN } from '../emitters/shape.ts'
-import type { ClientConfig } from './types.ts'
+import type { ClientConfig, HttpShape, StdioShape } from './types.ts'
 
 const SMITHERY_URL =
   'https://github.com/smithery-ai/cli/blob/main/src/config/clients.ts'
@@ -47,7 +47,8 @@ export const claudeDesktop: ClientConfig = {
   supportedTransports: { system: ['stdio'] },
   stdio: { topLevelKey: 'mcpServers' },
   sources: {
-    firstParty: 'https://modelcontextprotocol.io/quickstart/user',
+    firstParty:
+      'https://modelcontextprotocol.io/docs/2026-07-28/develop/connect-local-servers',
     smithery: SMITHERY_URL,
     notes:
       'Claude Desktop parses claude_desktop_config.json strictly. Entries without a `command` field are silently dropped on app launch. Hosted remote connectors are configured via the Claude Desktop UI, not this file.',
@@ -102,7 +103,7 @@ export const claudeCode: ClientConfig = {
     },
   },
   sources: {
-    firstParty: 'https://docs.claude.com/en/docs/claude-code/mcp',
+    firstParty: 'https://code.claude.com/docs/en/mcp',
     smithery: SMITHERY_URL,
     notes:
       'HTTP and SSE entries in ~/.claude.json require an explicit `type` field ("http", "sse", or "ws") or Claude Code emits a "url but no type" parse warning and skips the entry on launch. Stdio entries are accepted with or without a type tag. Project scope (.mcp.json) writes an explicit type: stdio tag per Claude Code project-scope docs. Three scopes, two of which share ~/.claude.json: `claude mcp add -s <local|user|project>`. `system` here is what the CLI calls `user`; `local` is the CLI default and writes projects.<cwd>.mcpServers in the same file, which is why this entry declares a containerPath.',
@@ -137,7 +138,7 @@ export const cursor: ClientConfig = {
     http: { tagKey: 'type', tagValue: 'http', supportsOAuth: true },
   },
   sources: {
-    firstParty: 'https://docs.cursor.com/context/model-context-protocol',
+    firstParty: 'https://cursor.com/docs/mcp',
     smithery: SMITHERY_URL,
     verified: '2026-10-26',
     verifiedAgainst: 'cursor@3.23.23',
@@ -178,7 +179,8 @@ export const vscode: ClientConfig = {
   http: VSCODE_HTTP,
   project: { stdio: VSCODE_STDIO, http: VSCODE_HTTP },
   sources: {
-    firstParty: 'https://code.visualstudio.com/docs/copilot/chat/mcp-servers',
+    firstParty:
+      'https://code.visualstudio.com/docs/agent-customization/mcp-servers',
     smithery: SMITHERY_URL,
     verified: '2026-10-26',
     verifiedAgainst: 'vscode@1.143.1',
@@ -200,11 +202,12 @@ export const vscodeInsiders: ClientConfig = {
     win32: ['$APPDATA\\Code - Insiders\\User\\mcp.json'],
   },
   sources: {
-    firstParty: 'https://code.visualstudio.com/docs/copilot/chat/mcp-servers',
+    firstParty:
+      'https://code.visualstudio.com/docs/agent-customization/mcp-servers',
     smithery: SMITHERY_URL,
     notes:
       'Same shape as the stable VS Code channel; only the config directory differs.',
-    verified: VERIFIED,
+    verified: '2026-10-26',
   },
 }
 
@@ -252,7 +255,7 @@ export const codex: ClientConfig = {
   stdio: { topLevelKey: 'mcp_servers' },
   http: { headerField: 'http_headers', supportsOAuth: true },
   sources: {
-    firstParty: 'https://developers.openai.com/codex/mcp',
+    firstParty: 'https://learn.chatgpt.com/docs/extend/mcp?surface=cli',
     smithery: SMITHERY_URL,
     notes:
       'TOML config. Streamable-HTTP entries carry `url`, optional `bearer_token_env_var`, `http_headers`, `env_http_headers`. SSE is not parsed.',
@@ -328,11 +331,11 @@ export const cline: ClientConfig = {
     supportsOAuth: true,
   },
   sources: {
-    firstParty: 'https://docs.cline.bot/mcp/mcp-server-development-protocol',
+    firstParty: 'https://docs.cline.bot/mcp/mcp-overview',
     smithery: SMITHERY_URL,
     notes:
       'Cline uses `type: "streamableHttp"` (camelCase) for remote HTTP, distinct from Kiro\'s `streamable-http`.',
-    verified: VERIFIED,
+    verified: '2026-10-26',
   },
 }
 
@@ -399,7 +402,7 @@ export const opencode: ClientConfig = {
     supportsOAuth: true,
   },
   sources: {
-    firstParty: 'https://opencode.ai/docs/mcp',
+    firstParty: 'https://opencode.ai/docs/mcp-servers/',
     smithery: SMITHERY_URL,
     notes:
       'Command written as a single array of [command, ...args] under `command`. `env` renamed to `environment`. Both stdio and remote entries carry a `type` field (`local` vs `remote`). OpenCode 1.x stores its global config at $XDG_CONFIG_HOME/opencode/ (falling back to ~/.config/opencode/) as `opencode.json`; installCheckPaths also list ~/.local/share/opencode (the OAuth token store, created before the config file exists) and legacy ~/.opencode/. Detection order prefers the XDG/.config locations to avoid missing fresh installs. An unreleased V2 nests servers under `mcp.servers` and inverts `enabled` into `disabled`; V2 is not on npm, homebrew or GitHub releases, so this entry targets the released 1.x line. `mcp.servers` with `disabled` is already read by 1.19.4, so the eventual move is a one-line change to containerPath plus the injected flag.',
@@ -433,12 +436,11 @@ export const goose: ClientConfig = {
   },
   http: { tagKey: 'type', tagValue: 'http', supportsOAuth: true },
   sources: {
-    firstParty:
-      'https://block.github.io/goose/docs/getting-started/using-extensions',
+    firstParty: 'https://goose-docs.ai/docs/getting-started/using-extensions/',
     smithery: SMITHERY_URL,
     notes:
       "Extension keys are letters-only lowercase (Goose's `simpleName` transform). Command renamed to `cmd`, env renamed to `envs`. Docker's upstream config also hardcodes several static fields (`bundled: null`, `description`, `enabled: true`); we do not emit those unless a consumer asks.",
-    verified: VERIFIED,
+    verified: '2026-10-26',
   },
 }
 
@@ -476,7 +478,7 @@ export const kiro: ClientConfig = {
     },
   },
   sources: {
-    firstParty: 'https://kiro.dev/docs/mcp',
+    firstParty: 'https://kiro.dev/docs/mcp/',
     smithery: SMITHERY_URL,
     notes:
       'Kiro uses `type: "streamable-http"` (kebab-case), the spec-canonical form.',
@@ -506,11 +508,11 @@ export const windsurf: ClientConfig = {
     supportsOAuth: true,
   },
   sources: {
-    firstParty: 'https://docs.windsurf.com/windsurf/mcp',
+    firstParty: 'https://docs.devin.ai/windsurf/plugins/cascade/mcp',
     smithery: SMITHERY_URL,
     notes:
       'Windsurf calls the URL field `serverUrl` for remote entries, not the default `url`.',
-    verified: VERIFIED,
+    verified: '2026-10-26',
   },
 }
 
@@ -554,9 +556,9 @@ export const enconvo: ClientConfig = {
   supportedTransports: { system: ['stdio'] },
   stdio: { topLevelKey: 'mcpServers' },
   sources: {
-    firstParty: 'https://enconvo.com',
+    firstParty: 'https://www.enconvo.com/',
     smithery: SMITHERY_URL,
-    verified: VERIFIED,
+    verified: '2026-10-26',
   },
 }
 
@@ -585,11 +587,11 @@ export const roocode: ClientConfig = {
   supportedTransports: { system: ['stdio'] },
   stdio: { topLevelKey: 'mcpServers' },
   sources: {
-    firstParty: 'https://docs.roocode.com/features/mcp/overview',
+    firstParty: 'https://roocodeinc.github.io/Roo-Code/features/mcp/overview/',
     smithery: SMITHERY_URL,
     notes:
       "Roo Code is a VS Code extension (fork of Cline). MCP settings live in the extension's globalStorage folder.",
-    verified: VERIFIED,
+    verified: '2026-10-26',
   },
 }
 
@@ -657,9 +659,9 @@ export const amazonq: ClientConfig = {
   stdio: { topLevelKey: 'mcpServers' },
   sources: {
     firstParty:
-      'https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/command-line-mcp.html',
+      'https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/qdev-mcp.html',
     smithery: SMITHERY_URL,
-    verified: VERIFIED,
+    verified: '2026-10-26',
   },
 }
 
@@ -782,6 +784,24 @@ export const trae: ClientConfig = {
 // Aggregated catalog
 // -------------------------------------------------------------------
 
+// GitHub Copilot CLI writes the same shape at both scopes. `tools: ['*']`
+// mirrors every first-party example; see the entry's notes for why it is
+// emitted rather than left to an undocumented default.
+const COPILOT_STDIO: StdioShape = {
+  topLevelKey: 'mcpServers',
+  tagKey: 'type',
+  tagValue: 'local',
+  injects: { tools: ['*'] },
+}
+
+const COPILOT_HTTP: HttpShape = {
+  tagKey: 'type',
+  tagValue: 'http',
+  sseTagValue: 'sse',
+  supportsOAuth: false,
+  injects: { tools: ['*'] },
+}
+
 export const copilotCli: ClientConfig = {
   id: 'copilot-cli',
   displayName: 'GitHub Copilot CLI',
@@ -801,27 +821,14 @@ export const copilotCli: ClientConfig = {
     system: ['stdio', 'sse', 'http'],
     project: ['stdio', 'sse', 'http'],
   },
-  stdio: { topLevelKey: 'mcpServers', tagKey: 'type', tagValue: 'local' },
-  http: {
-    tagKey: 'type',
-    tagValue: 'http',
-    sseTagValue: 'sse',
-    supportsOAuth: false,
-  },
-  project: {
-    stdio: { topLevelKey: 'mcpServers', tagKey: 'type', tagValue: 'local' },
-    http: {
-      tagKey: 'type',
-      tagValue: 'http',
-      sseTagValue: 'sse',
-      supportsOAuth: false,
-    },
-  },
+  stdio: COPILOT_STDIO,
+  http: COPILOT_HTTP,
+  project: { stdio: COPILOT_STDIO, http: COPILOT_HTTP },
   sources: {
     firstParty:
       'https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-mcp-servers',
     notes:
-      'Stdio entries carry `type: "local"`; the docs note "stdio" is accepted as the standard spelling. Remote entries use `type: "http"` (Streamable HTTP) or the deprecated `"sse"`. Project scope reads `.mcp.json` in preference to `.github/mcp.json` when both sit in one directory, so `.mcp.json` is the write target. Entries also accept a `tools` allowlist, which this library does not emit.',
+      'Stdio entries carry `type: "local"`; the docs note "stdio" is accepted as the standard spelling. Remote entries use `type: "http"` (Streamable HTTP) or the deprecated `"sse"`. Project scope reads `.mcp.json` in preference to `.github/mcp.json` when both sit in one directory, so `.mcp.json` is the write target. `tools: ["*"]` is emitted because every first-party JSON example carries it and the docs give `*` as the default only for the interactive form and the `--tools` flag, never for an omitted JSON field. Writing it matches the examples instead of betting on an undocumented default.',
     verified: '2026-10-26',
     verifiedAgainst: 'copilot-cli@docs-2026-10',
   },
