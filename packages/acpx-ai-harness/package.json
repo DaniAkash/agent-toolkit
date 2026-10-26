@@ -1,6 +1,6 @@
 {
   "name": "acpx-ai-harness",
-  "version": "0.0.3",
+  "version": "0.1.0",
   "description": "Vercel AI SDK v7 HarnessV1 adapter for acpx, bring any ACP agent (Claude, Codex, Copilot, Cursor) to the AI SDK Harnesses ecosystem.",
   "license": "MIT",
   "author": "Dani Akash",

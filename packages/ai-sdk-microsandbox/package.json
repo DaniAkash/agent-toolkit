@@ -1,6 +1,6 @@
 {
   "name": "ai-sdk-microsandbox",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Vercel AI SDK v7 HarnessV1 sandbox provider backed by microsandbox: local-first microVM isolation for HarnessAgent. Drop-in replacement for @ai-sdk/sandbox-vercel.",
   "license": "MIT",
   "author": "Dani Akash",
