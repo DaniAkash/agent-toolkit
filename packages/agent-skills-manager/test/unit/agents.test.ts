@@ -10,7 +10,7 @@ describe('agent catalog', () => {
   // Locks the vendored catalog size so a silent upstream drift on the next
   // refresh is caught. Bump this when the vendored `skills` version changes.
   test('exposes the full vendored catalog', () => {
-    expect(listSupportedAgents()).toHaveLength(76)
+    expect(listSupportedAgents()).toHaveLength(79)
   })
 
   test('every catalog entry has an id and a display name', () => {
@@ -22,6 +22,12 @@ describe('agent catalog', () => {
 
   test('recognizes agents added in the 1.5.22 refresh', () => {
     for (const id of ['minimax-code', 'zed', 'grok', 'kimchi', 'ona']) {
+      expect(isAgentSupported(id)).toBe(true)
+    }
+  })
+
+  test('recognizes agents added in the 1.7.4 refresh', () => {
+    for (const id of ['fx', 'posit-assistant', 'sarvam-code']) {
       expect(isAgentSupported(id)).toBe(true)
     }
   })

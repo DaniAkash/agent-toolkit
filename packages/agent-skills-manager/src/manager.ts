@@ -280,12 +280,24 @@ export function createSkillsManager(
       const { skillName, agent } = unlinkOpts
       const dirName = sanitizeName(skillName)
       const agentDir = unlinkOpts.agentSkillsDir ?? agentDirFor(agent)
-      const linkPath = join(agentDir, dirName)
+      const resolvedLinkPath = join(agentDir, dirName)
 
       return await enqueueWrite(async () => {
         const manifest = await readManifest()
         const entry = manifest.skills[dirName]
         const recorded = entry?.links[agent]
+
+        // Prefer the path the link was actually created at over the one the
+        // catalog resolves today. Upstream moves these directories: Codex's
+        // global skills dir went from ~/.codex/skills to ~/.agents/skills,
+        // and droid, kilo and pi all moved too. Recomputing would look in
+        // the new location, miss the existing symlink, and orphan it along
+        // with its manifest entry. An explicit `agentSkillsDir` still wins,
+        // since that is the caller naming the target.
+        const linkPath =
+          unlinkOpts.agentSkillsDir === undefined && recorded
+            ? recorded.linkPath
+            : resolvedLinkPath
 
         if (!recorded) {
           const declared = await declaredTarget(linkPath)
