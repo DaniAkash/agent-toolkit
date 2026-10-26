@@ -51,7 +51,8 @@ export const claudeDesktop: ClientConfig = {
     smithery: SMITHERY_URL,
     notes:
       'Claude Desktop parses claude_desktop_config.json strictly. Entries without a `command` field are silently dropped on app launch. Hosted remote connectors are configured via the Claude Desktop UI, not this file.',
-    verified: VERIFIED,
+    verified: '2026-10-26',
+    verifiedAgainst: 'claude-desktop@3.6556.2',
   },
 }
 
@@ -138,7 +139,8 @@ export const cursor: ClientConfig = {
   sources: {
     firstParty: 'https://docs.cursor.com/context/model-context-protocol',
     smithery: SMITHERY_URL,
-    verified: VERIFIED,
+    verified: '2026-10-26',
+    verifiedAgainst: 'cursor@3.23.23',
   },
 }
 
@@ -178,7 +180,8 @@ export const vscode: ClientConfig = {
   sources: {
     firstParty: 'https://code.visualstudio.com/docs/copilot/chat/mcp-servers',
     smithery: SMITHERY_URL,
-    verified: VERIFIED,
+    verified: '2026-10-26',
+    verifiedAgainst: 'vscode@1.143.1',
   },
 }
 
@@ -226,7 +229,8 @@ export const gemini: ClientConfig = {
     firstParty:
       'https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md',
     smithery: SMITHERY_URL,
-    verified: VERIFIED,
+    verified: '2026-10-26',
+    verifiedAgainst: 'gemini-cli@0.46.0',
   },
 }
 
@@ -252,7 +256,8 @@ export const codex: ClientConfig = {
     smithery: SMITHERY_URL,
     notes:
       'TOML config. Streamable-HTTP entries carry `url`, optional `bearer_token_env_var`, `http_headers`, `env_http_headers`. SSE is not parsed.',
-    verified: VERIFIED,
+    verified: '2026-10-26',
+    verifiedAgainst: 'codex-cli@0.164.0',
   },
 }
 
@@ -284,7 +289,8 @@ export const zed: ClientConfig = {
     smithery: SMITHERY_URL,
     notes:
       'Zed calls them "context_servers". The block sits alongside other settings, so writes are non-destructive under that key.',
-    verified: VERIFIED,
+    verified: '2026-10-26',
+    verifiedAgainst: 'zed@1.25.3',
   },
 }
 
@@ -474,7 +480,8 @@ export const kiro: ClientConfig = {
     smithery: SMITHERY_URL,
     notes:
       'Kiro uses `type: "streamable-http"` (kebab-case), the spec-canonical form.',
-    verified: VERIFIED,
+    verified: '2026-10-26',
+    verifiedAgainst: 'kiro@installed-2026-10-26',
   },
 }
 
@@ -740,7 +747,8 @@ export const antigravity: ClientConfig = {
     smithery: SMITHERY_URL,
     notes:
       "Google's Antigravity editor. Uses `serverUrl` for remote entries (matches Windsurf's convention). Config file lives at ~/.gemini/config/mcp_config.json; the ~/.gemini/antigravity/ directory is the install fingerprint.",
-    verified: '2026-07-10',
+    verified: '2026-10-26',
+    verifiedAgainst: 'antigravity@2.19.1',
   },
 }
 
@@ -872,6 +880,42 @@ export const devinCli: ClientConfig = {
   },
 }
 
+// The Cline CLI, distinct from the `cline` entry above: same product,
+// different config file. The VS Code extension keeps its settings under
+// the editor's globalStorage; the CLI keeps its own under ~/.cline/data.
+// Writing to the wrong one puts an entry in a file the user's tool never
+// reads, which is why these are two catalog entries rather than extra
+// paths on one.
+export const clineCli: ClientConfig = {
+  id: 'cline-cli',
+  displayName: 'Cline CLI',
+  installCheckPaths: {
+    darwin: ['$HOME/.cline'],
+    linux: ['$HOME/.cline'],
+    win32: ['$USERPROFILE\\.cline'],
+  },
+  systemPaths: {
+    darwin: ['$HOME/.cline/data/settings/cline_mcp_settings.json'],
+    linux: ['$HOME/.cline/data/settings/cline_mcp_settings.json'],
+    win32: ['$USERPROFILE\\.cline\\data\\settings\\cline_mcp_settings.json'],
+  },
+  format: 'json',
+  supportedTransports: { system: ['stdio', 'http'] },
+  stdio: { topLevelKey: 'mcpServers' },
+  http: {
+    tagKey: 'type',
+    tagValue: 'streamableHttp',
+    supportsOAuth: true,
+  },
+  sources: {
+    firstParty: 'https://docs.cline.bot/mcp/mcp-overview',
+    notes:
+      'Path read from upstream source rather than documentation: sdk/packages/shared/src/storage/paths.ts resolves it as CLINE_MCP_SETTINGS_PATH, else join(CLINE_DATA_DIR ?? join(CLINE_DIR ?? ~/.cline, "data"), "settings", "cline_mcp_settings.json"). Three env vars can move it, so a caller honouring them should pass an explicit configPath. Secondary sources claim ~/.cline/mcp.json; the source does not support that. Entry shape matches the `cline` extension entry, including `type: "streamableHttp"` for remote.',
+    verified: '2026-10-26',
+    verifiedAgainst: 'cline/cline@main (storage/paths.ts)',
+  },
+}
+
 export const CATALOG: ReadonlyArray<ClientConfig> = [
   amazonBedrock,
   amazonq,
@@ -880,6 +924,7 @@ export const CATALOG: ReadonlyArray<ClientConfig> = [
   claudeCode,
   claudeDesktop,
   cline,
+  clineCli,
   codex,
   copilotCli,
   cursor,

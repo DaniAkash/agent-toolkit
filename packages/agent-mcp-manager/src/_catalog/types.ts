@@ -68,6 +68,7 @@ export type ClientId =
   | 'trae'
   | 'copilot-cli'
   | 'devin-cli'
+  | 'cline-cli'
 
 export interface PerOsPaths {
   darwin?: string[]
