@@ -50,6 +50,36 @@ function parseVersion(v: string): [number, number, number] {
   return [parts[0] ?? 0, parts[1] ?? 0, parts[2] ?? 0]
 }
 
+/**
+ * Read `version` out of a registry payload.
+ *
+ * Typed through `unknown` rather than asserted. This repo compiles with
+ * `lib: ["ES2022"]` and no DOM, so the ambient `Response` type carries
+ * neither `ok` nor `json`, and a registry response is external data that
+ * wants validating at the boundary regardless.
+ */
+async function fetchLatestVersion(url: string): Promise<string> {
+  const response: unknown = await fetch(url)
+  if (
+    typeof response !== 'object' ||
+    response === null ||
+    !('json' in response) ||
+    typeof response.json !== 'function'
+  ) {
+    throw new Error('registry fetch returned no JSON reader')
+  }
+  const body: unknown = await response.json()
+  if (
+    typeof body !== 'object' ||
+    body === null ||
+    !('version' in body) ||
+    typeof body.version !== 'string'
+  ) {
+    throw new Error('registry payload has no string `version`')
+  }
+  return body.version
+}
+
 describe('vendored skills catalog', () => {
   test('THIRD_PARTY_NOTICES records the same version this test pins', async () => {
     // Runs offline. Catches the half-done refresh where the notices file
@@ -76,9 +106,9 @@ describe('vendored skills catalog', () => {
   test.skipIf(!ENABLED)(
     'the pinned version is not far behind npm latest',
     async () => {
-      const res = await fetch('https://registry.npmjs.org/skills/latest')
-      expect(res.ok).toBe(true)
-      const { version } = (await res.json()) as { version: string }
+      const version = await fetchLatestVersion(
+        'https://registry.npmjs.org/skills/latest',
+      )
 
       const [pinnedMajor, pinnedMinor] = parseVersion(VENDORED_VERSION)
       const [latestMajor, latestMinor] = parseVersion(version)
