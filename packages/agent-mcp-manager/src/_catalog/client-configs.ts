@@ -20,9 +20,13 @@
 import { PROJECT_ROOT_TOKEN } from '../emitters/shape.ts'
 import type { ClientConfig, HttpShape, StdioShape } from './types.ts'
 
+// There is deliberately no shared VERIFIED constant any more. One date for
+// every entry said only when the last sweep ran, which let an entry nobody
+// re-checked inherit someone else's confidence. Each entry now carries the
+// date it was actually looked at, alongside `verifiedAgainst` when a client
+// release or source revision was established.
 const SMITHERY_URL =
   'https://github.com/smithery-ai/cli/blob/main/src/config/clients.ts'
-const VERIFIED = '2026-07-06'
 
 // -------------------------------------------------------------------
 // Popular, well-documented clients
