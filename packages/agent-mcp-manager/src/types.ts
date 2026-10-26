@@ -79,4 +79,18 @@ export interface ManifestServerEntry {
 export interface ManifestLinkEntry {
   configPath: string
   createdAt: string
+  /**
+   * The scope the link was created at. Absent on entries written before
+   * this field existed, which are read as `'system'`.
+   *
+   * Required because `local` scope shares a file with `system` and is told
+   * apart only by the container inside it. Without this, removal read the
+   * right file and then deleted from the wrong container.
+   */
+  scope?: AgentScope
+  /**
+   * The project root a `local` link was created against, needed to rebuild
+   * its container path (`projects.<root>.mcpServers`) on removal.
+   */
+  projectRoot?: string
 }

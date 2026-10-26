@@ -41,10 +41,38 @@ function opensMultiline(line: string): MultilineDelim | null {
 
 type LineKind = 'header' | 'arrayHeader' | 'filler' | 'content'
 
+/**
+ * Drop a trailing `#` comment, ignoring one inside a quoted key.
+ *
+ * A header may carry a comment: `[mcp_servers.ctx] # managed by me`. Without
+ * stripping it the line does not end in `]`, so it reads as content, the
+ * table gets no span, and the edit falls through to the whole-document
+ * rewrite that loses every comment in the file. Quoted keys can contain a
+ * literal `#`, so the scan has to respect quotes.
+ */
+function stripComment(line: string): string {
+  let quote: '"' | "'" | null = null
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i]
+    if (quote) {
+      if (ch === quote) quote = null
+      else if (ch === '\\' && quote === '"') i++
+      continue
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch
+      continue
+    }
+    if (ch === '#') return line.slice(0, i)
+  }
+  return line
+}
+
 function classifyLine(trimmed: string): LineKind {
-  if (trimmed.startsWith('[[')) return 'arrayHeader'
-  if (trimmed.startsWith('[') && trimmed.endsWith(']')) return 'header'
   if (trimmed.length === 0 || trimmed.startsWith('#')) return 'filler'
+  const bare = stripComment(trimmed).trim()
+  if (bare.startsWith('[[')) return 'arrayHeader'
+  if (bare.startsWith('[') && bare.endsWith(']')) return 'header'
   return 'content'
 }
 
@@ -114,7 +142,8 @@ function scanTables(raw: string, prefix: string): TableSpan[] {
     closeCurrent(runStart ?? token.start)
     runStart = null
     if (token.kind === 'header') {
-      const path = parseHeaderPath(token.trimmed.slice(1, -1))
+      const bare = stripComment(token.trimmed).trim()
+      const path = parseHeaderPath(bare.slice(1, -1))
       if (path.length === 2 && path[0] === prefix) {
         current = { name: path[1] as string, start: token.start }
       }

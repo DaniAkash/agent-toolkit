@@ -10,11 +10,15 @@
  * per-project entries sit under `projects.<path>.mcpServers` alongside
  * the global `mcpServers` key.
  */
-import { describe, expect, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { claudeCode } from '../../src/_catalog/client-configs.ts'
 import { validateCatalog } from '../../src/_catalog/validate.ts'
 import { getEmitter } from '../../src/emitters/index.ts'
 import { resolveShapes } from '../../src/emitters/shape.ts'
+import { bind } from '../../src/index.ts'
 import type { McpServerSpec } from '../../src/types.ts'
 
 const ROOT = '/Users/example/code/thing'
@@ -148,5 +152,112 @@ describe('catalog validation of local scope', () => {
   test('accepts the shipped claude-code entry', () => {
     const errors = validateCatalog([claudeCode], new Date('2026-10-26'))
     expect(errors).toEqual([])
+  })
+})
+
+describe('removal honours the scope a link was created at', () => {
+  // Reported in review. The manifest recorded only `configPath`, so
+  // removal assumed `system`. For a `local` link that reads the right
+  // file and then edits the wrong container inside it: in practice
+  // jsonc-parser threw "Can not delete in empty document", and where it
+  // did not throw the entry was left on disk while the manifest record
+  // was deleted.
+  let root: string
+  let workspace: string
+  let configPath: string
+  let projectRoot: string
+
+  beforeEach(async () => {
+    root = await mkdtemp(join(tmpdir(), 'local-scope-'))
+    workspace = join(root, 'ws')
+    projectRoot = join(root, 'proj')
+    await mkdir(workspace, { recursive: true })
+    await mkdir(projectRoot, { recursive: true })
+    configPath = join(root, 'claude.json')
+    await writeFile(configPath, '{"numStartups":3}\n', 'utf8')
+  })
+
+  afterEach(async () => {
+    await rm(root, { recursive: true, force: true })
+  })
+
+  const HTTP_SRV = {
+    name: 'srv',
+    spec: { transport: 'http' as const, url: 'http://127.0.0.1:9/mcp' },
+  }
+
+  test('the link record carries its scope and project root', async () => {
+    const api = bind(workspace)
+    await api.link({
+      server: HTTP_SRV,
+      agent: 'claude-code',
+      scope: 'local',
+      projectRoot,
+      configPath,
+    })
+    const manifest = JSON.parse(
+      await readFile(join(workspace, 'manifest.json'), 'utf8'),
+    ) as {
+      servers: Record<
+        string,
+        { links: Record<string, { scope?: string; projectRoot?: string }> }
+      >
+    }
+    const link = manifest.servers.srv?.links['claude-code']
+    expect(link?.scope).toBe('local')
+    expect(link?.projectRoot).toBe(projectRoot)
+  })
+
+  test('remove() deletes the local entry, not the system container', async () => {
+    const api = bind(workspace)
+    await api.link({
+      server: HTTP_SRV,
+      agent: 'claude-code',
+      scope: 'local',
+      projectRoot,
+      configPath,
+    })
+    const summary = await api.remove({ serverName: 'srv' })
+    expect(summary.unlinkedAgents).toEqual(['claude-code'])
+
+    const after = JSON.parse(await readFile(configPath, 'utf8')) as {
+      numStartups?: number
+      projects?: Record<string, { mcpServers?: Record<string, unknown> }>
+    }
+    expect(after.projects?.[projectRoot]?.mcpServers?.srv).toBeUndefined()
+    // The surrounding document is untouched.
+    expect(after.numStartups).toBe(3)
+  })
+
+  test('unlink() without an explicit scope uses the recorded one', async () => {
+    const api = bind(workspace)
+    await api.link({
+      server: HTTP_SRV,
+      agent: 'claude-code',
+      scope: 'local',
+      projectRoot,
+      configPath,
+    })
+    const summary = await api.unlink({
+      serverName: 'srv',
+      agent: 'claude-code',
+    })
+    expect(summary.removed).toBe(true)
+    const after = JSON.parse(await readFile(configPath, 'utf8')) as {
+      projects?: Record<string, { mcpServers?: Record<string, unknown> }>
+    }
+    expect(after.projects?.[projectRoot]?.mcpServers?.srv).toBeUndefined()
+  })
+
+  test('a system link still removes from the top-level container', async () => {
+    const api = bind(workspace)
+    await api.link({ server: HTTP_SRV, agent: 'claude-code', configPath })
+    await api.remove({ serverName: 'srv' })
+    const after = JSON.parse(await readFile(configPath, 'utf8')) as {
+      mcpServers?: Record<string, unknown>
+      numStartups?: number
+    }
+    expect(after.mcpServers?.srv).toBeUndefined()
+    expect(after.numStartups).toBe(3)
   })
 })

@@ -132,3 +132,40 @@ command = "x"
     expect(io.read(reparsed).sort()).toEqual(['quoted', 'second'])
   })
 })
+
+describe('headers carrying an inline comment', () => {
+  // Reported in review. The header detector required the trimmed line to
+  // end in `]`, so `[mcp_servers.x] # note` read as content, the table got
+  // no span, and the edit fell through to the whole-document rewrite that
+  // loses every comment in the file. The surgical-edit guarantee silently
+  // did not apply to a document a user had annotated.
+  const ANNOTATED = `# keep me
+model = "o3"
+
+[mcp_servers.context7] # managed by me
+command = "npx"
+args = ["-y", "pkg"]
+`
+
+  test('replacing an annotated table keeps the rest of the file', () => {
+    const out = io.add(ANNOTATED, 'context7', {
+      transport: 'stdio',
+      command: 'bunx',
+      args: ['other'],
+    })
+    expect(out).toContain('# keep me')
+    expect(out).toContain('command = "bunx"')
+    expect(out).not.toContain('@upstash')
+    expect(out.startsWith('# keep me\nmodel = "o3"\n')).toBe(true)
+  })
+
+  test('removing an annotated table keeps the rest of the file', () => {
+    const out = io.remove(ANNOTATED, 'context7')
+    expect(out).toBe('# keep me\nmodel = "o3"\n')
+  })
+
+  test('a quoted hash inside a key is not treated as a comment', () => {
+    const quoted = '[mcp_servers."a#b"]\ncommand = "x"\n'
+    expect(io.read(quoted)).toEqual(['a#b'])
+  })
+})
