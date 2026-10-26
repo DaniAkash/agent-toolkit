@@ -32,12 +32,12 @@ describe('setModel', () => {
     ;(runtime as { setModel?: unknown }).setModel = undefined
     const provider = await withHandle(runtime)
 
-    await provider.setModel('gemini-2.5-pro')
+    await provider.setModel('gpt-5.6-luna')
 
     expect(runtime.setConfigOptionCalls).toHaveLength(1)
     expect(runtime.setConfigOptionCalls[0]).toMatchObject({
       key: 'model',
-      value: 'gemini-2.5-pro',
+      value: 'gpt-5.6-luna',
     })
   })
 })
@@ -71,12 +71,12 @@ describe('setModel on a fresh provider', () => {
       runtime,
     })
 
-    await provider.setModel('gemini-2.5-pro')
+    await provider.setModel('gpt-5.6-luna')
 
     expect(runtime.setConfigOptionCalls).toHaveLength(1)
     expect(runtime.setConfigOptionCalls[0]).toMatchObject({
       key: 'model',
-      value: 'gemini-2.5-pro',
+      value: 'gpt-5.6-luna',
     })
   })
 })

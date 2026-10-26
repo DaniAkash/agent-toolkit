@@ -165,7 +165,7 @@ function buildHttpEntry(
   // entries when set. Used by clients like Claude Code that write
   // `type: "http"` for http entries and `type: "sse"` for sse entries.
   // Clients that use the same tag value regardless (Cursor, VS Code,
-  // Gemini, ...) keep `tagValue: 'http'` and omit `sseTagValue`.
+  // ...) keep `tagValue: 'http'` and omit `sseTagValue`.
   const tagValue =
     spec.transport === 'sse' && shape.sseTagValue !== undefined
       ? shape.sseTagValue

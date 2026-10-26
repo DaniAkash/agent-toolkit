@@ -14,20 +14,14 @@ describe('toCommonToolName', () => {
     expect(toCommonToolName('codex', 'shell')).toBe('bash')
   })
 
-  test("gemini's run_shell_command -> common bash", () => {
-    expect(toCommonToolName('gemini', 'run_shell_command')).toBe('bash')
-  })
-
-  test('all three agents map their read tool to common read', () => {
+  test('both agents map their read tool to common read', () => {
     expect(toCommonToolName('claude', 'Read')).toBe('read')
     expect(toCommonToolName('codex', 'read')).toBe('read')
-    expect(toCommonToolName('gemini', 'read_file')).toBe('read')
   })
 
-  test('all three agents map their web-search tool to common webSearch', () => {
+  test('both agents map their web-search tool to common webSearch', () => {
     expect(toCommonToolName('claude', 'WebSearch')).toBe('webSearch')
     expect(toCommonToolName('codex', 'web_search')).toBe('webSearch')
-    expect(toCommonToolName('gemini', 'google_web_search')).toBe('webSearch')
   })
 
   test('unmapped agent passes the native name through', () => {
@@ -40,7 +34,7 @@ describe('toCommonToolName', () => {
 })
 
 describe('NATIVE_TO_COMMON_BY_AGENT', () => {
-  const supportedAgents = ['claude', 'codex', 'gemini'] as const
+  const supportedAgents = ['claude', 'codex'] as const
 
   // Standard names an agent has no mapping for. Blanket coverage stopped
   // being true once the standard grew a capability that not every agent
@@ -53,9 +47,6 @@ describe('NATIVE_TO_COMMON_BY_AGENT', () => {
     // Codex exposes no ask-the-user tool; upstream's codex adapter does not
     // declare one either.
     codex: new Set(['askUserQuestions']),
-    // Gemini's equivalent, if it has one, is unconfirmed. Left unmapped
-    // rather than guessed at.
-    gemini: new Set(['askUserQuestions']),
   }
 
   test('every supported agent covers every standard name it maps', () => {

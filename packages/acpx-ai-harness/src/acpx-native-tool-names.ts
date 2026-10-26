@@ -29,15 +29,6 @@ export const NATIVE_TO_COMMON_BY_AGENT: Readonly<
     glob: 'glob',
     web_search: 'webSearch',
   },
-  gemini: {
-    read_file: 'read',
-    write_file: 'write',
-    edit_file: 'edit',
-    run_shell_command: 'bash',
-    search_file_content: 'grep',
-    glob: 'glob',
-    google_web_search: 'webSearch',
-  },
 }
 
 /**

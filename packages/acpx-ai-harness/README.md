@@ -1,6 +1,6 @@
 # acpx-ai-harness
 
-A Vercel AI SDK v7 `HarnessV1` adapter built on the [acpx](https://www.npmjs.com/package/acpx) runtime. Brings any ACP-protocol agent (Claude Code, Codex, Gemini, Copilot, Cursor) into the [AI SDK Harnesses](https://ai-sdk.dev/v7/docs/ai-sdk-harnesses/overview) ecosystem alongside `@ai-sdk/harness-claude-code`, `@ai-sdk/harness-codex`, and `@ai-sdk/harness-pi`.
+A Vercel AI SDK v7 `HarnessV1` adapter built on the [acpx](https://www.npmjs.com/package/acpx) runtime. Brings any ACP-protocol agent (Claude Code, Codex, Copilot, Cursor) into the [AI SDK Harnesses](https://ai-sdk.dev/v7/docs/ai-sdk-harnesses/overview) ecosystem alongside `@ai-sdk/harness-claude-code`, `@ai-sdk/harness-codex`, and `@ai-sdk/harness-pi`.
 
 > **Experimental.** Both this package and the upstream `@ai-sdk/harness` API are pre-1.0 and subject to breaking changes.
 
@@ -53,7 +53,7 @@ const harness = createAcpxHarness({
 
 | Setting | Type | Notes |
 |---|---|---|
-| `agent` | `string` | ACP agent id: `'codex'`, `'claude'`, `'gemini'`, or any custom acpx-registered agent. Default `'codex'`. |
+| `agent` | `string` | ACP agent id: `'codex'`, `'claude'`, or any custom acpx-registered agent. Default `'codex'`. |
 | `model` | `string` | Overrides the agent's default model. Passed through to acpx as `sessionOptions.model`. |
 | `stateDir` | `string` | acpx state directory inside the sandbox. Defaults to acpx's own default. |
 | `startupTimeoutMs` | `number` | Bridge startup timeout. Default `120_000`. |
@@ -78,7 +78,6 @@ The harness's bootstrap recipe pre-warms the ACP wrapper binary acpx invokes for
 |---|---|---|
 | `'codex'` (default) | `npx --yes @agentclientprotocol/codex-acp --version` | `openai_api_key` |
 | `'claude'` | `npx --yes @agentclientprotocol/claude-agent-acp --version` | `anthropic_api_key` |
-| `'gemini'` | `npm install -g @google/gemini-cli` | `gemini_api_key` |
 | any other id | (skipped, bring your own install) | (varies, see acpx config docs) |
 
 ### Auth
@@ -145,7 +144,7 @@ The host receives `tool-approval-request` stream parts for any tool the agent wa
 
 ## Built-in tools
 
-The harness advertises the seven harness common-tool entries (`read`, `write`, `edit`, `bash`, `grep`, `glob`, `webSearch`) so cross-harness consumers can identify them. Per-agent native tool names (Claude's `Bash`, Codex's `shell`, Gemini's `run_shell_command`) are normalised to the common names on the wire; the original native name flows along on `tool-call.nativeName`.
+The harness advertises the seven harness common-tool entries (`read`, `write`, `edit`, `bash`, `grep`, `glob`, `webSearch`) so cross-harness consumers can identify them. Per-agent native tool names (Claude's `Bash`, Codex's `shell`) are normalised to the common names on the wire; the original native name flows along on `tool-call.nativeName`.
 
 ## Development
 

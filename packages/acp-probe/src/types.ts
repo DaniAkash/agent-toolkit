@@ -181,26 +181,26 @@ export interface AgentProbeResult {
    * `setConfigOption(modelConfig.configId, X)` inputs (the same values as
    * `modelConfig.values`), carrying the per-model `name` / `description`
    * the selector advertises. Empty when the agent exposes no model picker
-   * (e.g. gemini).
+   * (agents that expose no model picker).
    */
   models: ProbedModel[]
   modes: ProbedMode[]
   configOptions: ProbedConfigOption[]
   /**
    * Derived pointer to the thought_level configOption if present.
-   * `null` when the agent doesn't expose a reasoning surface (e.g. gemini).
+   * `null` when the agent doesn't expose a reasoning surface.
    */
   reasoning: ReasoningInfo | null
   /**
    * Derived pointer to the `configOptions[id=model]` select if present.
    * Its `values` are the ids `setConfigOption('model', X)` will accept.
    * `null` when the agent doesn't expose a settable model picker (e.g.
-   * gemini, where `setConfigOption` returns `-32601 method not found`).
+   * agents where `setConfigOption` returns `-32601 method not found`).
    */
   modelConfig: ModelConfigInfo | null
   /**
    * True iff `session/set_config_option` is responsive. False on agents
-   * like gemini that return ACP `-32601` ("method not found").
+   * that return ACP `-32601` ("method not found").
    */
   supportsConfigOption: boolean
 

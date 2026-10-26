@@ -39,7 +39,7 @@ describe('AcpxProvider — getModels', () => {
 
   test('returns undefined when the runtime status omits models', async () => {
     const runtime = new MockAcpRuntime({ status: { summary: 'no models' } })
-    const provider = createAcpxProvider({ agent: 'gemini', runtime })
+    const provider = createAcpxProvider({ agent: 'codex', runtime })
 
     const models = await provider.getModels()
 

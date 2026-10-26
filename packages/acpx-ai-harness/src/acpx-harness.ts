@@ -9,7 +9,7 @@ import { acpxLifecycleStateSchema } from './acpx-lifecycle.ts'
 import { doStartImpl } from './host-session.ts'
 
 export interface AcpxHarnessSettings {
-  /** ACP agent id, e.g. `'claude'`, `'codex'`, `'gemini'`. */
+  /** ACP agent id, e.g. `'claude'` or `'codex'`. */
   readonly agent?: string
   /** Override the agent's default model. */
   readonly model?: string
@@ -22,7 +22,7 @@ export interface AcpxHarnessSettings {
   /**
    * Auth credentials threaded into acpx's config inside the sandbox.
    * Keys are method ids (e.g. `openai_api_key`, `anthropic_api_key`,
-   * `gemini_api_key`) and values are the raw credentials. The harness
+   * `anthropic_api_key`) and values are the raw credentials. The harness
    * writes these to `~/.acpx/config.json` before every session start —
    * per-session so credentials never end up in the sandbox snapshot.
    *

@@ -27,13 +27,12 @@ const VERCEL_ENV_VARS = ['VERCEL_TOKEN', 'VERCEL_TEAM_ID', 'VERCEL_PROJECT_ID']
 const AGENT_AUTH_ENV: Record<string, ReadonlyArray<string>> = {
   codex: ['OPENAI_API_KEY'],
   claude: ['ANTHROPIC_API_KEY'],
-  gemini: ['GEMINI_API_KEY'],
 }
 
 export function selectedAgents(): ReadonlySet<string> {
   const raw = process.env[AGENTS_ENV]
   if (!raw) return new Set()
-  if (raw === 'all') return new Set(['codex', 'claude', 'gemini'])
+  if (raw === 'all') return new Set(['codex', 'claude'])
   return new Set(
     raw
       .split(',')

@@ -51,14 +51,14 @@ describe('buildAcpxConfigBody', () => {
       auth: {
         openai_api_key: 'sk-a',
         anthropic_api_key: 'sk-b',
-        gemini_api_key: 'g-c',
+        google_api_key: 'g-c',
       },
     })
     const parsed = JSON.parse(body!)
     expect(parsed.auth).toEqual({
       openai_api_key: 'sk-a',
       anthropic_api_key: 'sk-b',
-      gemini_api_key: 'g-c',
+      google_api_key: 'g-c',
     })
   })
 })
@@ -84,13 +84,13 @@ describe('buildAcpxAuthEnv', () => {
         auth: {
           openai_api_key: 'a',
           anthropic_api_key: 'b',
-          gemini_api_key: 'c',
+          google_api_key: 'c',
         },
       }),
     ).toEqual({
       ACPX_AUTH_OPENAI_API_KEY: 'a',
       ACPX_AUTH_ANTHROPIC_API_KEY: 'b',
-      ACPX_AUTH_GEMINI_API_KEY: 'c',
+      ACPX_AUTH_GOOGLE_API_KEY: 'c',
     })
   })
 })

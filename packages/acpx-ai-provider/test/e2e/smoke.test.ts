@@ -27,8 +27,6 @@
  *   - codex: needs an OpenAI key. Set ACPX_AUTH_OPENAI_API_KEY or
  *     OPENAI_API_KEY. First run will `npx`-download the adapter.
  *
- *   - gemini: no longer covered. Its ACP endpoint was withdrawn for
- *     individual accounts; see the note on AGENTS below.
  *
  * What the tests cover (per agent):
  *
@@ -59,21 +57,6 @@ const ALL_REQUESTED =
 const shouldRun = (agent: string): boolean =>
   ALL_REQUESTED || REQUESTED.includes(agent)
 
-/**
- * Agents this suite smoke-tests.
- *
- * gemini is not among them. Its ACP endpoint now answers every request
- * with `-32000 "This client is no longer supported for Gemini Code Assist
- * for individuals. ... migrate to the Antigravity suite"`, so no
- * capability assertion here can pass on an individual account: the four
- * turn-based tests failed for everyone running `SMOKE_AGENTS=all`,
- * regardless of credentials or code.
- *
- * This mirrors the same removal in acp-probe's e2e suite, where the error
- * path is covered by a dedicated contract test instead. If individual ACP
- * access is restored, add `'gemini'` back to this list; nothing else here
- * needs to change, since every test is written against the agent id.
- */
 const AGENTS = ['claude', 'codex'] as const
 type SmokeAgent = (typeof AGENTS)[number]
 

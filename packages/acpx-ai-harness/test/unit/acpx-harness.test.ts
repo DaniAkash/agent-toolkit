@@ -218,15 +218,6 @@ describe('getBootstrap recipe', () => {
     )
   })
 
-  test('installs the gemini CLI on the gemini agent', async () => {
-    const { harness } = buildWithFakeAssets('gemini')
-    const recipe = await harness.getBootstrap?.()
-    const install = recipe?.commands.find((c) =>
-      c.command.includes('@google/gemini-cli'),
-    )
-    expect(install?.command).toBe('npm install -g @google/gemini-cli')
-  })
-
   test('skips the agent install step for unknown agents', async () => {
     const { harness } = buildWithFakeAssets('some-custom-agent')
     const recipe = await harness.getBootstrap?.()

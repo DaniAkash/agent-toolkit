@@ -19,7 +19,7 @@ import type { McpServer } from '../../src/types.ts'
 
 let workspaceDir: string
 let cursorPath: string
-let geminiPath: string
+let traePath: string
 let claudeCodePath: string
 
 const GH_STDIO: McpServer = {
@@ -40,7 +40,7 @@ const SOLO: McpServer = {
 beforeEach(async () => {
   workspaceDir = await mkdtemp(join(tmpdir(), 'acpx-api-'))
   cursorPath = join(workspaceDir, 'cursor.json')
-  geminiPath = join(workspaceDir, 'gemini.json')
+  traePath = join(workspaceDir, 'trae.json')
   claudeCodePath = join(workspaceDir, 'claude.json')
 })
 
@@ -88,8 +88,8 @@ describe('link (upserts manifest + writes agent config)', () => {
     })
     await link(workspaceDir, {
       server: GH_HTTP,
-      agent: 'gemini',
-      configPath: geminiPath,
+      agent: 'trae',
+      configPath: traePath,
     })
     const state = await readState(workspaceDir)
     // Manifest reflects the LATER spec.
@@ -122,8 +122,8 @@ describe('disconnect (regression test for #63)', () => {
     })
     await link(workspaceDir, {
       server: GH_STDIO,
-      agent: 'gemini',
-      configPath: geminiPath,
+      agent: 'trae',
+      configPath: traePath,
     })
     await link(workspaceDir, {
       server: GH_STDIO,
@@ -132,7 +132,7 @@ describe('disconnect (regression test for #63)', () => {
     })
 
     const before = {
-      gemini: await readFile(geminiPath, 'utf8'),
+      trae: await readFile(traePath, 'utf8'),
       claudeCode: await readFile(claudeCodePath, 'utf8'),
     }
 
@@ -146,14 +146,14 @@ describe('disconnect (regression test for #63)', () => {
     const cursorAfter = await readFile(cursorPath, 'utf8')
     expect(JSON.parse(cursorAfter).mcpServers.gh).toBeUndefined()
 
-    expect(await readFile(geminiPath, 'utf8')).toBe(before.gemini)
+    expect(await readFile(traePath, 'utf8')).toBe(before.trae)
     expect(await readFile(claudeCodePath, 'utf8')).toBe(before.claudeCode)
 
     const state = await readState(workspaceDir)
     expect(state.manifest.servers.gh).toBeDefined()
     expect(Object.keys(state.manifest.servers.gh?.links ?? {}).sort()).toEqual([
       'claude-code',
-      'gemini',
+      'trae',
     ])
   })
 
@@ -182,8 +182,8 @@ describe('unlink + list + listLinks + remove', () => {
     })
     const res = await unlink(workspaceDir, {
       serverName: 'gh',
-      agent: 'gemini',
-      configPath: geminiPath,
+      agent: 'trae',
+      configPath: traePath,
     })
     expect(res.removed).toBe(false)
   })
@@ -226,11 +226,11 @@ describe('unlink + list + listLinks + remove', () => {
     })
     await link(workspaceDir, {
       server: GH_STDIO,
-      agent: 'gemini',
-      configPath: geminiPath,
+      agent: 'trae',
+      configPath: traePath,
     })
     const links = await listLinks(workspaceDir)
-    expect(links.map((l) => l.agent).sort()).toEqual(['cursor', 'gemini'])
+    expect(links.map((l) => l.agent).sort()).toEqual(['cursor', 'trae'])
   })
 
   test('remove drops the manifest entry and unlinks every currently-linked agent', async () => {
@@ -241,17 +241,17 @@ describe('unlink + list + listLinks + remove', () => {
     })
     await link(workspaceDir, {
       server: GH_STDIO,
-      agent: 'gemini',
-      configPath: geminiPath,
+      agent: 'trae',
+      configPath: traePath,
     })
     const res = await remove(workspaceDir, { serverName: 'gh' })
     expect(res.removedManifest).toBe(true)
-    expect(res.unlinkedAgents.sort()).toEqual(['cursor', 'gemini'])
+    expect(res.unlinkedAgents.sort()).toEqual(['cursor', 'trae'])
     expect(
       JSON.parse(await readFile(cursorPath, 'utf8')).mcpServers.gh,
     ).toBeUndefined()
     expect(
-      JSON.parse(await readFile(geminiPath, 'utf8')).mcpServers.gh,
+      JSON.parse(await readFile(traePath, 'utf8')).mcpServers.gh,
     ).toBeUndefined()
   })
 })

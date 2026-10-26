@@ -55,13 +55,13 @@ describe('AgentNotInstalledError', () => {
 
   test('message includes the agent id, config path, and parent dir', () => {
     const err = new AgentNotInstalledError(
-      'gemini',
-      '/tmp/x/.gemini/settings.json',
-      '/tmp/x/.gemini',
+      'trae',
+      '/tmp/x/.trae/settings.json',
+      '/tmp/x/.trae',
     )
-    expect(err.message).toContain('gemini')
-    expect(err.message).toContain('/tmp/x/.gemini/settings.json')
-    expect(err.message).toContain('/tmp/x/.gemini')
+    expect(err.message).toContain('trae')
+    expect(err.message).toContain('/tmp/x/.trae/settings.json')
+    expect(err.message).toContain('/tmp/x/.trae')
   })
 
   test('message contains no em-dashes (repo writing rule)', () => {

@@ -17,8 +17,7 @@
     "capability-discovery",
     "agent-probe",
     "claude-code",
-    "codex",
-    "gemini"
+    "codex"
   ],
   "type": "module",
   "main": "./dist/index.js",

@@ -1,11 +1,11 @@
 # `acp-probe` end-to-end probes
 
 These tests spawn **real** ACP adapter processes (claude, codex,
-gemini) and run a real `initialize` + `session/new` handshake against
+and run a real `initialize` + `session/new` handshake against
 each. They live outside the default `bun test` run because:
 
 - They require the corresponding CLIs to be installed locally
-  (`claude`, `codex`, `gemini`).
+  (`claude`, `codex`).
 - First-run `npx`-bootstrapped adapters take 30–60 s.
 - They've not deterministic without a captive network.
 
@@ -61,7 +61,6 @@ Both are regressions.
 |---|---|---|
 | `claude` | `claude` CLI on `$PATH` + an authenticated login | First run npx-downloads the ACP adapter (~30 s). |
 | `codex` | `codex` CLI on `$PATH` | npx-downloads the ACP adapter on first run. |
-| `gemini` | `gemini` CLI on `$PATH` + `gemini auth login` once | Loads the adapter from the local install. |
 
 If a CLI isn't installed, the spawn fails and the test reports
 `error: { code: 'spawn_failed' }` — the test then fails its
@@ -75,7 +74,7 @@ signal to install the missing CLI.
   `AGENT_REGISTRY`.
 - When changing anything in `probe.ts`, `resolve-command.ts`, or
   `_internal/normalize.ts`.
-- Whenever you suspect upstream adapter drift (claude/codex/gemini
+- Whenever you suspect upstream adapter drift (claude/codex
   ship adapter updates without bumping their CLIs).
 
 ## Why not CI

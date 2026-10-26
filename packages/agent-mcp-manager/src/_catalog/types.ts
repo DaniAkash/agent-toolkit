@@ -13,7 +13,7 @@
  *
  * Every entry is written as a config file. Smithery splits its roster in
  * two and shells out to the client's own CLI for five of them
- * (`claude mcp add`, `code --add-mcp`, `gemini mcp add`, `codex mcp add`).
+ * (`claude mcp add`, `code --add-mcp`, `codex mcp add`).
  * That is an attractive idea, since the client owns its own schema and
  * can never drift from it, and it is deliberately not adopted here.
  *
@@ -48,7 +48,6 @@ export type ClientId =
   | 'cursor'
   | 'vscode'
   | 'vscode-insiders'
-  | 'gemini'
   | 'codex'
   | 'zed'
   | 'cline'

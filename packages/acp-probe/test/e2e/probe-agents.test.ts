@@ -1,15 +1,15 @@
 /**
  * End-to-end probe tests against real ACP agents.
  *
- * NOT run in CI — these spawn real adapter processes (claude / codex /
- * gemini), perform a real ACP handshake, and need the corresponding
- * CLIs available locally. They exist so contributors can verify
+ * NOT run in CI — these spawn real adapter processes (claude / codex),
+ * perform a real ACP handshake, and need the corresponding CLIs
+ * available locally. They exist so contributors can verify
  * changes against agents the fake-agent harness can't catch: npx
  * download drift, agent CLI version skew, real schema evolution.
  *
  * How to run:
  *
- *   # All three agents
+ *   # Both agents
  *   PROBE_E2E=all bun test test/e2e
  *
  *   # Single agent
@@ -48,25 +48,8 @@ const ALL_REQUESTED = REQUESTED.includes('all')
 const shouldRun = (agent: string): boolean =>
   ALL_REQUESTED || REQUESTED.includes(agent)
 
-/**
- * Agents whose capability surface is asserted below.
- *
- * gemini is not among them. Its ACP endpoint now answers every probe with
- * `-32000 "This client is no longer supported for Gemini Code Assist for
- * individuals. ... migrate to the Antigravity suite"`, so there is no
- * capability surface left to assert on an individual account and the old
- * expectations could never pass. It is covered by its own contract test
- * at the bottom of this file instead, which asserts the thing that is
- * still true and still worth knowing: an agent-level failure is reported,
- * not thrown.
- *
- * If individual ACP access is restored, move gemini back into this list
- * and restore the capability expectations from git history.
- */
 const AGENTS = ['claude', 'codex'] as const
 type ProbeAgent = (typeof AGENTS)[number]
-const SPAWN_AGENTS = ['claude', 'codex', 'gemini'] as const
-type SpawnAgent = (typeof SPAWN_AGENTS)[number]
 
 // Hardcoded spawn commands for the no-acpx path. These mirror acpx's
 // AGENT_REGISTRY at the time of capture (2026-10-26, acpx 0.21.0). Drift
@@ -74,10 +57,9 @@ type SpawnAgent = (typeof SPAWN_AGENTS)[number]
 // catches, and it did: the previous capture still named
 // `@zed-industries/codex-acp`, which codex has since left for
 // `@agentclientprotocol/codex-acp`.
-const SPAWN_COMMAND: Record<SpawnAgent, string> = {
+const SPAWN_COMMAND: Record<ProbeAgent, string> = {
   claude: 'npx -y @agentclientprotocol/claude-agent-acp@^0.81.2',
   codex: 'npx -y @agentclientprotocol/codex-acp@^1.1.5',
-  gemini: 'gemini --acp',
 }
 
 // Per-agent stable invariants captured 2026-05-14. These are the
@@ -191,51 +173,3 @@ for (const agent of AGENTS) {
     )
   })
 }
-
-/**
- * gemini: the agent-error contract, against a real process.
- *
- * Gemini's ACP endpoint was withdrawn for individual accounts, so probing
- * it returns a JSON-RPC error rather than a capability set. That makes it
- * the one real agent available here that exercises the error path end to
- * end, which is worth keeping: the mock harness can construct an error
- * response, but only a live agent proves the probe reports a real one
- * instead of throwing or hanging.
- *
- * Written to hold whether or not access is restored. The contract is that
- * `probeAgent` resolves with a well-formed result either way, and that an
- * agent-returned JSON-RPC error arrives as a structured `acpError` with
- * its numeric code preserved rather than flattened into a message.
- */
-describe('e2e probe: gemini agent-error contract', () => {
-  test.skipIf(!shouldRun('gemini'))(
-    'an agent-level failure is reported, not thrown',
-    async () => {
-      const r = await probeAgent({
-        command: SPAWN_COMMAND.gemini,
-        timeoutMs: TURN_TIMEOUT_MS,
-      })
-
-      // Resolved, not thrown, and shaped like a result in both outcomes.
-      expect(r.agent.command).toBe(SPAWN_COMMAND.gemini)
-      expect(typeof r.agent.durationMs).toBe('number')
-      expect(Array.isArray(r.authMethods)).toBe(true)
-
-      if (!r.error) {
-        // Access restored: it must look like a working ACP agent again.
-        expect(r.protocolVersion).toBe(1)
-        expect(r.agentInfo?.name).toBe('gemini-cli')
-        return
-      }
-
-      // The withdrawn-access path. The probe must classify it rather than
-      // crash, and must not lose the agent's own error code.
-      expect(r.error.code).toBe('unknown')
-      expect(r.error.message.length).toBeGreaterThan(0)
-      expect(typeof r.error.acpError?.code).toBe('number')
-      // Partial values stay readable alongside the error.
-      expect(r.raw.newSession).toBeNull()
-    },
-    TURN_TIMEOUT_MS,
-  )
-})

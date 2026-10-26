@@ -381,7 +381,8 @@ async function pingConfigOption(
     return true
   } catch (err) {
     // `-32601 method not found` is the expected "unsupported" answer
-    // (gemini). Everything else is treated as unsupported too, rather
+    // from an agent without the method. Everything else is treated as
+    // unsupported too, rather
     // than failing the whole probe over an optional method.
     void (err instanceof RequestError && err.code === ACP_METHOD_NOT_FOUND)
     return false

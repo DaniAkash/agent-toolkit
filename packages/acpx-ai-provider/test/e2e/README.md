@@ -9,7 +9,7 @@ sure nothing drifted against the live runtime.
 ## Run
 
 ```bash
-# All three agents (Claude + Codex + Gemini)
+# Both agents (Claude + Codex)
 SMOKE_AGENTS=all bun test test/e2e
 
 # Or via the shorthand script
@@ -32,7 +32,6 @@ suite is unaffected — it always runs.
 |---|---|---|
 | `claude` | `ACPX_AUTH_ANTHROPIC_API_KEY` (or `ANTHROPIC_API_KEY`) | `npx`-downloads `@agentclientprotocol/claude-agent-acp` (~30s) |
 | `codex` | `ACPX_AUTH_OPENAI_API_KEY` (or `OPENAI_API_KEY`) | `npx`-downloads `@zed-industries/codex-acp` |
-| `gemini` | local `gemini` CLI installed and authenticated (`gemini auth login`) | none (uses local CLI) |
 
 ## What each test catches
 

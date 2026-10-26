@@ -1,0 +1,46 @@
+{
+  "sessionId": "696f6d78-6c54-4991-8631-25f700acef55",
+  "modes": {
+    "availableModes": [
+      {
+        "id": "default",
+        "name": "Default",
+        "description": "Prompts for approval"
+      },
+      {
+        "id": "autoEdit",
+        "name": "Auto Edit",
+        "description": "Auto-approves edit tools"
+      },
+      {
+        "id": "yolo",
+        "name": "YOLO",
+        "description": "Auto-approves all tools"
+      },
+      {
+        "id": "plan",
+        "name": "Plan",
+        "description": "Read-only mode"
+      }
+    ],
+    "currentModeId": "default"
+  },
+  "models": {
+    "availableModels": [
+      {
+        "modelId": "auto",
+        "name": "Auto",
+        "description": "Let the agent pick the best model for the task"
+      },
+      {
+        "modelId": "large-preview",
+        "name": "large-preview"
+      },
+      {
+        "modelId": "small-preview",
+        "name": "small-preview"
+      }
+    ],
+    "currentModelId": "small-preview"
+  }
+}

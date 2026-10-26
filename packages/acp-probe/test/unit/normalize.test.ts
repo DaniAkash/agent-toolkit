@@ -147,14 +147,17 @@ describe('normalize — codex (codex-acp 0.12.0)', () => {
   })
 })
 
-describe('normalize — gemini (gemini-cli 0.42.0)', () => {
+// An agent that advertises neither sessionCapabilities nor configOptions,
+// which is the sparsest shape ACP permits and the one most likely to trip
+// a normalizer that assumes those blocks exist.
+describe('normalize: minimal capability advertisement', () => {
   test('audio=true, configOptions empty, reasoning null', async () => {
-    const init = await loadInitialize('gemini')
-    const sess = await loadNewSession('gemini')
+    const init = await loadInitialize('minimal-caps')
+    const sess = await loadNewSession('minimal-caps')
 
     const caps = normalizeCapabilities(init)
     expect(caps.promptCapabilities.audio).toBe(true)
-    // Gemini's initialize doesn't advertise sessionCapabilities at all.
+    // The fixture's initialize omits sessionCapabilities entirely.
     expect(caps.sessionCapabilities.close).toBe(false)
 
     expect(normalizeConfigOptions(sess)).toEqual([])

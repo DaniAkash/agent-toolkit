@@ -215,32 +215,6 @@ export const vscodeInsiders: ClientConfig = {
   },
 }
 
-export const gemini: ClientConfig = {
-  id: 'gemini',
-  displayName: 'Gemini CLI',
-  installCheckPaths: {
-    darwin: ['$HOME/.gemini'],
-    linux: ['$HOME/.gemini'],
-    win32: ['$USERPROFILE\\.gemini'],
-  },
-  systemPaths: {
-    darwin: ['$HOME/.gemini/settings.json'],
-    linux: ['$HOME/.gemini/settings.json'],
-    win32: ['$USERPROFILE\\.gemini\\settings.json'],
-  },
-  format: 'json',
-  supportedTransports: { system: ['stdio', 'sse', 'http'] },
-  stdio: { topLevelKey: 'mcpServers' },
-  http: { tagKey: 'type', tagValue: 'http', supportsOAuth: true },
-  sources: {
-    firstParty:
-      'https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md',
-    smithery: SMITHERY_URL,
-    verified: '2026-10-26',
-    verifiedAgainst: 'gemini-cli@0.46.0',
-  },
-}
-
 export const codex: ClientConfig = {
   id: 'codex',
   displayName: 'Codex',
@@ -754,7 +728,7 @@ export const antigravity: ClientConfig = {
     firstParty: 'https://antigravity.google/',
     smithery: SMITHERY_URL,
     notes:
-      "Google's Antigravity editor. Uses `serverUrl` for remote entries (matches Windsurf's convention). Config file lives at ~/.gemini/config/mcp_config.json; the ~/.gemini/antigravity/ directory is the install fingerprint.",
+      "Google's Antigravity editor, which is a separate live product from the retired Gemini CLI and merely shares its `~/.gemini` directory, so these paths are not a Gemini CLI reference. Uses `serverUrl` for remote entries (matches Windsurf's convention). Config file lives at ~/.gemini/config/mcp_config.json; the ~/.gemini/antigravity/ directory is the install fingerprint.",
     verified: '2026-10-26',
     verifiedAgainst: 'antigravity@2.19.1',
   },
@@ -945,7 +919,6 @@ export const CATALOG: ReadonlyArray<ClientConfig> = [
   cursor,
   devinCli,
   enconvo,
-  gemini,
   goose,
   kiro,
   librechat,
