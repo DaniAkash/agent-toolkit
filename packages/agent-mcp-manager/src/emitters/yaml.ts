@@ -15,10 +15,17 @@ function parseDoc(raw: string): YAML.Document {
   return YAML.parseDocument(raw, { keepSourceTokens: true })
 }
 
+/** Walk a containerPath through a YAML document, or undefined if absent. */
+function getContainer(doc: YAML.Document, path: readonly string[]): unknown {
+  return path.length === 1
+    ? doc.get(path[0] as string)
+    : doc.getIn(path as string[])
+}
+
 export function yamlRead(raw: string, shapes: ResolvedShapes): string[] {
   if (!raw.trim()) return []
   const doc = parseDoc(raw)
-  const container = doc.get(shapes.topLevelKey)
+  const container = getContainer(doc, shapes.containerPath)
   if (!YAML.isMap(container)) return []
   return container.items
     .map((item) =>
@@ -36,11 +43,13 @@ export function yamlAdd(
   const doc = parseDoc(raw)
   const key = transformKey(name, shapes.stdio)
   const value = buildEntryValue(spec, shapes)
-  const container = doc.get(shapes.topLevelKey)
+  const container = getContainer(doc, shapes.containerPath)
   if (YAML.isMap(container)) {
     container.set(key, value)
+  } else if (shapes.containerPath.length === 1) {
+    doc.set(shapes.containerPath[0] as string, { [key]: value })
   } else {
-    doc.set(shapes.topLevelKey, { [key]: value })
+    doc.setIn(shapes.containerPath as string[], { [key]: value })
   }
   return String(doc)
 }
@@ -53,10 +62,16 @@ export function yamlRemove(
   if (!raw.trim()) return raw
   const doc = parseDoc(raw)
   const key = transformKey(name, shapes.stdio)
-  const container = doc.get(shapes.topLevelKey)
+  const container = getContainer(doc, shapes.containerPath)
   if (YAML.isMap(container)) {
     container.delete(key)
-    if (container.items.length === 0) doc.delete(shapes.topLevelKey)
+    if (container.items.length === 0) {
+      if (shapes.containerPath.length === 1) {
+        doc.delete(shapes.containerPath[0] as string)
+      } else {
+        doc.deleteIn(shapes.containerPath as string[])
+      }
+    }
   }
   return String(doc)
 }

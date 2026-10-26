@@ -51,6 +51,14 @@ export type ConfigFormat = 'json' | 'jsonc' | 'yaml' | 'toml'
 export interface StdioShape {
   /** Object key that holds the entry map. Examples: 'mcpServers', 'servers', 'mcp', 'context_servers', 'extensions'. */
   topLevelKey: string
+  /**
+   * Full path to the entry map, when it is nested deeper than one key.
+   * Defaults to `[topLevelKey]`. The literal segment `'{projectRoot}'` is
+   * substituted with the caller's project root, which is what lets Claude
+   * Code's `local` scope address `projects.<root>.mcpServers` in the same
+   * file its `system` scope writes to.
+   */
+  containerPath?: readonly string[]
   /** Field name for the executable command. Default 'command'. Goose uses 'cmd'. */
   commandField?: string
   /** Field name for the args array. Default 'args'. */
@@ -136,6 +144,16 @@ export interface ClientConfig {
   http?: HttpShape
   /** Present when project scope has divergent write shapes. Enforced by the validator. */
   project?: {
+    stdio: StdioShape
+    http?: HttpShape
+  }
+  /**
+   * Present only for clients with a third, project-specific scope stored
+   * inside the global config file rather than in the project directory.
+   * Claude Code is the only one: `claude mcp add -s local` writes to
+   * `projects.<cwd>.mcpServers` in `~/.claude.json`.
+   */
+  local?: {
     stdio: StdioShape
     http?: HttpShape
   }

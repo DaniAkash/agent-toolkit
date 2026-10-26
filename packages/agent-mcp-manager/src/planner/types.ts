@@ -38,6 +38,13 @@ export interface AgentFileState {
   scope: AgentScope
   /** Absolute path of the config file we would write to. */
   configPath: string
+  /**
+   * The project root this (agent, scope) pair was resolved against, when
+   * the scope needs one. `local` scope addresses entries by project root
+   * inside the global file, so the planner has to pass it through to the
+   * emitter; `readState` is where it is known.
+   */
+  projectRoot?: string
   /** Raw file contents read at boundary time. Empty string when the file does not exist yet. */
   rawContent: string
   /** True when the file existed on disk when State was read. */

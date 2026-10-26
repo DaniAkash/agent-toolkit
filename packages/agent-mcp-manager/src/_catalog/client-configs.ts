@@ -17,6 +17,7 @@
  * THIRD_PARTY_NOTICES.md.
  */
 
+import { PROJECT_ROOT_TOKEN } from '../emitters/shape.ts'
 import type { ClientConfig } from './types.ts'
 
 const SMITHERY_URL =
@@ -82,6 +83,22 @@ export const claudeCode: ClientConfig = {
   },
   project: {
     stdio: { topLevelKey: 'mcpServers', tagKey: 'type', tagValue: 'stdio' },
+  },
+  // `claude mcp add -s local`, which is Claude Code's DEFAULT scope. It
+  // shares ~/.claude.json with the user/system scope and is told apart
+  // only by the container: projects.<cwd>.mcpServers. A single key cannot
+  // address that, which is why StdioShape grew `containerPath`.
+  local: {
+    stdio: {
+      topLevelKey: 'projects',
+      containerPath: ['projects', PROJECT_ROOT_TOKEN, 'mcpServers'],
+    },
+    http: {
+      tagKey: 'type',
+      tagValue: 'http',
+      sseTagValue: 'sse',
+      supportsOAuth: true,
+    },
   },
   sources: {
     firstParty: 'https://docs.claude.com/en/docs/claude-code/mcp',

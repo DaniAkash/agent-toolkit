@@ -6,7 +6,20 @@ import type { ClientId } from './_catalog/types.ts'
 
 export type AgentId = ClientId
 
-export type AgentScope = 'system' | 'project'
+/**
+ * Which of a client's configuration surfaces to write.
+ *
+ * `system` is the single global file, which is what 22 of the 23 clients
+ * have. `project` is a file in the project directory. `local` is a third
+ * surface that lives *inside* the global file, keyed by project: Claude
+ * Code's `claude mcp add -s local` writes `projects.<cwd>.mcpServers` in
+ * `~/.claude.json`, and it is that client's default scope.
+ *
+ * `system` is kept as the name for what Claude Code calls `user`, since
+ * it is the correct name for the other 22 clients, where there is one
+ * global file and no per-project container.
+ */
+export type AgentScope = 'system' | 'project' | 'local'
 
 export type McpTransport = 'stdio' | 'sse' | 'http'
 

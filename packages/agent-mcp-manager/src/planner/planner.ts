@@ -68,7 +68,7 @@ export function planLink(
   const agentFile = requireAgentFile(state, input.agent, scope)
   ensureAgentInstalled(input.agent, agentFile)
   const client = getCatalogEntry(input.agent)
-  const emitter = getEmitter(client, scope)
+  const emitter = getEmitter(client, scope, agentFile?.projectRoot)
 
   const existing = state.manifest.servers[name]
   const existingKeys = emitter.read(agentFile.rawContent)
@@ -156,7 +156,7 @@ export function planUnlink(
     linkRecord.configPath,
   )
   const client = getCatalogEntry(input.agent)
-  const emitter = getEmitter(client, scope)
+  const emitter = getEmitter(client, scope, agentFile?.projectRoot)
   const ops: FsOp[] = []
   if (agentFile) {
     const nextRaw = emitter.remove(agentFile.rawContent, input.serverName)
@@ -296,7 +296,7 @@ export function planRemove(
       )
       if (agentFile) {
         const client = getCatalogEntry(agent as AgentId)
-        const emitter = getEmitter(client, scope)
+        const emitter = getEmitter(client, scope, agentFile?.projectRoot)
         const nextRaw = emitter.remove(agentFile.rawContent, input.serverName)
         if (nextRaw !== agentFile.rawContent) {
           ops.push(writeOp(agentFile.configPath, nextRaw))
@@ -368,7 +368,7 @@ export function planRescan(
         continue
       }
       const client = getCatalogEntry(agent)
-      const emitter = getEmitter(client, scope)
+      const emitter = getEmitter(client, scope, file.projectRoot)
       const keys = emitter.read(file.rawContent)
       if (keys.includes(server.name)) {
         verified.push({
