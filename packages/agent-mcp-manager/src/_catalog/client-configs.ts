@@ -665,31 +665,6 @@ export const amazonq: ClientConfig = {
   },
 }
 
-export const tome: ClientConfig = {
-  id: 'tome',
-  displayName: 'Tome',
-  installCheckPaths: {
-    darwin: ['$HOME/.tome'],
-    linux: ['$HOME/.tome'],
-    win32: ['$USERPROFILE\\.tome'],
-  },
-  systemPaths: {
-    darwin: ['$HOME/.tome/mcp_config.json'],
-    linux: ['$HOME/.tome/mcp_config.json'],
-    win32: ['$USERPROFILE\\.tome\\mcp_config.json'],
-  },
-  format: 'json',
-  supportedTransports: { system: ['stdio'] },
-  stdio: { topLevelKey: 'mcpServers' },
-  sources: {
-    firstParty: 'https://github.com/runebookai/tome',
-    smithery: SMITHERY_URL,
-    notes:
-      'UNCONFIRMED: the cited source contradicts this entry. Tome\'s README advertises a UI to install and remove MCP servers and says "No fiddling with JSON" and that you should not have to manage json config files, and documents no path or top-level key. The path and `mcpServers` key here match Smithery\'s roster, which is the likely origin. Treat writes through this entry as unverified until the file is confirmed against a running Tome; removing the entry is the alternative and is a maintainer call.',
-    verified: VERIFIED,
-  },
-}
-
 export const librechat: ClientConfig = {
   id: 'librechat',
   displayName: 'LibreChat',
@@ -954,7 +929,6 @@ export const CATALOG: ReadonlyArray<ClientConfig> = [
   librechat,
   opencode,
   roocode,
-  tome,
   trae,
   vscode,
   vscodeInsiders,

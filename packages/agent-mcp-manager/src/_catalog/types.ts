@@ -62,7 +62,6 @@ export type ClientId =
   | 'boltai'
   | 'amazon-bedrock'
   | 'amazonq'
-  | 'tome'
   | 'librechat'
   | 'antigravity'
   | 'trae'

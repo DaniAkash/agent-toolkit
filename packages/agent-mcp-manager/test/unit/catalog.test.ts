@@ -11,8 +11,8 @@ describe('populated catalog', () => {
     expect(errors).toEqual([])
   })
 
-  test('ships 26 clients matching Smithery roster + docker-known set + CLIs', () => {
-    expect(CATALOG).toHaveLength(26)
+  test('ships 25 clients matching Smithery roster + docker-known set + CLIs', () => {
+    expect(CATALOG).toHaveLength(25)
     expect(CATALOG.map((e) => e.id).sort()).toEqual([
       'amazon-bedrock',
       'amazonq',
@@ -33,7 +33,6 @@ describe('populated catalog', () => {
       'librechat',
       'opencode',
       'roocode',
-      'tome',
       'trae',
       'vscode',
       'vscode-insiders',
