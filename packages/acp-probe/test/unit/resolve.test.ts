@@ -5,11 +5,34 @@ import {
   splitArgv,
 } from '../../src/resolve-command.ts'
 
-// acpx 0.13's real agent registry depends on machine config and is empty (or
-// its methods are absent) in a bare environment such as CI, so mock
+// acpx's real agent registry depends on machine config and is empty (or its
+// methods are absent) in a bare environment such as CI, so mock
 // `acpx/runtime` to exercise the resolver deterministically everywhere. The
-// stub also covers both `resolve()` return shapes: acpx 0.13 structured argv
+// stub also covers both `resolve()` return shapes: structured argv
 // (string[]) and a legacy command string.
+//
+// `mock.module` replaces the module for the whole test PROCESS, not just
+// this file, and bun loads every test file into one process. Without the
+// restore below, the e2e suite's real `probeAgent({ agent: 'codex' })` saw
+// this two-entry stub and failed with `acpx does not recognise agent id
+// "codex". Known: claude, legacy`. It only stayed hidden because the e2e
+// suite is gated off by default.
+// `mock.module` replaces the module for the whole test PROCESS and cannot
+// be undone: re-mocking with the real namespace object does not restore it
+// (measured on bun 1.4.2). Scoping it to a `beforeAll` does not help
+// either, because bun applies a module-scope call when it LOADS the file
+// and loads every file before running any test.
+//
+// So this stub reaches any other file sharing the process. It did: the e2e
+// suite's real `probeAgent({ agent: 'codex' })` resolved through this
+// two-entry registry and failed with `acpx does not recognise agent id
+// "codex". Known: claude, legacy`, and the claude side-by-side check
+// disagreed on `systemPrompt` because the stub's unpinned spawn command
+// fetched a different agent version than the pinned one. It stayed hidden
+// only because the e2e suite is gated off by default.
+//
+// The fix is the runner's, not this file's: `bun test --isolate` gives each
+// file a fresh module registry, and the package `test` scripts pass it.
 mock.module('acpx/runtime', () => ({
   createAgentRegistry: () => ({
     list: (): string[] => ['claude', 'legacy'],

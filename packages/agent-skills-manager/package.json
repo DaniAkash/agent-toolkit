@@ -46,7 +46,7 @@
   "scripts": {
     "build": "bunup",
     "dev": "bunup --watch",
-    "test": "bun test",
+    "test": "bun test --isolate",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

@@ -16,7 +16,7 @@
   },
   "sideEffects": false,
   "scripts": {
-    "test": "bun test",
+    "test": "bun test --isolate",
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {

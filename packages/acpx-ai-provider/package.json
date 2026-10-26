@@ -43,7 +43,7 @@
   "scripts": {
     "build": "bunup",
     "dev": "bunup --watch",
-    "test": "bun test",
+    "test": "bun test --isolate",
     "test:smoke": "SMOKE_AGENTS=all bun test test/e2e",
     "typecheck": "tsc --noEmit"
   },

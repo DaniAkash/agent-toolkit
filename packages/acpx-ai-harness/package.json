@@ -46,7 +46,7 @@
     "build": "bunup && bun run copy-bridge-assets",
     "copy-bridge-assets": "node --input-type=module -e \"import { copyFile, mkdir } from 'node:fs/promises'; await mkdir('dist/bridge', { recursive: true }); await copyFile('src/bridge/package.json', 'dist/bridge/package.json');\"",
     "dev": "bunup --watch",
-    "test": "bun test test/unit",
+    "test": "bun test --isolate test/unit",
     "test:e2e": "bun run build && bun test test/e2e",
     "test:smoke": "SMOKE_AGENTS=all bun run test:e2e",
     "typecheck": "tsc --noEmit"
