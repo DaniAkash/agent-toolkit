@@ -533,9 +533,12 @@ export const witsy: ClientConfig = {
   supportedTransports: { system: ['stdio'] },
   stdio: { topLevelKey: 'mcpServers' },
   sources: {
-    firstParty: 'https://github.com/nbonamy/witsy',
+    firstParty: 'https://github.com/Kochava-Studios/witsy',
     smithery: SMITHERY_URL,
-    verified: VERIFIED,
+    notes:
+      'Verified from source. `src/main/config.ts` puts settings at Electron\'s `app.getPath("userData")/settings.json`, which is ~/Library/Application Support/Witsy/settings.json on macOS. `src/main/mcp.ts` getServers() reads two places and merges them: its own `mcp.servers` array, and a TOP-LEVEL `mcpServers` map whose entries it reads as `command`, `args` and `cwd`. The top-level map is the one this catalog writes. The citation moved: nbonamy/witsy is now a stub whose README points here.',
+    verified: '2026-10-26',
+    verifiedAgainst: 'Kochava-Studios/witsy@main (main/mcp.ts)',
   },
 }
 
@@ -661,7 +664,10 @@ export const amazonq: ClientConfig = {
     firstParty:
       'https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/qdev-mcp.html',
     smithery: SMITHERY_URL,
+    notes:
+      'CONDITIONAL: ~/.aws/amazonq/mcp.json is the LEGACY location. Per aws/amazon-q-developer-cli docs/agent-format.md it is read only when the active agent sets `useLegacyMcpJson: true`; otherwise Q ignores it and a linked server silently never appears. The current location is the `mcpServers` field inside an agent document, ~/.aws/amazonq/agents/default.json for the IDE or under ~/.aws/amazonq/cli-agents for the CLI. Writing there is not a path change: an agent document also needs `name` and other fields, so creating one from scratch would produce an invalid agent. That makes it a feature (emit an agent document) rather than a catalog edit, which is why the legacy path is still the write target here. Reordering the candidates alone would be worse, since pickConfigPath falls back to the first entry and would create a nameless agent file.',
     verified: '2026-10-26',
+    verifiedAgainst: 'amazon-q-developer-cli@main (docs/agent-format.md)',
   },
 }
 
