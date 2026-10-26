@@ -32,7 +32,7 @@
     },
     "packages/acpx-ai-harness": {
       "name": "acpx-ai-harness",
-      "version": "0.0.2",
+      "version": "0.0.3",
       "dependencies": {
         "ws": "^8.21.3",
         "zod": "3.25.76",
@@ -56,7 +56,7 @@
     },
     "packages/acpx-ai-provider": {
       "name": "acpx-ai-provider",
-      "version": "1.0.0",
+      "version": "2.0.0",
       "devDependencies": {
         "@ai-sdk/provider": "4.0.34",
         "@ai-sdk/provider-utils": "5.0.68",
