@@ -12,6 +12,19 @@ import {
 import { getEmitter } from '../../src/emitters/index.ts'
 import type { McpServerSpec } from '../../src/types.ts'
 
+/** Read one entry out of a parsed config, typed and optional. */
+function entryAt(
+  raw: string,
+  container: string,
+  name: string,
+): Record<string, unknown> | undefined {
+  const parsed = JSON.parse(raw) as Record<
+    string,
+    Record<string, Record<string, unknown>> | undefined
+  >
+  return parsed[container]?.[name]
+}
+
 const STDIO: McpServerSpec = {
   transport: 'stdio',
   command: 'npx',
@@ -44,61 +57,43 @@ describe('OpenCode, released 1.x shape', () => {
       args: ['-y', 'pkg'],
       env: { KEY: 'v' },
     })
-    const entry = (
-      (JSON.parse(out) as Record<string, Record<string, unknown>>)
-        .mcp as Record<string, Record<string, unknown>>
-    ).ctx
-    expect(entry.type).toBe('local')
-    expect(entry.enabled).toBe(true)
+    const entry = entryAt(out, 'mcp', 'ctx')
+    expect(entry?.type).toBe('local')
+    expect(entry?.enabled).toBe(true)
     // command is one array, and env is renamed to environment.
-    expect(entry.command).toEqual(['npx', '-y', 'pkg'])
-    expect(entry.environment).toEqual({ KEY: 'v' })
-    expect(entry.env).toBeUndefined()
+    expect(entry?.command).toEqual(['npx', '-y', 'pkg'])
+    expect(entry?.environment).toEqual({ KEY: 'v' })
+    expect(entry?.env).toBeUndefined()
   })
 
   test('remote entries are tagged remote', () => {
     const out = io.add('{}', 'rem', HTTP)
-    const entry = (
-      (JSON.parse(out) as Record<string, Record<string, unknown>>)
-        .mcp as Record<string, Record<string, unknown>>
-    ).rem
-    expect(entry.type).toBe('remote')
-    expect(entry.url).toBe('https://mcp.example.com/mcp')
+    const entry = entryAt(out, 'mcp', 'rem')
+    expect(entry?.type).toBe('remote')
+    expect(entry?.url).toBe('https://mcp.example.com/mcp')
   })
 })
 
 describe('newly catalogued CLIs', () => {
   test('Copilot CLI tags stdio as local and http as http', () => {
     const io = getEmitter(copilotCli, 'system')
-    const stdio = JSON.parse(io.add('{}', 's', STDIO)) as Record<
-      string,
-      Record<string, Record<string, unknown>>
-    >
-    expect(stdio.mcpServers?.s?.type).toBe('local')
-    const http = JSON.parse(io.add('{}', 'h', HTTP)) as Record<
-      string,
-      Record<string, Record<string, unknown>>
-    >
-    expect(http.mcpServers?.h?.type).toBe('http')
+    const stdio = io.add('{}', 's', STDIO)
+    expect(entryAt(stdio, 'mcpServers', 's')?.type).toBe('local')
+    const http = io.add('{}', 'h', HTTP)
+    expect(entryAt(http, 'mcpServers', 'h')?.type).toBe('http')
   })
 
   test('Devin CLI writes bare stdio entries and tags remotes with transport', () => {
     const io = getEmitter(devinCli, 'system')
-    const stdio = JSON.parse(io.add('{}', 's', STDIO)) as Record<
-      string,
-      Record<string, Record<string, unknown>>
-    >
+    const stdio = io.add('{}', 's', STDIO)
     // Documented shape is bare command/args/env with no type field.
-    expect(stdio.mcpServers?.s?.type).toBeUndefined()
-    expect(stdio.mcpServers?.s?.command).toBe('npx')
+    expect(entryAt(stdio, 'mcpServers', 's')?.type).toBeUndefined()
+    expect(entryAt(stdio, 'mcpServers', 's')?.command).toBe('npx')
 
-    const http = JSON.parse(io.add('{}', 'h', HTTP)) as Record<
-      string,
-      Record<string, Record<string, unknown>>
-    >
+    const http = io.add('{}', 'h', HTTP)
     // Devin spells the discriminator `transport`, not `type`.
-    expect(http.mcpServers?.h?.transport).toBe('http')
-    expect(http.mcpServers?.h?.type).toBeUndefined()
+    expect(entryAt(http, 'mcpServers', 'h')?.transport).toBe('http')
+    expect(entryAt(http, 'mcpServers', 'h')?.type).toBeUndefined()
   })
 })
 
