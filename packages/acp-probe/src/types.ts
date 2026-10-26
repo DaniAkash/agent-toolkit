@@ -13,6 +13,12 @@ export interface PromptCapabilities {
 export interface McpCapabilities {
   http: boolean
   sse: boolean
+  /**
+   * MCP-over-ACP: the agent accepts MCP servers proxied through the ACP
+   * connection itself rather than over http/sse. Advertised under the
+   * SDK's unstable v1 schema.
+   */
+  acp: boolean
   /** Any extension keys we didn't explicitly model. */
   meta?: Record<string, unknown>
 }
@@ -22,6 +28,11 @@ export interface SessionCapabilities {
   list: boolean
   resume: boolean
   fork: boolean
+  /**
+   * Whether the agent accepts `systemPrompt` on session lifecycle
+   * requests. Advertised under the SDK's unstable v1 schema.
+   */
+  systemPrompt: boolean
   additionalDirectories: boolean
 }
 
@@ -31,15 +42,16 @@ export interface AgentCapabilities {
   mcpCapabilities: McpCapabilities
   sessionCapabilities: SessionCapabilities
   /**
-   * Experimental ACP capabilities surfaced verbatim. Typed as `unknown`
-   * until they stabilise; consumers can index into them at their own risk.
+   * Every advertised agent capability that the named groups above do not
+   * cover, surfaced verbatim. Values are `unknown` until they stabilise;
+   * consumers can index into them at their own risk.
+   *
+   * Pass-through rather than an allowlist, so a capability ACP adds after
+   * this package was published still reaches the caller. The keys ACP
+   * currently puts here include `auth`, `providers` and, on agents that
+   * speak it, `nes`.
    */
-  experimental?: {
-    auth?: unknown
-    nes?: unknown
-    providers?: unknown
-    positionEncoding?: unknown
-  }
+  experimental?: Record<string, unknown>
 }
 
 export interface AuthMethod {

@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import type {
   InitializeResponse,
   NewSessionResponse,
-} from '@agentclientprotocol/sdk'
+} from '@agentclientprotocol/sdk/unstable'
 import {
   deriveModelConfig,
   deriveReasoning,
@@ -47,12 +47,13 @@ describe('normalize — claude (claude-agent-acp 0.31.4)', () => {
       audio: false,
       embeddedContext: true,
     })
-    expect(caps.mcpCapabilities).toEqual({ http: true, sse: true })
+    expect(caps.mcpCapabilities).toEqual({ http: true, sse: true, acp: false })
     expect(caps.sessionCapabilities).toEqual({
       close: true,
       list: true,
       resume: true,
       fork: true,
+      systemPrompt: false,
       additionalDirectories: false,
     })
 
