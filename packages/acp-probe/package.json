@@ -40,7 +40,7 @@
     "build": "bunup",
     "dev": "bunup --watch",
     "test": "bun test --isolate",
-    "test:e2e": "PROBE_E2E=all bun test test/e2e",
+    "test:e2e": "PROBE_E2E=all bun test --isolate test/e2e",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
