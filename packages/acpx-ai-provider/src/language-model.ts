@@ -97,6 +97,9 @@ export class AcpxLanguageModel implements LanguageModelV2 {
       onAvailableCommands: (commands) => {
         this.providerInstance.recordAvailableCommands(sessionKey, commands)
       },
+      onPlan: (entries) => {
+        this.providerInstance.recordPlan(sessionKey, entries)
+      },
     })
 
     let stream = createTranslatingStream(turn, translator)

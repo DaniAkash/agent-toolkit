@@ -38,9 +38,9 @@ bun add acpx-ai-provider acpx ai
 npm i acpx-ai-provider acpx ai
 ```
 
-`acpx` and `ai` are peer dependencies. Requires `ai` ≥ 7.0.0-beta and `acpx` ≥ 0.13.0.
+`acpx` and `ai` are peer dependencies. Requires `ai` ≥ 7.0.0-beta and `acpx` ≥ 0.21.0.
 
-> **AI SDK v7 support.** The provider implements `LanguageModelV2`, which AI SDK 7 accepts directly via its `LanguageModel = LanguageModelV2 | LanguageModelV3 | LanguageModelV4` union. You'll see a one-time `"specificationVersion" is used in a compatibility mode` warning during the first call — this is by design and harmless. A future minor release may migrate the provider to `LanguageModelV4` to drop the warning.
+> **AI SDK v7 support.** The provider implements `LanguageModelV2`, which AI SDK 7 accepts directly via its `LanguageModel = GlobalProviderModelId | LanguageModelV4 | LanguageModelV3 | LanguageModelV2` union; V2 is still in that union as of `ai` 7.0.153. You'll see a one-time `"specificationVersion" is used in a compatibility mode` warning during the first call, which is by design and harmless. Migrating to `LanguageModelV4` to drop the warning stays an open option, not a pending requirement.
 
 ## Quickstart
 
@@ -171,6 +171,38 @@ Built-in agents `acpx` ships:
 `pi`, `openclaw`, `codex`, `claude`, `gemini`, `cursor`, `copilot`,
 `droid`, `iflow`, `kilocode`, `kimi`, `kiro`, `opencode`, `qoder`, `qwen`,
 `trae`. Behavior varies — see [Known limitations](#known-limitations).
+
+### Isolating the agent's environment
+
+By default the agent process, command probes and ACP terminals inherit the
+host's entire environment, which includes whatever credentials the embedding
+application happens to be holding. Two opt-in settings narrow that:
+
+```ts
+createAcpxProvider({
+  agent: 'codex',
+  // Only these reach the agent.
+  agentProcessEnvAllow: ['PATH', 'HOME', 'OPENAI_API_KEY'],
+  // Or keep specific values out while inheriting the rest.
+  agentProcessEnvBlock: ['AWS_SECRET_ACCESS_KEY', 'STRIPE_SECRET_KEY'],
+  // Child-only additions, not persisted to the session.
+  agentProcessEnv: { ACPX_FEATURE_FLAG: '1' },
+})
+```
+
+Both lists are off unless set, so behaviour is unchanged until you opt in.
+
+The ACP filesystem and terminal callbacks can also be switched off:
+
+```ts
+createAcpxProvider({ agent: 'codex', fs: false, terminal: false })
+```
+
+> **This is a protocol policy, not a sandbox.** `fs` and `terminal` decide
+> which ACP callbacks get registered for the connection. They do not confine
+> the agent process, which can still touch the filesystem or spawn commands by
+> any other means available to it. Use OS-level isolation if you need a real
+> boundary.
 
 ## Custom agents
 
@@ -347,6 +379,39 @@ configurations) simply produce no `reasoning-*` parts; consumer
 code with a `reasoning-delta` branch never fires, no special-case
 needed.
 
+### Structured plan snapshots
+
+Agents that emit ACP `plan` updates send a normalized snapshot: each entry has
+`content`, a `status` of `pending` / `in_progress` / `completed`, and an
+optional `priority`. Every update **replaces** the previous plan rather than
+adding to it, and an empty array means the agent cleared it.
+
+Subscribe for the structured form, or read the latest snapshot synchronously:
+
+```ts
+provider.events.on('plan', ({ sessionKey, entries }) => {
+  // entries is the whole plan, not a delta. [] means "clear it".
+  renderTaskList(entries)
+})
+
+const entries = provider.getPlan() // defensive copy; [] if none or cleared
+```
+
+The same snapshot is also rendered into the AI SDK reasoning stream, so a
+plain `streamText` consumer that never touches `provider.events` still sees
+plans, with status carried as a mark:
+
+```text
+[Plan]
+[x] Read the failing test
+[~] Patch the translator (high)
+[ ] Run the suite
+```
+
+Agents that send a prose plan with no structured entries keep working through
+the reasoning stream; the `plan` event stays quiet for them, since there is no
+entry list to report.
+
 ### Controlling reasoning effort
 
 Most thinking-capable agents accept a `reasoning_effort` config
@@ -370,6 +435,29 @@ What's confirmed today:
 The CLI alias `thought_level` is **Codex-only** — `acpx codex set
 thought_level high` translates to `reasoning_effort = high` before
 dispatch. Other agents take `reasoning_effort` verbatim.
+
+### Selecting a model
+
+`setModel` goes through the agent's advertised model control, which survives
+reconnects:
+
+```ts
+await provider.setModel('gpt-5-codex')
+```
+
+Prefer this over `setConfigOption('model', id)`. Some agents reject
+`session/set_config_option` for the model key, which is why the config-option
+route existed before a first-class setter was available. `setModel` falls back
+to that route automatically when the underlying runtime has no model setter.
+
+### Inspecting capabilities
+
+```ts
+const caps = await provider.getCapabilities()
+```
+
+Reads the session's advertised capabilities off the runtime, with no CLI
+spawn. Returns `undefined` on a runtime that does not implement it.
 
 ### Discovering an agent's config keys
 
@@ -436,8 +524,8 @@ ergonomics; the provider converts them to the ACP wire format
 (`Array<{ name, value }>`) before handing the config to the runtime.
 
 > **Note**: host-side AI SDK tools (the `acpTools()` /
-> TCP-callback story from `acp-ai-provider`) are **not** supported in
-> v0.1. See [Known limitations](#known-limitations).
+> TCP-callback story from `acp-ai-provider`) are **not** supported. See
+> [Known limitations](#known-limitations).
 
 ## Per-call permissions
 
@@ -662,8 +750,8 @@ agent doesn't implement them. Inspect
 
 ## Known limitations
 
-This is alpha software. Most rough edges flow through from
-`acpx/runtime`, which is itself pre-1.0.
+The provider's own API is stable as of `1.0.0`. Most rough edges below
+flow through from `acpx/runtime`, which is itself pre-1.0.
 
 ### Inherited from `acpx/runtime`
 
@@ -698,13 +786,22 @@ This is alpha software. Most rough edges flow through from
   `setConfigOption`, `doctor`, `getStatus` aren't implemented by every
   agent.
 
+- **`fs` and `terminal` are protocol policy, not an OS sandbox.** They
+  control which ACP callbacks exist for the connection, not what the agent
+  process can reach.
+- **Incoming ACP messages are capped at 64 MiB by default.** Raise it with
+  `ACPX_MAX_ACP_MESSAGE_BYTES`, or set that to `0` to disable the cap. A
+  warm session keeps whatever setting it started with.
+
 ### AI SDK integration
 
-- **`LanguageModelV2` compatibility-mode warning.** AI SDK v6 prints a
+- **`LanguageModelV2` compatibility-mode warning.** AI SDK 7 prints a
   warning on first use ("specificationVersion is used in a
-  compatibility mode"). Harmless. Will go away when we move to V3.
-- **No host-side AI SDK tools.** v0.1 only supports tools the agent
-  learns about via MCP servers. AI SDK `tool({ execute })` callbacks
+  compatibility mode"). Harmless, and expected: V2 is still a member of
+  the `LanguageModel` union. It would go away by moving the provider to
+  `LanguageModelV4`, which is an open option rather than a planned step.
+- **No host-side AI SDK tools.** Only tools the agent learns about via
+  MCP servers are available. AI SDK `tool({ execute })` callbacks
   passed to `streamText` won't be invoked from this provider — the
   agent doesn't know about them.
 - **`tool-call.providerExecuted` is always `true`.** Every tool call
@@ -722,6 +819,15 @@ This is alpha software. Most rough edges flow through from
 
 ### Per-agent quirks
 
+- **Fixed-choice agent questions cannot be answered by a host callback.**
+  Agents that ask fixed-choice interaction questions (Antigravity, and
+  custom launchers wrapping it) have those questions cancelled with a
+  user-answer-required error rather than resolved through tool approval.
+  acpx applies this ahead of permission policies and host permission
+  callbacks by design, so `onPermissionRequest` cannot answer them.
+  Continue such a conversation in an interactive client that supports the
+  agent's own question flow.
+
 Behavior varies by built-in agent. Recommended starting matrix:
 
 | Agent | Notes |
@@ -732,11 +838,12 @@ Behavior varies by built-in agent. Recommended starting matrix:
 | `gemini` | Requires `--experimental-acp` (registry already passes it). Capability surface still evolving. |
 | `copilot` | Requires authenticated GitHub Copilot CLI. Run `gh auth login` first. |
 
-### Out of scope for v0.1
+### Out of scope
 
 These are deliberate non-goals, not bugs:
 
-- Host-side AI SDK tools.
+- Host-side AI SDK tools. The agent only learns about tools through MCP
+  servers, so `tool({ execute })` callbacks are never invoked here.
 - Mid-stream model switching from inside a single `streamText` call.
 - Provider-defined dynamic tool routing.
 - Live token-cost calculation.

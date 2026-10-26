@@ -4,10 +4,12 @@ import path from 'node:path'
 import type {
   AcpRuntime,
   AcpRuntimeAvailableCommand,
+  AcpRuntimeCapabilities,
   AcpRuntimeDoctorReport,
   AcpRuntimeEvent,
   AcpRuntimeHandle,
   AcpRuntimeOptions,
+  AcpRuntimePlanEntry,
   AcpRuntimeSessionModels,
 } from 'acpx/runtime'
 import {
@@ -44,6 +46,7 @@ export interface AcpxProviderEvents {
   availableCommands: [
     { sessionKey: string; commands: AcpRuntimeAvailableCommand[] },
   ]
+  plan: [{ sessionKey: string; entries: AcpRuntimePlanEntry[] }]
 }
 
 export class AcpxProvider {
@@ -55,6 +58,7 @@ export class AcpxProvider {
   private runtimeInstance: AcpRuntime | null
   private readonly handles = new Map<string, ResolvedHandle>()
   private readonly usedKeys = new Set<string>()
+  private readonly lastPlan = new Map<string, AcpRuntimePlanEntry[]>()
   private readonly lastUsage = new Map<string, AcpxUsageSnapshot>()
   private readonly lastCommands = new Map<
     string,
@@ -109,8 +113,42 @@ export class AcpxProvider {
       this.handles.set(sessionKey, cached)
     }
 
+    // acpx 0.21 stopped streaming `available_commands_update` for codex and
+    // surfaces the same list on `getStatus()` instead. Seed from there when
+    // nothing has arrived by event, so `getAvailableCommands` and `compact`
+    // keep working on both shapes.
+    if (!this.lastCommands.has(sessionKey)) {
+      await this.syncAvailableCommandsFromStatus(sessionKey, cached.handle)
+    }
+
     const isFresh = !this.usedKeys.has(sessionKey)
     return { handle: cached.handle, sessionKey, mode, isFresh }
+  }
+
+  /**
+   * Read the agent's advertised commands off session status. Best effort: a
+   * runtime without `getStatus`, or a status without a command list, leaves
+   * the cache untouched so the event path still wins when it fires.
+   */
+  private async syncAvailableCommandsFromStatus(
+    sessionKey: string,
+    handle: AcpRuntimeHandle,
+  ): Promise<void> {
+    const getStatusImpl = this.runtime.getStatus
+    if (!getStatusImpl) return
+    try {
+      const status = await getStatusImpl.call(this.runtime, { handle })
+      const commands = status.availableCommands
+      // Record an empty list too, rather than only a populated one. The seed
+      // is guarded on the key being absent from the cache, so skipping []
+      // would leave it absent and re-run getStatus on every ensureHandle for
+      // any agent that advertises nothing. A later event still overwrites it.
+      if (commands !== undefined) {
+        this.recordAvailableCommands(sessionKey, commands)
+      }
+    } catch {
+      // Status is an optimisation here, never a precondition for a turn.
+    }
   }
 
   markSessionKeyUsed(sessionKey: string): boolean {
@@ -151,6 +189,49 @@ export class AcpxProvider {
     for (const [, { handle }] of this.handles) {
       await setModeImpl.call(this.runtime, { handle, mode })
     }
+  }
+
+  /**
+   * Select a model through the adapter's advertised model control, which
+   * survives reconnects. Prefer this over `setConfigOption('model', id)`:
+   * some agents (gemini-cli among them) reject `session/set_config_option`
+   * for the model key, which is what forced the config-option workaround
+   * before acpx exposed a first-class setter. Falls back to that workaround
+   * when the runtime has no `setModel`, so older acpx keeps working.
+   */
+  async setModel(
+    model: string,
+    opts: AcpxLanguageModelOptions = {},
+  ): Promise<void> {
+    // Establish the session first. Without this a call on a fresh provider
+    // iterates an empty handle map and silently discards the request, which
+    // is what the README's one-line example would have done.
+    await this.ensureHandle(opts)
+    const setModelImpl = this.runtime.setModel
+    if (!setModelImpl) {
+      await this.setConfigOption('model', model)
+      return
+    }
+    for (const [, { handle }] of this.handles) {
+      await setModelImpl.call(this.runtime, { handle, model })
+    }
+  }
+
+  /**
+   * The session's advertised capabilities. Reads from the runtime rather than
+   * spawning the CLI, so it costs nothing beyond the already-open session.
+   */
+  async getCapabilities(
+    opts: AcpxLanguageModelOptions = {},
+  ): Promise<AcpRuntimeCapabilities | undefined> {
+    const getCapsImpl = this.runtime.getCapabilities
+    if (!getCapsImpl) return undefined
+    // Resolve the requested session, as getModels does. Picking the first
+    // cached handle reported an arbitrary session once more than one existed,
+    // and passing no handle asks the runtime for global capabilities rather
+    // than the session's.
+    const { handle } = await this.ensureHandle(opts)
+    return await getCapsImpl.call(this.runtime, { handle })
   }
 
   async setConfigOption(key: string, value: string): Promise<void> {
@@ -199,10 +280,28 @@ export class AcpxProvider {
     return (commands ?? []).map((c) => ({ ...c }))
   }
 
+  /**
+   * Latest plan snapshot for this session, or `[]` if the agent has not sent
+   * one. A snapshot replaces the previous one rather than adding to it, and an
+   * empty array means the agent cleared the plan, so an empty result is a real
+   * answer and not a missing one.
+   */
+  getPlan(sessionKey?: string): AcpRuntimePlanEntry[] {
+    const entries = this.lastPlan.get(sessionKey ?? this.resolveSessionKey({}))
+    // Defensive copy so callers cannot mutate the provider's stored state.
+    return (entries ?? []).map((entry) => ({ ...entry }))
+  }
+
   /** Internal: called by the language model when an event arrives. */
   recordUsage(snapshot: AcpxUsageSnapshot): void {
     this.lastUsage.set(snapshot.sessionKey, snapshot)
     this.events.emit('usage', snapshot)
+  }
+
+  /** Internal: called by the language model when an event arrives. */
+  recordPlan(sessionKey: string, entries: AcpRuntimePlanEntry[]): void {
+    this.lastPlan.set(sessionKey, entries)
+    this.events.emit('plan', { sessionKey, entries })
   }
 
   /** Internal: called by the language model when an event arrives. */
@@ -235,6 +334,8 @@ export class AcpxProvider {
       event.availableCommands
     ) {
       this.recordAvailableCommands(sessionKey, event.availableCommands)
+    } else if (event.tag === 'plan' && event.entries) {
+      this.recordPlan(sessionKey, event.entries)
     }
   }
 
@@ -335,6 +436,28 @@ export class AcpxProvider {
       timeoutMs: this.settings.turnTimeoutMs,
       mcpServers: toRuntimeMcpServers(this.settings.mcpServers),
       onPermissionRequest: this.settings.onPermissionRequest,
+      // Pass-through embedding controls. Each is omitted rather than set to
+      // undefined when unset, because acpx treats an omitted option as
+      // "inherit the default" and the defaults differ per option.
+      ...(this.settings.agentProcessEnv
+        ? { agentProcessEnv: this.settings.agentProcessEnv }
+        : {}),
+      ...(this.settings.agentProcessEnvAllow
+        ? { agentProcessEnvAllow: this.settings.agentProcessEnvAllow }
+        : {}),
+      ...(this.settings.agentProcessEnvBlock
+        ? { agentProcessEnvBlock: this.settings.agentProcessEnvBlock }
+        : {}),
+      ...(this.settings.fs !== undefined ? { fs: this.settings.fs } : {}),
+      ...(this.settings.terminal !== undefined
+        ? { terminal: this.settings.terminal }
+        : {}),
+      ...(this.settings.processLifecycle
+        ? { processLifecycle: this.settings.processLifecycle }
+        : {}),
+      ...(this.settings.sessionPermissions
+        ? { sessionPermissions: this.settings.sessionPermissions }
+        : {}),
     }
   }
 }
