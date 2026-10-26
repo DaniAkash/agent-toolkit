@@ -3,23 +3,23 @@
   "authMethods": [
     {
       "id": "oauth-personal",
-      "name": "Log in with Google",
-      "description": "Log in with your Google account"
+      "name": "Log in with your account",
+      "description": "Browser-based OAuth login"
     },
     {
-      "id": "gemini-api-key",
-      "name": "Gemini API key",
-      "description": "Use an API key with Gemini Developer API",
+      "id": "provider-api-key",
+      "name": "Provider API key",
+      "description": "Use an API key with the provider's developer API",
       "_meta": {
         "api-key": {
-          "provider": "google"
+          "provider": "example"
         }
       }
     },
     {
-      "id": "vertex-ai",
-      "name": "Vertex AI",
-      "description": "Use an API key with Vertex AI GenAI API"
+      "id": "cloud-platform",
+      "name": "Cloud platform",
+      "description": "Use an API key with the hosted platform API"
     },
     {
       "id": "gateway",
@@ -27,16 +27,16 @@
       "description": "Use a custom AI API Gateway",
       "_meta": {
         "gateway": {
-          "protocol": "google",
+          "protocol": "example",
           "restartRequired": "false"
         }
       }
     }
   ],
   "agentInfo": {
-    "name": "gemini-cli",
-    "title": "Gemini CLI",
-    "version": "0.42.0"
+    "name": "example-agent",
+    "title": "Example Agent",
+    "version": "1.2.3"
   },
   "agentCapabilities": {
     "loadSession": true,

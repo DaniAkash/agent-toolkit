@@ -8,14 +8,14 @@ const FAKE_AGENT = fileURLToPath(
 const FIXTURES_DIR = fileURLToPath(new URL('../fixtures/', import.meta.url))
 
 function probeWithFake(
-  agent: 'claude' | 'codex' | 'gemini',
+  fixture: 'claude' | 'codex' | 'minimal-caps',
   env: Record<string, string> = {},
 ): ReturnType<typeof probeAgent> {
   return probeAgent({
     argv: ['bun', 'run', FAKE_AGENT],
     env: {
-      FAKE_INITIALIZE_FIXTURE: `${FIXTURES_DIR}${agent}-initialize.json`,
-      FAKE_NEWSESSION_FIXTURE: `${FIXTURES_DIR}${agent}-newsession.json`,
+      FAKE_INITIALIZE_FIXTURE: `${FIXTURES_DIR}${fixture}-initialize.json`,
+      FAKE_NEWSESSION_FIXTURE: `${FIXTURES_DIR}${fixture}-newsession.json`,
       ...env,
     },
     timeoutMs: 10_000,
@@ -76,10 +76,10 @@ describe('probeAgent — happy path against fake-agent driven by fixtures', () =
     expect(result.authMethods.length).toBe(3)
   })
 
-  test('gemini fixture surfaces audio=true, configOptions=[], reasoning=null', async () => {
-    const result = await probeWithFake('gemini', {
-      // gemini fixture has no configOptions; we still set ok so the
-      // ping path is skipped (configOptions.length === 0 short-circuit).
+  test('a minimal-caps agent surfaces audio=true, configOptions=[], reasoning=null', async () => {
+    const result = await probeWithFake('minimal-caps', {
+      // The fixture has no configOptions, so the ping path is skipped by
+      // the `configOptions.length === 0` short-circuit regardless.
       FAKE_SETCONFIG_BEHAVIOR: 'method_not_found',
     })
 

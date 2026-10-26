@@ -14,14 +14,14 @@
 
 ## What it does
 
-Given an ACP-compatible agent (built-in like `claude` / `codex` /
-`gemini` or any custom adapter you can spawn), `acp-probe` performs
-the ACP `initialize` + `session/new` handshake, then optionally
-pings `session/set_config_option` to test whether the agent
-implements that method — agents like **gemini-cli** that don't
-implement it respond with the standard JSON-RPC "method not found"
-error, which the probe catches to flip `supportsConfigOption: false`
-in the result. Finally the agent is torn down. The result is a
+Given an ACP-compatible agent (built-in like `claude` or `codex`, or
+any custom adapter you can spawn), `acp-probe` performs the ACP
+`initialize` + `session/new` handshake, then optionally pings
+`session/set_config_option` to test whether the agent implements that
+method. Agents that do not implement it respond with the standard
+JSON-RPC "method not found" error, which the probe catches to flip
+`supportsConfigOption: false` in the result. Finally the agent is torn
+down. The result is a
 typed, schema-stable `AgentProbeResult` you can feed into a settings
 UI, picker, or downstream `AcpRuntimeOptions` call.
 
@@ -98,14 +98,14 @@ interface AgentProbeResult {
   /**
    * Derived pointer to `configOptions[id=model]`. `values` are the ids
    * that `setConfigOption('model', X)` will accept. `null` when the
-   * agent doesn't expose a settable model picker (e.g. gemini).
+   * agent doesn't expose a settable model picker.
    */
   modelConfig: { configId; values; currentValue? } | null
   /**
    * True iff the agent implements `session/set_config_option`. False
    * when the agent responds with JSON-RPC "method not found" to a
-   * no-op set call — that's how gemini-cli (and similar adapters that
-   * skip configOptions support) signal the method is unimplemented.
+   * no-op set call, which is how an adapter without configOptions
+   * support signals the method is unimplemented.
    */
   supportsConfigOption: boolean
   error?: ProbeError
@@ -128,8 +128,8 @@ protocol surfaces don't always agree:
   "error"` and no error frame).
 - **`result.modelConfig.values`** — the string ids that the agent's
   `configOptions[id=model]` select will accept. `null` for agents that
-  don't expose `configOptions[model]` at all (e.g. gemini, where
-  `setConfigOption` itself returns `-32601 method not found`).
+  don't expose `configOptions[model]` at all, which is also where
+  `setConfigOption` itself returns `-32601 method not found`.
 - **`result.configOptions.find(o => o.id === 'model')`** — the full typed
   picker option (names, descriptions, `currentValue`) for the settable
   values. Use this when you want to render a rich picker UI on top of
@@ -219,14 +219,14 @@ Exactly one of `agent`, `command`, or `argv` is required.
 ## Captured fixtures (2026-05-14)
 
 The repo ships recorded `initialize` + `session/new` responses for
-claude / codex / gemini under `test/fixtures/`. They power the unit
+claude / codex and a minimal-capability agent under `test/fixtures/`. They power the unit
 test suite and document the per-agent capability matrix at the time
 of capture.
 
 ## End-to-end probes against real agents
 
 An opt-in suite under [`test/e2e/`](./test/e2e/README.md) runs the
-probe against the locally-installed `claude` / `codex` / `gemini`
+probe against the locally-installed `claude` / `codex`
 CLIs to catch upstream adapter drift the fixture tests can't see.
 Each agent is probed twice — once via `{ agent: <id> }` (acpx
 resolution) and once via `{ command: <hardcoded> }` (the no-acpx

@@ -11,8 +11,8 @@ describe('populated catalog', () => {
     expect(errors).toEqual([])
   })
 
-  test('ships 23 clients matching Smithery roster + docker-known set', () => {
-    expect(CATALOG).toHaveLength(23)
+  test('ships 24 clients matching Smithery roster + docker-known set + CLIs', () => {
+    expect(CATALOG).toHaveLength(24)
     expect(CATALOG.map((e) => e.id).sort()).toEqual([
       'amazon-bedrock',
       'amazonq',
@@ -21,16 +21,17 @@ describe('populated catalog', () => {
       'claude-code',
       'claude-desktop',
       'cline',
+      'cline-cli',
       'codex',
+      'copilot-cli',
       'cursor',
+      'devin-cli',
       'enconvo',
-      'gemini',
       'goose',
       'kiro',
       'librechat',
       'opencode',
       'roocode',
-      'tome',
       'trae',
       'vscode',
       'vscode-insiders',
@@ -95,5 +96,27 @@ describe('populated catalog', () => {
     expect(cc.http?.tagKey).toBe('type')
     expect(cc.http?.tagValue).toBe('http')
     expect(cc.http?.sseTagValue).toBe('sse')
+  })
+})
+
+describe('verification provenance', () => {
+  test('every entry verified against a known client release records it', () => {
+    // `verified` is a date and cannot say which client major it describes.
+    // Entries checked first-hand carry the release too; the rest leave the
+    // field unset rather than claim a version nobody looked at.
+    const withVersion = CATALOG.filter((e) => e.sources.verifiedAgainst)
+    expect(withVersion.length).toBeGreaterThanOrEqual(13)
+    for (const entry of withVersion) {
+      // Shaped `<client>@<version>`, so the value is greppable.
+      expect(entry.sources.verifiedAgainst).toContain('@')
+      // A recorded version implies the entry was looked at that day.
+      expect(entry.sources.verified).toBe('2026-10-26')
+    }
+  })
+
+  test('an entry without a recorded version still has a date', () => {
+    for (const entry of CATALOG) {
+      expect(entry.sources.verified).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    }
   })
 })

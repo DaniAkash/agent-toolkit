@@ -1,0 +1,24 @@
+{
+  "protocolVersion": 1,
+  "agentInfo": { "name": "unstable-caps-agent", "version": "1.2.3" },
+  "authMethods": [],
+  "agentCapabilities": {
+    "loadSession": true,
+    "promptCapabilities": {
+      "image": true,
+      "audio": true,
+      "embeddedContext": true
+    },
+    "mcpCapabilities": { "http": true, "sse": false, "acp": true },
+    "sessionCapabilities": {
+      "close": {},
+      "list": {},
+      "resume": {},
+      "fork": {},
+      "systemPrompt": {},
+      "additionalDirectories": {}
+    },
+    "providers": { "configurable": true },
+    "someFutureCapability": { "version": 9 }
+  }
+}

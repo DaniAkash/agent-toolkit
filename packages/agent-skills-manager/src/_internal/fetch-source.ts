@@ -14,6 +14,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { parseFrontmatter } from '../_vendor/frontmatter.ts'
 import { sanitizeName } from '../_vendor/sanitize.ts'
+import { sanitizeMetadata } from '../_vendor/strip-escapes.ts'
 import { SourceParseError } from '../errors.ts'
 import type { AddSkillOptions, AddSkillResult, SkillSource } from '../types.ts'
 
@@ -161,14 +162,23 @@ async function discoverSkills(root: string): Promise<DiscoveredSkill[]> {
     if (isSkillDir) {
       const raw = await readFile(skillMd, 'utf8')
       const { data } = parseFrontmatter(raw)
-      const name =
+      // Sanitised at the parse boundary, not at each result site. These
+      // strings come from a SKILL.md in an arbitrary repository and are
+      // handed to callers that print them to a terminal, a log or a TUI,
+      // where an escape sequence can clear the screen, move the cursor or
+      // forge output (CWE-150). The boundary is the smaller surface to
+      // audit than every place they surface.
+      const rawName =
         typeof data.name === 'string' && data.name.trim().length > 0
           ? data.name.trim()
           : dir === baseRoot
             ? 'unnamed-skill'
             : dir.slice(baseRoot.length + 1) || 'unnamed-skill'
+      const name = sanitizeMetadata(rawName) || 'unnamed-skill'
       const description =
-        typeof data.description === 'string' ? data.description : ''
+        typeof data.description === 'string'
+          ? sanitizeMetadata(data.description)
+          : ''
       out.push({ name, description, sourcePath: dir })
       return // do not recurse below a skill directory
     }

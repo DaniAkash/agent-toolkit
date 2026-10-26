@@ -1,15 +1,15 @@
 /**
  * End-to-end probe tests against real ACP agents.
  *
- * NOT run in CI — these spawn real adapter processes (claude / codex /
- * gemini), perform a real ACP handshake, and need the corresponding
- * CLIs available locally. They exist so contributors can verify
+ * NOT run in CI — these spawn real adapter processes (claude / codex),
+ * perform a real ACP handshake, and need the corresponding CLIs
+ * available locally. They exist so contributors can verify
  * changes against agents the fake-agent harness can't catch: npx
  * download drift, agent CLI version skew, real schema evolution.
  *
  * How to run:
  *
- *   # All three agents
+ *   # Both agents
  *   PROBE_E2E=all bun test test/e2e
  *
  *   # Single agent
@@ -48,16 +48,18 @@ const ALL_REQUESTED = REQUESTED.includes('all')
 const shouldRun = (agent: string): boolean =>
   ALL_REQUESTED || REQUESTED.includes(agent)
 
-const AGENTS = ['claude', 'codex', 'gemini'] as const
+const AGENTS = ['claude', 'codex'] as const
 type ProbeAgent = (typeof AGENTS)[number]
 
 // Hardcoded spawn commands for the no-acpx path. These mirror acpx's
-// AGENT_REGISTRY at the time of capture (2026-05-14). Drift between
-// these and the registry is what the side-by-side assertion catches.
+// AGENT_REGISTRY at the time of capture (2026-10-26, acpx 0.21.0). Drift
+// between these and the registry is what the side-by-side assertion
+// catches, and it did: the previous capture still named
+// `@zed-industries/codex-acp`, which codex has since left for
+// `@agentclientprotocol/codex-acp`.
 const SPAWN_COMMAND: Record<ProbeAgent, string> = {
-  claude: 'npx -y @agentclientprotocol/claude-agent-acp@^0.31.0',
-  codex: 'npx @zed-industries/codex-acp@^0.12.0',
-  gemini: 'gemini --acp',
+  claude: 'npx -y @agentclientprotocol/claude-agent-acp@^0.81.2',
+  codex: 'npx -y @agentclientprotocol/codex-acp@^1.1.5',
 }
 
 // Per-agent stable invariants captured 2026-05-14. These are the
@@ -100,24 +102,6 @@ const EXPECTATIONS: Record<ProbeAgent, (r: AgentProbeResult) => void> = {
     expect(r.modelConfig?.values.every((v) => !v.includes('/'))).toBe(true)
     expect(r.models.every((m) => !m.id.includes('/'))).toBe(true)
     expect(r.supportsConfigOption).toBe(true)
-  },
-  gemini(r) {
-    expect(r.error).toBeUndefined()
-    expect(r.protocolVersion).toBe(1)
-    expect(r.agentInfo?.name).toBe('gemini-cli')
-    // Gemini is unique in advertising audio support.
-    expect(r.capabilities.promptCapabilities.audio).toBe(true)
-    // ACP 1.x sources models from the model config option; gemini exposes
-    // none, so no models surface (the declarative list was removed).
-    expect(r.models).toEqual([])
-    expect(r.modes.length).toBeGreaterThan(0)
-    // No configOptions → no reasoning surface, no settable model picker,
-    // set_config_option absent.
-    expect(r.configOptions).toEqual([])
-    expect(r.reasoning).toBeNull()
-    expect(r.modelConfig).toBeNull()
-    expect(r.supportsConfigOption).toBe(false)
-    expect(r.authMethods.length).toBeGreaterThan(0)
   },
 }
 

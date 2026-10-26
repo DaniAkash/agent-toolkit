@@ -21,7 +21,11 @@ export function jsonRead(raw: string, shapes: ResolvedShapes): string[] {
     return []
   }
   if (!parsed || typeof parsed !== 'object') return []
-  const container = (parsed as Record<string, unknown>)[shapes.topLevelKey]
+  let container: unknown = parsed
+  for (const segment of shapes.containerPath) {
+    if (!container || typeof container !== 'object') return []
+    container = (container as Record<string, unknown>)[segment]
+  }
   if (!container || typeof container !== 'object') return []
   return Object.keys(container as Record<string, unknown>)
 }
@@ -35,7 +39,9 @@ export function jsonAdd(
   const seed = raw.trim() ? raw : '{}'
   const key = transformKey(name, shapes.stdio)
   const value = buildEntryValue(spec, shapes)
-  const edits = modify(seed, [shapes.topLevelKey, key], value, FORMATTING)
+  // `modify` creates the intermediate objects along the path, so a nested
+  // container needs no special handling here.
+  const edits = modify(seed, [...shapes.containerPath, key], value, FORMATTING)
   return applyEdits(seed, edits)
 }
 
@@ -46,6 +52,11 @@ export function jsonRemove(
 ): string {
   if (!raw.trim()) return raw
   const key = transformKey(name, shapes.stdio)
-  const edits = modify(raw, [shapes.topLevelKey, key], undefined, FORMATTING)
+  const edits = modify(
+    raw,
+    [...shapes.containerPath, key],
+    undefined,
+    FORMATTING,
+  )
   return applyEdits(raw, edits)
 }

@@ -5,12 +5,12 @@
 ## skills (vercel-labs/skills)
 
 - Source: https://github.com/vercel-labs/skills
-- Version: 1.5.22
+- Version: 1.7.4
 - License: MIT
 - Files derived from this project (located under `src/_vendor/`):
   - `agents.ts`: copied from upstream `src/agents.ts` with import-path adjustments and explicit parameter/return types on exported helpers (required by the DTS build)
   - `sanitize.ts`: `sanitizeName` extracted from upstream `src/installer.ts`
-  - `frontmatter.ts`: copied from upstream `src/frontmatter.ts` with import-path adjustments
+  - `frontmatter.ts`: copied from upstream `src/frontmatter.ts` with import-path adjustments, and `match[1] ?? ''` in place of upstream's non-null assertion (forbidden by this repo's lint config)
   - `types.ts`: `AgentType` union and `AgentConfig` interface extracted from upstream `src/types.ts`
 
 ### MIT License

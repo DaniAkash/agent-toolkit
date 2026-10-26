@@ -88,7 +88,7 @@ Each can be run individually while iterating; CI runs them all.
 
 ### Smoke tests (gated)
 
-Real-runtime tests against `claude`, `codex`, and `gemini` live under
+Real-runtime tests against `claude` and `codex` live under
 [`packages/acpx-ai-provider/test/e2e/`](./packages/acpx-ai-provider/test/e2e/README.md).
 Skipped by default. Run before tagging a release:
 
@@ -184,7 +184,7 @@ When filing a bug:
 
 1. Include the package version (`acpx-ai-provider` and `acpx`).
 2. Include the agent id you were using (`claude` / `codex` /
-   `gemini` / etc.).
+   etc.).
 3. Include a minimal reproduction. The smaller it is, the faster
    it gets diagnosed.
 4. Note whether the failure reproduces against the mock runtime

@@ -2,7 +2,7 @@
  * End-to-end smoke tests against real ACP agents.
  *
  * NOT run in CI — these spawn real agent processes (claude / codex /
- * gemini), make real API calls, and need authenticated credentials.
+ * codex), make real API calls, and need authenticated credentials.
  * They exist so a contributor can verify their changes against agents
  * the mock harness can't catch: npx download drift, agent CLI version
  * skew, env auth wiring, real session persistence on disk.
@@ -27,9 +27,6 @@
  *   - codex: needs an OpenAI key. Set ACPX_AUTH_OPENAI_API_KEY or
  *     OPENAI_API_KEY. First run will `npx`-download the adapter.
  *
- *   - gemini: needs the local `gemini` CLI installed and
- *     authenticated. Install via `npm i -g @google/gemini-cli` (or
- *     equivalent), then run `gemini auth login` first.
  *
  * What the tests cover (per agent):
  *
@@ -60,7 +57,7 @@ const ALL_REQUESTED =
 const shouldRun = (agent: string): boolean =>
   ALL_REQUESTED || REQUESTED.includes(agent)
 
-const AGENTS = ['claude', 'codex', 'gemini'] as const
+const AGENTS = ['claude', 'codex'] as const
 type SmokeAgent = (typeof AGENTS)[number]
 
 const TURN_TIMEOUT_MS = 90_000

@@ -68,7 +68,7 @@ export function planLink(
   const agentFile = requireAgentFile(state, input.agent, scope)
   ensureAgentInstalled(input.agent, agentFile)
   const client = getCatalogEntry(input.agent)
-  const emitter = getEmitter(client, scope)
+  const emitter = getEmitter(client, scope, agentFile?.projectRoot)
 
   const existing = state.manifest.servers[name]
   const existingKeys = emitter.read(agentFile.rawContent)
@@ -92,6 +92,10 @@ export function planLink(
       [input.agent]: {
         configPath: agentFile.configPath,
         createdAt: existing?.links[input.agent]?.createdAt ?? now,
+        scope,
+        ...(agentFile.projectRoot !== undefined
+          ? { projectRoot: agentFile.projectRoot }
+          : {}),
       },
     },
   }
@@ -126,7 +130,13 @@ export function planUnlink(
   state: State,
   input: UnlinkInput,
 ): Plan & UnlinkPlanSummary {
-  const scope = input.scope ?? 'system'
+  // An explicit scope wins; otherwise use the one the link was created at.
+  // Defaulting straight to 'system' edited the wrong container for a
+  // `local` link, since local and system share one file.
+  const scope =
+    input.scope ??
+    state.manifest.servers[input.serverName]?.links[input.agent]?.scope ??
+    'system'
   const server = state.manifest.servers[input.serverName]
   if (!server) {
     return {
@@ -156,7 +166,13 @@ export function planUnlink(
     linkRecord.configPath,
   )
   const client = getCatalogEntry(input.agent)
-  const emitter = getEmitter(client, scope)
+  // The recorded project root first: a caller unlinking by name need not
+  // repeat it, and a `local` container cannot be rebuilt without it.
+  const emitter = getEmitter(
+    client,
+    scope,
+    linkRecord.projectRoot ?? agentFile?.projectRoot,
+  )
   const ops: FsOp[] = []
   if (agentFile) {
     const nextRaw = emitter.remove(agentFile.rawContent, input.serverName)
@@ -198,7 +214,11 @@ export function planDisconnect(
   state: State,
   input: DisconnectInput,
 ): Plan & DisconnectPlanSummary {
-  const scope = input.scope ?? 'system'
+  // Same precedence as planUnlink: explicit, else recorded, else system.
+  const scope =
+    input.scope ??
+    state.manifest.servers[input.serverName]?.links[input.agent]?.scope ??
+    'system'
   const removeIfLast = input.removeIfLast ?? true
   const server = state.manifest.servers[input.serverName]
   if (!server?.links[input.agent]) {
@@ -287,7 +307,10 @@ export function planRemove(
       // identically at either scope. If a future client's project
       // topLevelKey diverges, ManifestLinkEntry needs a scope field
       // and this line becomes real inference.
-      const scope: AgentScope = 'system'
+      // The scope the link was CREATED at, not an assumption. `local`
+      // shares its file with `system`, so using the wrong one here reads
+      // the right file and then edits the wrong container inside it.
+      const scope: AgentScope = link.scope ?? 'system'
       const agentFile = findAgentFile(
         { ...state, manifest: cursor },
         agent as AgentId,
@@ -296,7 +319,11 @@ export function planRemove(
       )
       if (agentFile) {
         const client = getCatalogEntry(agent as AgentId)
-        const emitter = getEmitter(client, scope)
+        const emitter = getEmitter(
+          client,
+          scope,
+          link.projectRoot ?? agentFile.projectRoot,
+        )
         const nextRaw = emitter.remove(agentFile.rawContent, input.serverName)
         if (nextRaw !== agentFile.rawContent) {
           ops.push(writeOp(agentFile.configPath, nextRaw))
@@ -368,7 +395,7 @@ export function planRescan(
         continue
       }
       const client = getCatalogEntry(agent)
-      const emitter = getEmitter(client, scope)
+      const emitter = getEmitter(client, scope, file.projectRoot)
       const keys = emitter.read(file.rawContent)
       if (keys.includes(server.name)) {
         verified.push({

@@ -194,7 +194,7 @@ export class AcpxProvider {
   /**
    * Select a model through the adapter's advertised model control, which
    * survives reconnects. Prefer this over `setConfigOption('model', id)`:
-   * some agents (gemini-cli among them) reject `session/set_config_option`
+   * some agents reject `session/set_config_option`
    * for the model key, which is what forced the config-option workaround
    * before acpx exposed a first-class setter. Falls back to that workaround
    * when the runtime has no `setModel`, so older acpx keeps working.

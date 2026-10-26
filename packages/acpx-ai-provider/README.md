@@ -1,7 +1,7 @@
 # acpx-ai-provider
 
 > Vercel AI SDK provider on top of [`acpx/runtime`](https://www.npmjs.com/package/acpx).
-> One install, any ACP agent — Claude Code, Codex, Gemini, Copilot, Cursor, Pi, and more.
+> One install, any ACP agent — Claude Code, Codex, Copilot, Cursor, Pi, and more.
 
 [![npm](https://img.shields.io/npm/v/acpx-ai-provider.svg)](https://www.npmjs.com/package/acpx-ai-provider)
 
@@ -23,7 +23,7 @@ spawn config.
 `acpx-ai-provider` sits one level higher — on top of `acpx/runtime` — so:
 
 - **Zero extra installs.** `acpx` resolves and `npx`-spawns built-in
-  agents (Claude, Codex, Gemini, Copilot, Cursor, Pi, etc.) on first
+  agents (Claude, Codex, Copilot, Cursor, Pi, etc.) on first
   use.
 - **No stdio plumbing, no init handshake, no auth retry loop, no
   permission dialog wiring** — the runtime owns all of that.
@@ -168,7 +168,7 @@ createAcpxProvider({
 ```
 
 Built-in agents `acpx` ships:
-`pi`, `openclaw`, `codex`, `claude`, `gemini`, `cursor`, `copilot`,
+`pi`, `openclaw`, `codex`, `claude`, `cursor`, `copilot`,
 `droid`, `iflow`, `kilocode`, `kimi`, `kiro`, `opencode`, `qoder`, `qwen`,
 `trae`. Behavior varies — see [Known limitations](#known-limitations).
 
@@ -332,7 +332,7 @@ and re-using the same key is a no-op for reused records by design — and
 note that `provider.close()` does not clear the persistent record either,
 so it won't force a fresh `session/new` on its own.
 
-Not every agent honors every option — Codex / Gemini ignore Claude-specific
+Not every agent honors every option — Codex ignores Claude-specific
 fields like `model`, and so on. Unrecognized options are dropped silently
 at the ACP layer.
 
@@ -374,7 +374,7 @@ Plan blocks have their own block ids and don't disturb any
 in-progress thought block — the agent can keep streaming reasoning
 into one id while plan announcements come and go on others.
 
-Agents that don't emit reasoning (e.g. Gemini CLI in some
+Agents that don't emit reasoning (in some
 configurations) simply produce no `reasoning-*` parts; consumer
 code with a `reasoning-delta` branch never fires, no special-case
 needed.
@@ -430,7 +430,6 @@ What's confirmed today:
 |---|---|---|---|
 | `claude` | `reasoning_effort` | `low` / `medium` / `high` / `xhigh` | `medium` |
 | `codex` | `reasoning_effort` (CLI alias `thought_level`) | `low` / `medium` / `high` / `xhigh` | `medium` |
-| `gemini`, `copilot`, `cursor`, others | not yet documented | — | — |
 
 The CLI alias `thought_level` is **Codex-only** — `acpx codex set
 thought_level high` translates to `reasoning_effort = high` before
@@ -599,7 +598,7 @@ if (models) {
 
 Returns `undefined` when:
 
-- The agent didn't advertise any models (e.g. Gemini CLI, custom
+- The agent didn't advertise any models (custom
   adapters that omit `NewSessionResponse.models`).
 - The underlying runtime doesn't implement `getStatus`.
 
@@ -835,7 +834,6 @@ Behavior varies by built-in agent. Recommended starting matrix:
 | `claude` | Best-tested path. Clean text + tools. |
 | `codex` | JSON output benefits most from the fence cleanup. |
 | `pi` | Cheapest for smoke tests. |
-| `gemini` | Requires `--experimental-acp` (registry already passes it). Capability surface still evolving. |
 | `copilot` | Requires authenticated GitHub Copilot CLI. Run `gh auth login` first. |
 
 ### Out of scope

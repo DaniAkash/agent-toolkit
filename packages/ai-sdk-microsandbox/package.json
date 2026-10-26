@@ -1,6 +1,6 @@
 {
   "name": "ai-sdk-microsandbox",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Vercel AI SDK v7 HarnessV1 sandbox provider backed by microsandbox: local-first microVM isolation for HarnessAgent. Drop-in replacement for @ai-sdk/sandbox-vercel.",
   "license": "MIT",
   "author": "Dani Akash",
@@ -46,7 +46,7 @@
   "scripts": {
     "build": "bunup",
     "dev": "bunup --watch",
-    "test": "bun test test/unit",
+    "test": "bun test --isolate test/unit",
     "test:integration": "MICROSANDBOX_INTEGRATION=1 bun test --parallel=1 test/integration",
     "test:e2e": "MICROSANDBOX_INTEGRATION=1 bun test --parallel=1 test/e2e",
     "test:all": "MICROSANDBOX_INTEGRATION=1 bun test --parallel=1",
@@ -63,7 +63,7 @@
     "@ai-sdk/provider-utils": "5.0.43",
     "bunup": "^0.16.32",
     "microsandbox": "0.6.18",
-    "typescript": "^6.0.3"
+    "typescript": "^7.0.2"
   },
   "publishConfig": {
     "access": "public",

@@ -184,16 +184,16 @@ describe('planLink', () => {
         },
       }),
       {
-        agents: [agentFile('gemini', '/tmp/ws/gemini.json', '')],
+        agents: [agentFile('trae', '/tmp/ws/trae.json', '')],
       },
     )
-    const plan = planLink(state, { server: GH_HTTP, agent: 'gemini' }, NOW)
+    const plan = planLink(state, { server: GH_HTTP, agent: 'trae' }, NOW)
     // Manifest reflects the newer spec.
     expect(plan.nextManifest.servers.gh?.spec).toEqual(HTTP_SPEC)
     // Existing cursor link is preserved.
     expect(plan.nextManifest.servers.gh?.links.cursor).toBeDefined()
-    // New gemini link is added.
-    expect(plan.nextManifest.servers.gh?.links.gemini).toBeDefined()
+    // New trae link is added.
+    expect(plan.nextManifest.servers.gh?.links.trae).toBeDefined()
   })
 
   test('throws UnsupportedTransportError when transport not accepted', () => {
@@ -396,7 +396,7 @@ describe('planDisconnect (closes #63)', () => {
           cursor: { configPath: '/tmp/ws/cursor.json', createdAt: NOW },
           'claude-code': { configPath: '/tmp/ws/claude.json', createdAt: NOW },
           vscode: { configPath: '/tmp/ws/vscode.json', createdAt: NOW },
-          gemini: { configPath: '/tmp/ws/gemini.json', createdAt: NOW },
+          trae: { configPath: '/tmp/ws/trae.json', createdAt: NOW },
         },
       }),
       {
@@ -419,8 +419,8 @@ describe('planDisconnect (closes #63)', () => {
             }),
           ),
           agentFile(
-            'gemini',
-            '/tmp/ws/gemini.json',
+            'trae',
+            '/tmp/ws/trae.json',
             JSON.stringify({ mcpServers: { gh: { command: 'gh-mcp' } } }),
           ),
         ],
@@ -433,7 +433,7 @@ describe('planDisconnect (closes #63)', () => {
     expect(remainingEntry).toBeDefined()
     expect(Object.keys(remainingEntry?.links ?? {}).sort()).toEqual([
       'claude-code',
-      'gemini',
+      'trae',
       'vscode',
     ])
     const writePaths = plan.ops
@@ -443,7 +443,7 @@ describe('planDisconnect (closes #63)', () => {
     expect(writePaths).toContain('/tmp/ws/manifest.json')
     expect(writePaths).not.toContain('/tmp/ws/claude.json')
     expect(writePaths).not.toContain('/tmp/ws/vscode.json')
-    expect(writePaths).not.toContain('/tmp/ws/gemini.json')
+    expect(writePaths).not.toContain('/tmp/ws/trae.json')
   })
 
   test('removeIfLast: false keeps the manifest entry with empty links map', () => {
@@ -491,7 +491,7 @@ describe('planRemove', () => {
       serverEntry({
         links: {
           cursor: { configPath: '/tmp/ws/cursor.json', createdAt: NOW },
-          gemini: { configPath: '/tmp/ws/gemini.json', createdAt: NOW },
+          trae: { configPath: '/tmp/ws/trae.json', createdAt: NOW },
         },
       }),
       {
@@ -502,8 +502,8 @@ describe('planRemove', () => {
             JSON.stringify({ mcpServers: { gh: { command: 'gh-mcp' } } }),
           ),
           agentFile(
-            'gemini',
-            '/tmp/ws/gemini.json',
+            'trae',
+            '/tmp/ws/trae.json',
             JSON.stringify({ mcpServers: { gh: { command: 'gh-mcp' } } }),
           ),
         ],
@@ -511,13 +511,13 @@ describe('planRemove', () => {
     )
     const plan = planRemove(state, { serverName: 'gh' })
     expect(plan.removedManifest).toBe(true)
-    expect(plan.unlinkedAgents.sort()).toEqual(['cursor', 'gemini'])
+    expect(plan.unlinkedAgents.sort()).toEqual(['cursor', 'trae'])
     expect(plan.nextManifest.servers.gh).toBeUndefined()
     const paths = plan.ops
       .filter((op) => op.kind === 'writeFile')
       .map((op) => (op.kind === 'writeFile' ? op.path : ''))
     expect(paths).toContain('/tmp/ws/cursor.json')
-    expect(paths).toContain('/tmp/ws/gemini.json')
+    expect(paths).toContain('/tmp/ws/trae.json')
     expect(paths).toContain('/tmp/ws/manifest.json')
   })
 
@@ -614,7 +614,7 @@ describe('planRescan', () => {
       serverEntry({
         links: {
           cursor: { configPath: '/tmp/ws/cursor.json', createdAt: NOW },
-          gemini: { configPath: '/tmp/ws/gemini.json', createdAt: NOW },
+          trae: { configPath: '/tmp/ws/trae.json', createdAt: NOW },
         },
       }),
       {
@@ -625,8 +625,8 @@ describe('planRescan', () => {
             JSON.stringify({ mcpServers: { gh: { command: 'gh-mcp' } } }),
           ),
           agentFile(
-            'gemini',
-            '/tmp/ws/gemini.json',
+            'trae',
+            '/tmp/ws/trae.json',
             JSON.stringify({ mcpServers: { gh: { command: 'gh-mcp' } } }),
           ),
         ],

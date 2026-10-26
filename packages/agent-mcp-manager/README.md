@@ -68,7 +68,7 @@ if (report.drifted.length > 0 || report.missing.length > 0) {
 
 // For consumers who use the same workspaceDir across many calls:
 const mgr = bind(workspaceDir)
-await mgr.link({ server: github, agent: 'gemini' })
+await mgr.link({ server: github, agent: 'trae' })
 ```
 
 ## API reference
@@ -172,7 +172,7 @@ interface RescanReport {
 `rescan` is your source of truth whenever the on-disk state may have drifted from what the library last wrote. Common triggers:
 
 - **After a user edits the config file directly.** Someone opens `~/.cursor/mcp.json` in a text editor and deletes an entry. The manifest still thinks it's there.
-- **After you change a spec.** `link({server: A})` then `link({server: A_prime, agent: 'gemini'})` where the name is the same but the spec differs. The manifest holds the newest spec; `A`'s previous linkers (cursor, vscode, ...) still have the old spec on disk. `rescan` won't report drift on presence, but see the note below on how to interpret it.
+- **After you change a spec.** `link({server: A})` then `link({server: A_prime, agent: 'trae'})` where the name is the same but the spec differs. The manifest holds the newest spec; `A`'s previous linkers (cursor, vscode, ...) still have the old spec on disk. `rescan` won't report drift on presence, but see the note below on how to interpret it.
 - **On app startup.** UI shells that display "which servers are linked to which agents" should call `rescan` on load, not trust the manifest alone.
 - **Before batching writes.** If you're about to `link` a large batch, `rescan` first to detect any pre-existing drift you should surface to the user rather than silently overwriting.
 
@@ -232,7 +232,7 @@ Before you call `link()`, you probably want to know whether the target agent is 
 import { isInstalled } from 'agent-mcp-manager'
 
 const installed = await isInstalled({
-  agents: ['cursor', 'claude-code', 'gemini', 'vscode'],
+  agents: ['cursor', 'claude-code', 'trae', 'vscode'],
 })
 
 if (installed.cursor) {
@@ -277,7 +277,7 @@ const shown = supported.filter((a) => installed[a] === true)
 **Precheck a batch before linking.**
 
 ```ts
-const targets = ['cursor', 'claude-code', 'gemini']
+const targets = ['cursor', 'claude-code', 'trae']
 const installed = await isInstalled({ agents: targets })
 for (const agent of targets) {
   if (installed[agent]) {
@@ -413,7 +413,7 @@ Available today; no equivalent in v0.0.3:
 ### Known behavioral differences
 
 - **One-step link.** v0.0.3 required `mgr.add()` before `mgr.link()`. v0.1.0 `link({server, agent})` does both. The manifest server entry is upserted as a side-effect of the link.
-- **Last-write-wins on the manifest spec.** If you call `link({server: A, agent: 'cursor'})` and later `link({server: A', agent: 'gemini'})` where `A.name === A'.name` but the specs differ, the manifest's spec updates to `A'`. Cursor's config still holds `A` on disk (stale) until you re-link cursor. Use `rescan()` to detect this class of drift.
+- **Last-write-wins on the manifest spec.** If you call `link({server: A, agent: 'cursor'})` and later `link({server: A', agent: 'trae'})` where `A.name === A'.name` but the specs differ, the manifest's spec updates to `A'`. Cursor's config still holds `A` on disk (stale) until you re-link cursor. Use `rescan()` to detect this class of drift.
 - **Trimmed names.** `link({server: {name: '  gh  ', ...}})` persists the trimmed key `'gh'`. v0.0.3 persisted the untrimmed value.
 - **Idempotent re-links skip the config write.** `link()` no longer touches mtime when the resulting content is identical. IDE file-watchers (Cursor, VS Code) no longer reload on idempotent re-runs.
 - **`exists: true` for empty files.** `readState` from `/lowlevel` returns `AgentFileState.exists = true` for existing empty files; v0.0.3 conflated existence with non-emptiness.
@@ -456,7 +456,7 @@ import {
   applyPlan,
 } from 'agent-mcp-manager/lowlevel'
 
-const state = await readState(workspaceDir, ['cursor', 'gemini'])
+const state = await readState(workspaceDir, ['cursor', 'trae'])
 
 // Compute both plans against the SAME state snapshot.
 const linkPlan = planLink(
@@ -464,7 +464,7 @@ const linkPlan = planLink(
   { server: { name: 'gh', spec: { transport: 'stdio', command: 'gh-mcp' } }, agent: 'cursor' },
   new Date().toISOString(),
 )
-const disconnectPlan = planDisconnect(state, { serverName: 'old', agent: 'gemini' })
+const disconnectPlan = planDisconnect(state, { serverName: 'old', agent: 'trae' })
 
 // Inspect before writing.
 console.log('link ops:', linkPlan.ops)
@@ -489,18 +489,20 @@ Every write goes through atomic `<file>.tmp + rename`.
 
 ## Supported clients
 
-23 clients ship in v0.1.0 with hand-authored per-client shape declarations. See `src/_catalog/client-configs.ts` for the source of truth, including each entry's citation URLs.
+24 clients ship with hand-authored per-client shape declarations. See
+`src/_catalog/client-configs.ts` for the source of truth, including each
+entry's citation URLs and the client release it was verified against.
 
-| Established | Well-documented | Additional |
+| Clients | | |
 |---|---|---|
-| claude-desktop | cline | amazon-bedrock |
-| claude-code | opencode | amazonq |
-| cursor | goose | antigravity |
-| vscode | kiro | boltai |
-| vscode-insiders | windsurf | enconvo |
-| gemini | witsy | librechat |
-| codex | roocode | tome |
-| zed |  | trae |
+| amazon-bedrock | codex | opencode |
+| amazonq | copilot-cli | roocode |
+| antigravity | cursor | trae |
+| boltai | devin-cli | vscode |
+| claude-code | enconvo | vscode-insiders |
+| claude-desktop | goose | windsurf |
+| cline | kiro | witsy |
+| cline-cli | librechat | zed |
 
 Every catalog entry has:
 

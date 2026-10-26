@@ -21,8 +21,9 @@ export interface EmitterIO {
 export function getEmitter(
   client: ClientConfig,
   scope: AgentScope = 'system',
+  projectRoot?: string,
 ): EmitterIO {
-  const shapes = resolveShapes(client, scope)
+  const shapes = resolveShapes(client, scope, projectRoot)
   if (client.format === 'yaml') {
     return {
       read: (raw) => yamlRead(raw, shapes),

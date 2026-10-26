@@ -62,6 +62,22 @@ export async function resolveAgentMcpConfigPath(
     }
     return path.join(projectRoot, entry.projectFile)
   }
+  if (scope === 'local') {
+    if (!entry.local) {
+      throw new UnresolvedConfigPathError(
+        agent,
+        `agent has no local-scope container`,
+      )
+    }
+    if (!projectRoot) {
+      throw new UnresolvedConfigPathError(
+        agent,
+        `projectRoot is required when scope === 'local'`,
+      )
+    }
+    // Local scope shares the system file; only the container inside it
+    // differs, which `resolveShapes` handles via the containerPath.
+  }
   const candidates = pickOsList(entry.systemPaths)
   if (candidates.length === 0) {
     throw new UnresolvedConfigPathError(

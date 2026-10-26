@@ -1,14 +1,21 @@
 import { type ChildProcessByStdio, spawn } from 'node:child_process'
 import { Readable, Writable } from 'node:stream'
+// The `/unstable` entrypoint, deliberately. A capability probe reports what
+// an agent advertises, and the stable entrypoint's types omit
+// `sessionCapabilities.fork`, `sessionCapabilities.systemPrompt`,
+// `agentCapabilities.providers` and `mcpCapabilities.acp`. Both entrypoints
+// pass those fields through at runtime, so this buys typed access to them
+// rather than rescuing data: on stable they would still arrive and would
+// still have to be reported, just through an untyped bag.
 import {
-  type Client,
-  ClientSideConnection,
+  type ClientContext,
+  client,
   type InitializeResponse,
+  methods,
   type NewSessionResponse,
   ndJsonStream,
   RequestError,
-  type RequestPermissionResponse,
-} from '@agentclientprotocol/sdk'
+} from '@agentclientprotocol/sdk/unstable'
 import {
   deriveModelConfig,
   deriveReasoning,
@@ -30,6 +37,46 @@ import type {
 const DEFAULT_TIMEOUT_MS = 30_000
 const STDERR_CAP_BYTES = 8 * 1024
 const ACP_METHOD_NOT_FOUND = -32601
+
+/**
+ * Carries an already-classified `ProbeError` out of the `connectWith`
+ * callback. `connectWith` owns the connection lifetime, so a handshake
+ * failure cannot `return` past it the way the pre-2.x straight-line code
+ * did; it throws this instead and the caller unwraps it.
+ */
+class ProbeFailure extends Error {
+  override name = 'ProbeFailure'
+  constructor(readonly probeError: ProbeError) {
+    super(probeError.message)
+  }
+}
+
+/** Which handshake request is in flight, for error classification. */
+type HandshakePhase = 'initialize' | 'session_new' | 'teardown'
+
+const PHASE_TIMEOUT_CODE: Record<HandshakePhase, ProbeErrorCode> = {
+  initialize: 'initialize_timeout',
+  session_new: 'session_new_timeout',
+  // The teardown requests swallow their own rejections, so a timeout
+  // reaching the classifier from here is not one of theirs.
+  teardown: 'unknown',
+}
+
+const PHASE_DESCRIPTION: Record<HandshakePhase, string> = {
+  initialize: 'before responding to initialize',
+  session_new: 'during session/new',
+  teardown: 'during session teardown',
+}
+
+/** What the handshake produced, before it is shaped into a result. */
+type Handshake =
+  | {
+      kind: 'ok'
+      initialize: InitializeResponse
+      newSession: NewSessionResponse
+      supportsConfigOption: boolean
+    }
+  | { kind: 'auth_required'; initialize: InitializeResponse }
 
 /**
  * Probe an ACP-compatible agent for its capabilities. Performs an
@@ -120,157 +167,165 @@ export async function probeAgent(
     Writable.toWeb(child.stdin) as WritableStream<Uint8Array>,
     Readable.toWeb(child.stdout) as ReadableStream<Uint8Array>,
   )
-  const connection = new ClientSideConnection(() => createProbeClient(), stream)
+  const app = client()
+    .onRequest(methods.client.session.requestPermission, async () => {
+      // The probe never sends a real session/prompt, so this branch
+      // shouldn't fire. Deny defensively if an agent emits a request
+      // out-of-band.
+      return { outcome: { outcome: 'cancelled' as const } }
+    })
+    .onNotification(methods.client.session.update, async () => {
+      // Probe is non-interactive; updates are ignored.
+    })
 
   const timeBudget = new TimeBudget(timeoutMs)
 
-  // --- initialize ---
-  try {
-    initialize = await withDeadline(
-      connection.initialize({
-        protocolVersion: 1,
-        clientCapabilities: {
-          fs: { readTextFile: true, writeTextFile: true },
-          terminal: false,
-        },
-        clientInfo: { name: 'acp-probe', version: '0.0.1' },
-      }),
-      timeBudget.remaining(),
-    )
-  } catch (err) {
-    // Let pending 'error'/'exit' events drain before classifying. The
-    // SDK call can reject (closed stream / EPIPE) racily a tick before
-    // the spawn 'error' or child 'exit' event fires.
+  /**
+   * Which request is in flight. Read by the outer catch to pick the right
+   * timeout code and message.
+   *
+   * Classification cannot happen inside the `connectWith` callback.
+   * `connectWith` rejects with its own "ACP connection closed" error the
+   * moment the stream dies, which beats an inner handler that awaits
+   * anything: the child's 'exit' event has not been observed yet at that
+   * point, so an inner classifier sees no exit and reports `unknown`
+   * instead of `agent_crashed`. The outer catch runs after the connection
+   * has closed, where draining the event loop does surface the exit.
+   */
+  let phase: HandshakePhase = 'initialize'
+
+  /**
+   * Classify a handshake rejection. Lets pending 'error'/'exit' events
+   * drain first: the SDK call can reject (closed stream / EPIPE) racily a
+   * tick before the spawn 'error' or child 'exit' event fires.
+   */
+  const classifyHandshake = async (err: unknown): Promise<ProbeError> => {
+    const timeoutCode = PHASE_TIMEOUT_CODE[phase]
     await drainPendingEvents()
     if (spawnError.value) {
-      await killChild(child, killedByUs)
-      return fail({
+      return {
         code: 'spawn_failed',
         message: spawnError.value.message,
         stderr: stderrBuf || undefined,
-      })
+      }
     }
     if (err instanceof TimeoutError) {
-      await killChild(child, killedByUs)
-      return fail({
-        code: 'initialize_timeout',
+      return {
+        code: timeoutCode,
         message: err.message,
         stderr: stderrBuf || undefined,
-      })
+      }
     }
     if (
       childExited.value &&
       !killedByUs.value &&
       childExited.value.code !== 0
     ) {
-      await killChild(child, killedByUs)
-      return fail({
+      return {
         code: 'agent_crashed',
-        message: `Agent exited (code=${childExited.value.code ?? null}, signal=${childExited.value.signal ?? null}) before responding to initialize`,
+        message: `Agent exited (code=${childExited.value.code ?? null}, signal=${childExited.value.signal ?? null}) ${PHASE_DESCRIPTION[phase]}`,
         stderr: stderrBuf || undefined,
-      })
+      }
     }
-    await killChild(child, killedByUs)
-    return fail(classifyError(err, 'unknown', stderrBuf))
+    return classifyError(err, 'unknown', stderrBuf)
   }
 
-  if (initialize.protocolVersion !== 1) {
+  let handshake: Handshake
+  try {
+    handshake = await app.connectWith(
+      stream,
+      async (ctx: ClientContext): Promise<Handshake> => {
+        // --- initialize ---
+        phase = 'initialize'
+        initialize = await withDeadline(
+          ctx.request(methods.agent.initialize, {
+            protocolVersion: 1,
+            clientCapabilities: {
+              fs: { readTextFile: true, writeTextFile: true },
+              terminal: false,
+            },
+            clientInfo: { name: 'acp-probe', version: '0.0.1' },
+          }),
+          timeBudget.remaining(),
+        )
+
+        if (initialize.protocolVersion !== 1) {
+          throw new ProbeFailure({
+            code: 'protocol_mismatch',
+            message: `Agent advertised protocol version ${initialize.protocolVersion}; this probe supports 1.`,
+            stderr: stderrBuf || undefined,
+          })
+        }
+
+        // --- session/new ---
+        const authMethods = normalizeAuthMethods(initialize)
+        if (authMethods.length > 0 && request.authPolicy === 'fail') {
+          return { kind: 'auth_required', initialize }
+        }
+
+        phase = 'session_new'
+        newSession = await withDeadline(
+          ctx.request(methods.agent.session.new, {
+            cwd: request.cwd ?? process.cwd(),
+            mcpServers: [],
+          }),
+          timeBudget.remaining(),
+        )
+
+        // --- supportsConfigOption ping ---
+        phase = 'teardown'
+        const supportsConfigOption = await pingConfigOption(
+          ctx,
+          newSession,
+          timeBudget,
+        )
+
+        // --- tear down the session (best effort) ---
+        await closeSession(ctx, newSession.sessionId, initialize)
+
+        return {
+          kind: 'ok',
+          initialize,
+          newSession,
+          supportsConfigOption,
+        }
+      },
+    )
+  } catch (err) {
+    // Classify BEFORE killing. `killChild` sets `killedByUs`, and the
+    // `agent_crashed` branch is gated on that flag being unset, so killing
+    // first turns every crash into `unknown`.
+    const probeError =
+      err instanceof ProbeFailure
+        ? err.probeError
+        : await classifyHandshake(err)
     await killChild(child, killedByUs)
-    return fail({
-      code: 'protocol_mismatch',
-      message: `Agent advertised protocol version ${initialize.protocolVersion}; this probe supports 1.`,
-      stderr: stderrBuf || undefined,
-    })
+    return fail(probeError)
   }
 
-  // --- session/new ---
-  const authMethods = normalizeAuthMethods(initialize)
-  if (authMethods.length > 0 && request.authPolicy === 'fail') {
-    await killChild(child, killedByUs)
+  await killChild(child, killedByUs)
+
+  if (handshake.kind === 'auth_required') {
+    const authMethods = normalizeAuthMethods(handshake.initialize)
     return {
       ...baseResult(),
       agent: { ...baseResult().agent, durationMs: durationSince(startedNs) },
-      protocolVersion: initialize.protocolVersion,
-      agentInfo: normalizeAgentInfo(initialize),
-      capabilities: normalizeCapabilities(initialize),
+      protocolVersion: handshake.initialize.protocolVersion,
+      agentInfo: normalizeAgentInfo(handshake.initialize),
+      capabilities: normalizeCapabilities(handshake.initialize),
       authMethods,
       error: {
         code: 'auth_required',
         message: `Agent advertised authMethods (${authMethods.length}) and authPolicy is 'fail'.`,
       },
-      raw: { initialize, newSession: null },
+      raw: { initialize: handshake.initialize, newSession: null },
     }
   }
 
-  try {
-    newSession = await withDeadline(
-      connection.newSession({
-        cwd: request.cwd ?? process.cwd(),
-        mcpServers: [],
-      }),
-      timeBudget.remaining(),
-    )
-  } catch (err) {
-    await drainPendingEvents()
-    if (err instanceof TimeoutError) {
-      await killChild(child, killedByUs)
-      return fail({
-        code: 'session_new_timeout',
-        message: err.message,
-        stderr: stderrBuf || undefined,
-      })
-    }
-    if (
-      childExited.value &&
-      !killedByUs.value &&
-      childExited.value.code !== 0
-    ) {
-      await killChild(child, killedByUs)
-      return fail({
-        code: 'agent_crashed',
-        message: `Agent exited (code=${childExited.value.code ?? null}, signal=${childExited.value.signal ?? null}) during session/new`,
-        stderr: stderrBuf || undefined,
-      })
-    }
-    await killChild(child, killedByUs)
-    return fail(classifyError(err, 'unknown', stderrBuf))
-  }
-
-  // --- supportsConfigOption ping ---
-  const configOptions = normalizeConfigOptions(newSession)
-  let supportsConfigOption = false
-  if (configOptions.length > 0) {
-    const first = configOptions[0]!
-    if (first.type === 'select' && typeof first.currentValue === 'string') {
-      try {
-        await withDeadline(
-          connection.setSessionConfigOption({
-            sessionId: newSession.sessionId,
-            configId: first.id,
-            value: first.currentValue,
-          }),
-          Math.min(5_000, timeBudget.remaining()),
-        )
-        supportsConfigOption = true
-      } catch (err) {
-        if (err instanceof RequestError && err.code === ACP_METHOD_NOT_FOUND) {
-          supportsConfigOption = false
-        } else {
-          // Other errors are treated as "unsupported" conservatively —
-          // they shouldn't fail the whole probe.
-          supportsConfigOption = false
-        }
-      }
-    }
-  }
-
-  // --- tear down ---
-  await closeSession(connection, newSession.sessionId, initialize)
-  await killChild(child, killedByUs)
-
-  const capabilities = normalizeCapabilities(initialize)
+  const configOptions = normalizeConfigOptions(handshake.newSession)
+  const capabilities = normalizeCapabilities(handshake.initialize)
   const models = normalizeModels(configOptions)
-  const modes = normalizeModes(newSession)
+  const modes = normalizeModes(handshake.newSession)
   const reasoning = deriveReasoning(configOptions)
   const modelConfig = deriveModelConfig(configOptions)
 
@@ -282,17 +337,55 @@ export async function probeAgent(
       probedAt,
       durationMs: durationSince(startedNs),
     },
-    protocolVersion: initialize.protocolVersion,
-    agentInfo: normalizeAgentInfo(initialize),
+    protocolVersion: handshake.initialize.protocolVersion,
+    agentInfo: normalizeAgentInfo(handshake.initialize),
     capabilities,
-    authMethods,
+    authMethods: normalizeAuthMethods(handshake.initialize),
     models,
     modes,
     configOptions,
     reasoning,
     modelConfig,
-    supportsConfigOption,
-    raw: { initialize, newSession },
+    supportsConfigOption: handshake.supportsConfigOption,
+    raw: {
+      initialize: handshake.initialize,
+      newSession: handshake.newSession,
+    },
+  }
+}
+
+/**
+ * Probe whether `session/set_config_option` is wired up, by setting the
+ * first select option back to the value it already holds. Any rejection
+ * counts as unsupported: a probe must not fail over an optional method.
+ */
+async function pingConfigOption(
+  ctx: ClientContext,
+  newSession: NewSessionResponse,
+  timeBudget: TimeBudget,
+): Promise<boolean> {
+  const configOptions = normalizeConfigOptions(newSession)
+  if (configOptions.length === 0) return false
+  const first = configOptions[0]
+  if (first?.type !== 'select') return false
+  if (typeof first.currentValue !== 'string') return false
+  try {
+    await withDeadline(
+      ctx.request(methods.agent.session.setConfigOption, {
+        sessionId: newSession.sessionId,
+        configId: first.id,
+        value: first.currentValue,
+      }),
+      Math.min(5_000, timeBudget.remaining()),
+    )
+    return true
+  } catch (err) {
+    // `-32601 method not found` is the expected "unsupported" answer
+    // from an agent without the method. Everything else is treated as
+    // unsupported too, rather
+    // than failing the whole probe over an optional method.
+    void (err instanceof RequestError && err.code === ACP_METHOD_NOT_FOUND)
+    return false
   }
 }
 
@@ -356,29 +449,18 @@ async function killChild(
 }
 
 async function closeSession(
-  connection: ClientSideConnection,
+  ctx: ClientContext,
   sessionId: string,
   initialize: InitializeResponse,
 ): Promise<void> {
   if (!initialize.agentCapabilities?.sessionCapabilities?.close) return
   try {
-    await withDeadline(connection.closeSession({ sessionId } as never), 3_000)
+    await withDeadline(
+      ctx.request(methods.agent.session.close, { sessionId }),
+      3_000,
+    )
   } catch {
     // Best-effort close. We're about to kill the process anyway.
-  }
-}
-
-function createProbeClient(): Client {
-  return {
-    async requestPermission(): Promise<RequestPermissionResponse> {
-      // The probe never sends a real session/prompt, so this branch
-      // shouldn't fire. Deny defensively if an agent emits a request
-      // out-of-band.
-      return { outcome: { outcome: 'cancelled' } } as RequestPermissionResponse
-    },
-    async sessionUpdate(): Promise<void> {
-      // Probe is non-interactive; updates are ignored.
-    },
   }
 }
 
@@ -470,12 +552,13 @@ function emptyCapabilities(): AgentProbeResult['capabilities'] {
   return {
     loadSession: false,
     promptCapabilities: { image: false, audio: false, embeddedContext: false },
-    mcpCapabilities: { http: false, sse: false },
+    mcpCapabilities: { http: false, sse: false, acp: false },
     sessionCapabilities: {
       close: false,
       list: false,
       resume: false,
       fork: false,
+      systemPrompt: false,
       additionalDirectories: false,
     },
   }

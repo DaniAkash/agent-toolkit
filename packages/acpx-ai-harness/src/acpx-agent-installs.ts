@@ -5,7 +5,7 @@
  * acpx's README's "Built-ins" table for the canonical mapping). For the
  * agents that need a separately-installed wrapper, we pre-warm the npx
  * cache during bootstrap so the first turn doesn't pay the fetch cost.
- * Agents whose wrapper is the agent CLI itself (gemini, qwen, kiro, ...)
+ * Agents whose wrapper is the agent CLI itself (qwen, kiro, ...)
  * still need that CLI on PATH; for those we run `npm install -g`.
  *
  * Each install command is run once per snapshot identity (Vercel sandbox
@@ -31,8 +31,6 @@ export const ACPX_AGENT_INSTALL_COMMANDS: Readonly<Record<string, string>> = {
   // @agentclientprotocol scope per acpx's registry).
   claude:
     'npx --yes @agentclientprotocol/claude-agent-acp --version || npm install -g @anthropic-ai/claude-code',
-  // gemini ships ACP natively (`gemini --acp`); install the CLI.
-  gemini: 'npm install -g @google/gemini-cli',
 }
 
 export function installCommandForAgent(agent: string): string | undefined {

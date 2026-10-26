@@ -1,6 +1,6 @@
 {
   "name": "acp-probe",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Probe any ACP-compatible agent for its capabilities (models, modes, configOptions, prompt capabilities, auth methods, MCP transports). No real prompt required; no token cost.",
   "license": "MIT",
   "author": "Dani Akash",
@@ -17,8 +17,7 @@
     "capability-discovery",
     "agent-probe",
     "claude-code",
-    "codex",
-    "gemini"
+    "codex"
   ],
   "type": "module",
   "main": "./dist/index.js",
@@ -40,15 +39,16 @@
   "scripts": {
     "build": "bunup",
     "dev": "bunup --watch",
-    "test": "bun test",
-    "test:e2e": "PROBE_E2E=all bun test test/e2e",
+    "test": "bun test --isolate",
+    "test:e2e": "PROBE_E2E=all bun test --isolate test/e2e",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@agentclientprotocol/sdk": "^1.4.0"
+    "@agentclientprotocol/sdk": "^2.0.2"
   },
   "peerDependencies": {
-    "acpx": ">=0.21.0"
+    "acpx": ">=0.21.0",
+    "zod": "^3.25.76 || ^4.0.0"
   },
   "peerDependenciesMeta": {
     "acpx": {
@@ -58,7 +58,8 @@
   "devDependencies": {
     "acpx": "^0.21.0",
     "bunup": "^0.16.32",
-    "typescript": "^6.0.3"
+    "typescript": "^7.0.2",
+    "zod": "^4.4.3"
   },
   "publishConfig": {
     "access": "public",

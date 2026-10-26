@@ -1,7 +1,7 @@
 {
   "name": "acpx-ai-harness",
-  "version": "0.0.3",
-  "description": "Vercel AI SDK v7 HarnessV1 adapter for acpx, bring any ACP agent (Claude, Codex, Gemini, Copilot, Cursor) to the AI SDK Harnesses ecosystem.",
+  "version": "0.1.0",
+  "description": "Vercel AI SDK v7 HarnessV1 adapter for acpx, bring any ACP agent (Claude, Codex, Copilot, Cursor) to the AI SDK Harnesses ecosystem.",
   "license": "MIT",
   "author": "Dani Akash",
   "homepage": "https://github.com/DaniAkash/agent-toolkit/tree/main/packages/acpx-ai-harness#readme",
@@ -21,7 +21,6 @@
     "acpx",
     "claude-code",
     "codex",
-    "gemini",
     "copilot",
     "cursor"
   ],
@@ -46,7 +45,7 @@
     "build": "bunup && bun run copy-bridge-assets",
     "copy-bridge-assets": "node --input-type=module -e \"import { copyFile, mkdir } from 'node:fs/promises'; await mkdir('dist/bridge', { recursive: true }); await copyFile('src/bridge/package.json', 'dist/bridge/package.json');\"",
     "dev": "bunup --watch",
-    "test": "bun test test/unit",
+    "test": "bun test --isolate test/unit",
     "test:e2e": "bun run build && bun test test/e2e",
     "test:smoke": "SMOKE_AGENTS=all bun run test:e2e",
     "typecheck": "tsc --noEmit"
@@ -69,7 +68,7 @@
     "acpx": "^0.21.0",
     "acpx-test-helpers": "workspace:*",
     "bunup": "^0.16.32",
-    "typescript": "^6.0.3"
+    "typescript": "^7.0.2"
   },
   "publishConfig": {
     "access": "public",

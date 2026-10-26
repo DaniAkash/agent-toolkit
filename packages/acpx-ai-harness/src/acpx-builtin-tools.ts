@@ -6,7 +6,7 @@ import { z } from 'zod/v4'
  * common-tool schemas so they're recognised across the harness ecosystem.
  *
  * The map is keyed by common-tool names. Per-agent native names (Claude Code's
- * `Read`/`Bash`, Codex's `read`/`shell`, Gemini's variants) are normalised
+ * `Read`/`Bash`, Codex's `read`/`shell`) are normalised
  * inside the bridge before events leave the sandbox, so consumers always see
  * the common names on the wire.
  *

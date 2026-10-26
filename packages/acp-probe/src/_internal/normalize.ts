@@ -1,8 +1,10 @@
+// `/unstable` to match probe.ts: the stable entrypoint's types omit the
+// capability fields this module reports. See the note in probe.ts.
 import type {
   InitializeResponse,
   NewSessionResponse,
   SessionConfigOption as SdkConfigOption,
-} from '@agentclientprotocol/sdk'
+} from '@agentclientprotocol/sdk/unstable'
 import type {
   AgentCapabilities,
   AgentInfo,
@@ -40,31 +42,44 @@ export function normalizeCapabilities(
     embeddedContext: Boolean(caps.promptCapabilities?.embeddedContext),
   }
   const mcp = (caps.mcpCapabilities ?? {}) as Record<string, unknown>
-  const { http, sse, _meta: _ignoredMeta, ...rest } = mcp
+  // `acp` joins http/sse as a named transport rather than landing in the
+  // `meta` catch-all. Destructured out for that reason; anything still
+  // unrecognised keeps falling through to `meta`.
+  const { http, sse, acp, _meta: _ignoredMeta, ...rest } = mcp
   const restEntries = Object.entries(rest)
   const mcpCapabilities: McpCapabilities = {
     http: Boolean(http),
     sse: Boolean(sse),
+    acp: Boolean(acp),
     ...(restEntries.length > 0
       ? { meta: Object.fromEntries(restEntries) }
       : {}),
   }
-  const sess = caps.sessionCapabilities ?? {}
+  const sess = (caps.sessionCapabilities ?? {}) as Record<string, unknown>
   const sessionCapabilities: SessionCapabilities = {
-    close: sess.close != null,
-    list: sess.list != null,
-    resume: sess.resume != null,
-    fork: sess.fork != null,
-    additionalDirectories: sess.additionalDirectories != null,
+    close: advertised(sess.close),
+    list: advertised(sess.list),
+    resume: advertised(sess.resume),
+    fork: advertised(sess.fork),
+    systemPrompt: advertised(sess.systemPrompt),
+    additionalDirectories: advertised(sess.additionalDirectories),
   }
+  // Everything the four named capability groups above did not consume.
+  // An allowlist here would silently drop a capability an agent advertises,
+  // which is the one thing a capability probe must not do: ACP adds
+  // top-level capabilities faster than this package can name them.
+  const KNOWN_CAPABILITY_KEYS = new Set([
+    'loadSession',
+    'promptCapabilities',
+    'mcpCapabilities',
+    'sessionCapabilities',
+    '_meta',
+  ])
   const experimental: AgentCapabilities['experimental'] = {}
-  if ('auth' in caps && caps.auth != null) experimental.auth = caps.auth
-  if ('nes' in caps && caps.nes != null) experimental.nes = caps.nes
-  if ('providers' in caps && caps.providers != null) {
-    experimental.providers = caps.providers
-  }
-  if ('positionEncoding' in caps && caps.positionEncoding != null) {
-    experimental.positionEncoding = caps.positionEncoding
+  for (const [key, value] of Object.entries(caps as Record<string, unknown>)) {
+    if (KNOWN_CAPABILITY_KEYS.has(key)) continue
+    if (value == null) continue
+    experimental[key] = value
   }
   return {
     loadSession: Boolean(caps.loadSession),
@@ -73,6 +88,20 @@ export function normalizeCapabilities(
     sessionCapabilities,
     ...(Object.keys(experimental).length > 0 ? { experimental } : {}),
   }
+}
+
+/**
+ * Whether a session sub-capability counts as advertised.
+ *
+ * ACP spells these as an object: `{}` means supported, omitted or `null`
+ * means not. So presence is the signal and `Boolean(value)` would agree,
+ * since `{}` is truthy. The two diverge only on an off-spec literal
+ * `false`, which pre-object agents did send and which a bare presence
+ * check would read as supported. Rejecting `false` explicitly covers both
+ * spellings.
+ */
+function advertised(value: unknown): boolean {
+  return value != null && value !== false
 }
 
 export function normalizeAuthMethods(raw: InitializeResponse): AuthMethod[] {

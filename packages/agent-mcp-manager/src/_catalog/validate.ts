@@ -8,6 +8,7 @@
  * enforce the schema-plus-citation invariants on `client-configs.ts`.
  */
 
+import { PROJECT_ROOT_TOKEN } from '../emitters/shape.ts'
 import type { ClientConfig, ClientId } from './types.ts'
 
 export interface ValidationError {
@@ -53,6 +54,7 @@ function validateEntry(
   validatePaths(entry, errors)
   validateTransportShape(entry, errors)
   validateProjectShape(entry, errors)
+  validateLocalShape(entry, errors)
 }
 
 function validateSources(
@@ -112,6 +114,41 @@ function validateTransportShape(
     push(
       'http',
       'http shape declared but supportedTransports.system does not include http or sse',
+    )
+  }
+}
+
+/**
+ * A `local` scope shares the system config file, so the container path is
+ * the only thing separating them. If it did not differ, a local write
+ * would land silently in the global container: the exact bug the scope
+ * exists to avoid.
+ */
+function validateLocalShape(
+  entry: ClientConfig,
+  errors: ValidationError[],
+): void {
+  if (!entry.local) return
+  const push = mkPush(entry, errors)
+  const local = entry.local.stdio.containerPath
+  if (!local || local.length === 0) {
+    push(
+      'local.stdio.containerPath',
+      'must be set, since local scope shares the system config file and is told apart only by its container',
+    )
+    return
+  }
+  const system = entry.stdio.containerPath ?? [entry.stdio.topLevelKey]
+  if (local.join('\u0000') === system.join('\u0000')) {
+    push(
+      'local.stdio.containerPath',
+      'must differ from the system container, or local writes land in the system one',
+    )
+  }
+  if (!local.includes(PROJECT_ROOT_TOKEN)) {
+    push(
+      'local.stdio.containerPath',
+      `must include the ${PROJECT_ROOT_TOKEN} segment, or every project shares one container`,
     )
   }
 }

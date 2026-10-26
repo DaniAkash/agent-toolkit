@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import type {
   InitializeResponse,
   NewSessionResponse,
-} from '@agentclientprotocol/sdk'
+} from '@agentclientprotocol/sdk/unstable'
 import {
   deriveModelConfig,
   deriveReasoning,
@@ -47,12 +47,13 @@ describe('normalize — claude (claude-agent-acp 0.31.4)', () => {
       audio: false,
       embeddedContext: true,
     })
-    expect(caps.mcpCapabilities).toEqual({ http: true, sse: true })
+    expect(caps.mcpCapabilities).toEqual({ http: true, sse: true, acp: false })
     expect(caps.sessionCapabilities).toEqual({
       close: true,
       list: true,
       resume: true,
       fork: true,
+      systemPrompt: false,
       additionalDirectories: false,
     })
 
@@ -146,14 +147,17 @@ describe('normalize — codex (codex-acp 0.12.0)', () => {
   })
 })
 
-describe('normalize — gemini (gemini-cli 0.42.0)', () => {
+// An agent that advertises neither sessionCapabilities nor configOptions,
+// which is the sparsest shape ACP permits and the one most likely to trip
+// a normalizer that assumes those blocks exist.
+describe('normalize: minimal capability advertisement', () => {
   test('audio=true, configOptions empty, reasoning null', async () => {
-    const init = await loadInitialize('gemini')
-    const sess = await loadNewSession('gemini')
+    const init = await loadInitialize('minimal-caps')
+    const sess = await loadNewSession('minimal-caps')
 
     const caps = normalizeCapabilities(init)
     expect(caps.promptCapabilities.audio).toBe(true)
-    // Gemini's initialize doesn't advertise sessionCapabilities at all.
+    // The fixture's initialize omits sessionCapabilities entirely.
     expect(caps.sessionCapabilities.close).toBe(false)
 
     expect(normalizeConfigOptions(sess)).toEqual([])

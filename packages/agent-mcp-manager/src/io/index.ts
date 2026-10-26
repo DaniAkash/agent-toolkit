@@ -88,6 +88,9 @@ export async function readState(
       agent,
       scope,
       configPath,
+      // Carried so the pure planner can resolve a scope whose container
+      // path depends on it, without doing I/O of its own.
+      projectRoot: opts.projectRoot,
       rawContent: content,
       exists,
       parentExists,

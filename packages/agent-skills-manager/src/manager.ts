@@ -31,6 +31,7 @@ import {
 import { agents as agentsCatalog } from './_vendor/agents.ts'
 import { parseFrontmatter } from './_vendor/frontmatter.ts'
 import { sanitizeName } from './_vendor/sanitize.ts'
+import { sanitizeMetadata } from './_vendor/strip-escapes.ts'
 import { resolveAgentSkillsDir } from './agents.ts'
 import { ForeignPathError, SkillNotFoundError } from './errors.ts'
 import { parseSourceInput } from './source.ts'
@@ -164,9 +165,15 @@ export function createSkillsManager(
       return null
     }
     const { data } = parseFrontmatter(raw)
+    // Second parse boundary (the first is in _internal/fetch-source.ts).
+    // Sanitised for the same reason: untrusted SKILL.md frontmatter that
+    // callers will print. See the note there.
     return {
-      name: typeof data.name === 'string' ? data.name : '',
-      description: typeof data.description === 'string' ? data.description : '',
+      name: typeof data.name === 'string' ? sanitizeMetadata(data.name) : '',
+      description:
+        typeof data.description === 'string'
+          ? sanitizeMetadata(data.description)
+          : '',
     }
   }
 
@@ -280,12 +287,24 @@ export function createSkillsManager(
       const { skillName, agent } = unlinkOpts
       const dirName = sanitizeName(skillName)
       const agentDir = unlinkOpts.agentSkillsDir ?? agentDirFor(agent)
-      const linkPath = join(agentDir, dirName)
+      const resolvedLinkPath = join(agentDir, dirName)
 
       return await enqueueWrite(async () => {
         const manifest = await readManifest()
         const entry = manifest.skills[dirName]
         const recorded = entry?.links[agent]
+
+        // Prefer the path the link was actually created at over the one the
+        // catalog resolves today. Upstream moves these directories: Codex's
+        // global skills dir went from ~/.codex/skills to ~/.agents/skills,
+        // and droid, kilo and pi all moved too. Recomputing would look in
+        // the new location, miss the existing symlink, and orphan it along
+        // with its manifest entry. An explicit `agentSkillsDir` still wins,
+        // since that is the caller naming the target.
+        const linkPath =
+          unlinkOpts.agentSkillsDir === undefined && recorded
+            ? recorded.linkPath
+            : resolvedLinkPath
 
         if (!recorded) {
           const declared = await declaredTarget(linkPath)

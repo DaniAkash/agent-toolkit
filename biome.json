@@ -89,6 +89,9 @@
           "nursery": {},
           "complexity": {
             "noExcessiveCognitiveComplexity": "off"
+          },
+          "suspicious": {
+            "noControlCharactersInRegex": "off"
           }
         }
       }
@@ -114,7 +117,9 @@
           "complexity": {
             "noExcessiveCognitiveComplexity": {
               "level": "error",
-              "options": { "maxAllowedComplexity": 50 }
+              "options": {
+                "maxAllowedComplexity": 50
+              }
             }
           },
           "nursery": {},
@@ -137,7 +142,9 @@
           "complexity": {
             "noExcessiveCognitiveComplexity": {
               "level": "error",
-              "options": { "maxAllowedComplexity": 50 }
+              "options": {
+                "maxAllowedComplexity": 50
+              }
             }
           },
           "nursery": {},
@@ -164,7 +171,9 @@
           "complexity": {
             "noExcessiveCognitiveComplexity": {
               "level": "error",
-              "options": { "maxAllowedComplexity": 50 }
+              "options": {
+                "maxAllowedComplexity": 50
+              }
             }
           },
           "nursery": {},
@@ -199,7 +208,9 @@
           "complexity": {
             "noExcessiveCognitiveComplexity": {
               "level": "error",
-              "options": { "maxAllowedComplexity": 50 }
+              "options": {
+                "maxAllowedComplexity": 50
+              }
             }
           },
           "nursery": {},
