@@ -684,6 +684,8 @@ export const tome: ClientConfig = {
   sources: {
     firstParty: 'https://github.com/runebookai/tome',
     smithery: SMITHERY_URL,
+    notes:
+      'UNCONFIRMED: the cited source contradicts this entry. Tome\'s README advertises a UI to install and remove MCP servers and says "No fiddling with JSON" and that you should not have to manage json config files, and documents no path or top-level key. The path and `mcpServers` key here match Smithery\'s roster, which is the likely origin. Treat writes through this entry as unverified until the file is confirmed against a running Tome; removing the entry is the alternative and is a maintainer call.',
     verified: VERIFIED,
   },
 }
@@ -713,14 +715,23 @@ export const librechat: ClientConfig = {
   format: 'yaml',
   supportedTransports: { system: ['stdio', 'sse', 'http'] },
   stdio: { topLevelKey: 'mcpServers' },
-  http: { tagKey: 'type', tagValue: 'http', supportsOAuth: true },
+  http: {
+    tagKey: 'type',
+    // LibreChat accepts `streamable-http` with `http` as its documented
+    // alias, and `sse` as a distinct type. Without sseTagValue an sse spec
+    // was written as `type: http`, which is a different transport.
+    tagValue: 'http',
+    sseTagValue: 'sse',
+    supportsOAuth: true,
+  },
   sources: {
     firstParty:
       'https://www.librechat.ai/docs/configuration/librechat_yaml/object_structure/mcp_servers',
     smithery: SMITHERY_URL,
     notes:
       'YAML config file. mcpServers block accepts stdio (command/args) and remote (url) entries.',
-    verified: VERIFIED,
+    verified: '2026-10-26',
+    verifiedAgainst: 'librechat@docs-2026-10',
   },
 }
 

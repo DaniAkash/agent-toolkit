@@ -7,6 +7,7 @@ import {
   claudeCode,
   copilotCli,
   devinCli,
+  librechat,
   opencode,
 } from '../../src/_catalog/client-configs.ts'
 import { getEmitter } from '../../src/emitters/index.ts'
@@ -136,5 +137,29 @@ describe('UTF-8 BOM handling in the JSONC path', () => {
     expect(out.startsWith(BOM)).toBe(true)
     expect(out).toContain('// keep')
     expect(io.read(out)).toEqual(['b'])
+  })
+})
+
+describe('LibreChat remote transports', () => {
+  // LibreChat documents `sse` as its own type alongside `streamable-http`
+  // (alias `http`). The entry declared sse support with no sseTagValue, so
+  // an sse spec was written as `type: http`: a different transport.
+  const io = getEmitter(librechat, 'system')
+
+  test('an sse spec is tagged sse, not http', () => {
+    const out = io.add('', 'remote', {
+      transport: 'sse',
+      url: 'https://mcp.example.com/sse',
+    })
+    expect(out).toContain('type: sse')
+    expect(out).not.toContain('type: http')
+  })
+
+  test('an http spec is still tagged http', () => {
+    const out = io.add('', 'remote', {
+      transport: 'http',
+      url: 'https://mcp.example.com/mcp',
+    })
+    expect(out).toContain('type: http')
   })
 })
