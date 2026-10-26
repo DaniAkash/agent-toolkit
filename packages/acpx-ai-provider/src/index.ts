@@ -30,6 +30,7 @@ export type {
   AcpPermissionRequest,
   AcpRuntime,
   AcpRuntimeAvailableCommand,
+  AcpRuntimeCapabilities,
   AcpRuntimeDoctorReport,
   AcpRuntimeEvent,
   AcpRuntimeHandle,

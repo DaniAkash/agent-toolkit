@@ -4,6 +4,7 @@ import path from 'node:path'
 import type {
   AcpRuntime,
   AcpRuntimeAvailableCommand,
+  AcpRuntimeCapabilities,
   AcpRuntimeDoctorReport,
   AcpRuntimeEvent,
   AcpRuntimeHandle,
@@ -154,6 +155,36 @@ export class AcpxProvider {
     for (const [, { handle }] of this.handles) {
       await setModeImpl.call(this.runtime, { handle, mode })
     }
+  }
+
+  /**
+   * Select a model through the adapter's advertised model control, which
+   * survives reconnects. Prefer this over `setConfigOption('model', id)`:
+   * some agents (gemini-cli among them) reject `session/set_config_option`
+   * for the model key, which is what forced the config-option workaround
+   * before acpx exposed a first-class setter. Falls back to that workaround
+   * when the runtime has no `setModel`, so older acpx keeps working.
+   */
+  async setModel(model: string): Promise<void> {
+    const setModelImpl = this.runtime.setModel
+    if (!setModelImpl) {
+      await this.setConfigOption('model', model)
+      return
+    }
+    for (const [, { handle }] of this.handles) {
+      await setModelImpl.call(this.runtime, { handle, model })
+    }
+  }
+
+  /**
+   * The session's advertised capabilities. Reads from the runtime rather than
+   * spawning the CLI, so it costs nothing beyond the already-open session.
+   */
+  async getCapabilities(): Promise<AcpRuntimeCapabilities | undefined> {
+    const getCapsImpl = this.runtime.getCapabilities
+    if (!getCapsImpl) return undefined
+    const [first] = this.handles.values()
+    return await getCapsImpl.call(this.runtime, { handle: first?.handle })
   }
 
   async setConfigOption(key: string, value: string): Promise<void> {

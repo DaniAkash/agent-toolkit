@@ -75,6 +75,8 @@ export class MockAcpRuntime implements AcpRuntime {
     discardPersistentState?: boolean
   }> = []
   readonly setModeCalls: Array<{ handle: AcpRuntimeHandle; mode: string }> = []
+  readonly setModelCalls: Array<{ handle: AcpRuntimeHandle; model: string }> =
+    []
   readonly setConfigOptionCalls: Array<{
     handle: AcpRuntimeHandle
     key: string
@@ -193,6 +195,11 @@ export class MockAcpRuntime implements AcpRuntime {
     value: string
   }): Promise<void> {
     this.setConfigOptionCalls.push(input)
+    return Promise.resolve()
+  }
+
+  setModel(input: { handle: AcpRuntimeHandle; model: string }): Promise<void> {
+    this.setModelCalls.push(input)
     return Promise.resolve()
   }
 
