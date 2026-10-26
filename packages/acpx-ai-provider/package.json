@@ -48,13 +48,13 @@
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
-    "acpx": ">=0.13.0",
+    "acpx": ">=0.21.0",
     "ai": ">=7.0.0-beta.0"
   },
   "devDependencies": {
     "@ai-sdk/provider": "4.0.17",
     "@ai-sdk/provider-utils": "5.0.43",
-    "acpx": "^0.13.2",
+    "acpx": "^0.21.0",
     "acpx-test-helpers": "workspace:*",
     "ai": "7.0.105",
     "bunup": "^0.16.32",

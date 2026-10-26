@@ -1,8 +1,12 @@
 import type { AcpRuntimeOptions } from 'acpx/runtime'
 import type { AcpxBridgeMcpServer } from '../acpx-bridge-protocol.ts'
 
-export type RuntimeMcpServer = NonNullable<
-  AcpRuntimeOptions['mcpServers']
+// acpx 0.16 widened this to `McpServer[] | ((session) => McpServer[])` for
+// session-scoped tool servers. Indexing the union directly fails, so pull out
+// the array branch; the callback form is not wired up yet.
+export type RuntimeMcpServer = Extract<
+  NonNullable<AcpRuntimeOptions['mcpServers']>,
+  readonly unknown[]
 >[number]
 
 /**
