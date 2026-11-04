@@ -140,7 +140,9 @@ export class AcpxProvider {
 
   get runtime(): AcpRuntime {
     if (!this.runtimeInstance) {
-      this.runtimeInstance = createAcpRuntime(this.buildRuntimeOptions())
+      const options = this.buildRuntimeOptions()
+      const create = this.settings._internal?.createRuntime ?? createAcpRuntime
+      this.runtimeInstance = create(options)
     }
     return this.runtimeInstance
   }

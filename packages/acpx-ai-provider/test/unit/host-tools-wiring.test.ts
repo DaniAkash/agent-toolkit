@@ -7,12 +7,18 @@
  * receive another's URL, a name collision must be loud, and `close()` must
  * release the port.
  *
- * `mock.module` is process-global and irreversible in bun, which is why
- * this file owns its own runtime stub and the suite runs with --isolate.
+ * Uses the `_internal.createRuntime` seam rather than
+ * `mock.module('acpx/runtime')`. A second module mock in the suite broke
+ * CI on linux: bun's module mocks are process-global and irreversible, so
+ * the other files that import the real module failed to link with
+ * "Export named 'createAcpRuntime' not found". The seam also gives this
+ * file what it actually needs, which is the options the provider built.
  */
-import { describe, expect, mock, test } from 'bun:test'
+import { describe, expect, test } from 'bun:test'
 import type { AcpRuntime, AcpRuntimeOptions } from 'acpx/runtime'
 import type { AcpxHostTool } from '../../src/host-tools/types.ts'
+import { createAcpxProvider } from '../../src/provider.ts'
+import type { AcpxProviderSettings } from '../../src/types.ts'
 
 interface Captured {
   options: AcpRuntimeOptions | undefined
@@ -30,7 +36,7 @@ const captured: Captured = {
   allMcp: [],
 }
 
-const createAcpRuntimeMock = mock((options: AcpRuntimeOptions): AcpRuntime => {
+function makeRuntime(options: AcpRuntimeOptions): AcpRuntime {
   captured.options = options
   return {
     ensureSession: async (args: Record<string, unknown>) => {
@@ -55,15 +61,16 @@ const createAcpRuntimeMock = mock((options: AcpRuntimeOptions): AcpRuntime => {
     cancel: async () => {},
     close: async () => {},
   } as unknown as AcpRuntime
-})
+}
 
-mock.module('acpx/runtime', () => ({
-  createAcpRuntime: createAcpRuntimeMock,
-  createAgentRegistry: () => ({}),
-  createFileSessionStore: () => ({}),
-}))
-
-const { createAcpxProvider } = await import('../../src/provider.ts')
+/** Every provider in this file goes through the test seam. */
+function makeProvider(settings: Partial<AcpxProviderSettings> = {}) {
+  return createAcpxProvider({
+    agent: 'codex',
+    ...settings,
+    _internal: { createRuntime: makeRuntime },
+  })
+}
 
 const SAY: AcpxHostTool = {
   description: 'Say something.',
@@ -88,7 +95,7 @@ interface HttpEntry {
 describe('registration', () => {
   test('no hostTools means no extra MCP server', async () => {
     reset()
-    const provider = createAcpxProvider({ agent: 'codex', sessionKey: 'k1' })
+    const provider = makeProvider({ sessionKey: 'k1' })
     await provider.prepare()
     expect(captured.mcpAtSessionTime).toEqual([])
     await provider.close('test')
@@ -96,8 +103,7 @@ describe('registration', () => {
 
   test('a host tool server is registered for the session', async () => {
     reset()
-    const provider = createAcpxProvider({
-      agent: 'codex',
+    const provider = makeProvider({
       sessionKey: 'k2',
       hostTools: { tools: { say: SAY } },
     })
@@ -119,8 +125,7 @@ describe('registration', () => {
     // If it bound after, the URL would be missing from session/new and the
     // agent would never learn the tools exist. acpx cannot add it later.
     reset()
-    const provider = createAcpxProvider({
-      agent: 'codex',
+    const provider = makeProvider({
       sessionKey: 'k3',
       hostTools: { tools: { say: SAY } },
     })
@@ -133,8 +138,7 @@ describe('registration', () => {
 
   test('a caller-configured server is kept alongside the host one', async () => {
     reset()
-    const provider = createAcpxProvider({
-      agent: 'codex',
+    const provider = makeProvider({
       sessionKey: 'k4',
       mcpServers: [
         { type: 'http', name: 'search', url: 'http://example.test/mcp' },
@@ -149,8 +153,7 @@ describe('registration', () => {
 
   test('serverName is honoured', async () => {
     reset()
-    const provider = createAcpxProvider({
-      agent: 'codex',
+    const provider = makeProvider({
       sessionKey: 'k5',
       hostTools: { tools: { say: SAY }, serverName: 'herbie' },
     })
@@ -164,8 +167,7 @@ describe('registration', () => {
     // The resolver form exists for exactly this. An array would hand every
     // session every other session's URL and token.
     reset()
-    const provider = createAcpxProvider({
-      agent: 'codex',
+    const provider = makeProvider({
       hostTools: { tools: { say: SAY } },
     })
     await provider.prepare({ sessionKey: 'a' })
@@ -186,8 +188,7 @@ describe('name collision', () => {
     // Silently replacing the caller's server would break whatever it
     // pointed at; silently dropping ours would make hostTools do nothing.
     reset()
-    const provider = createAcpxProvider({
-      agent: 'codex',
+    const provider = makeProvider({
       sessionKey: 'k6',
       mcpServers: [{ type: 'http', name: 'host', url: 'http://x.test/mcp' }],
       hostTools: { tools: { say: SAY } },
@@ -204,8 +205,7 @@ describe('name collision', () => {
 
   test('renaming resolves the collision', async () => {
     reset()
-    const provider = createAcpxProvider({
-      agent: 'codex',
+    const provider = makeProvider({
       sessionKey: 'k7',
       mcpServers: [{ type: 'http', name: 'host', url: 'http://x.test/mcp' }],
       hostTools: { tools: { say: SAY }, serverName: 'host-tools' },
@@ -220,8 +220,7 @@ describe('name collision', () => {
 describe('teardown', () => {
   test('close releases the host tool port', async () => {
     reset()
-    const provider = createAcpxProvider({
-      agent: 'codex',
+    const provider = makeProvider({
       sessionKey: 'k8',
       hostTools: { tools: { say: SAY } },
     })
@@ -245,8 +244,7 @@ describe('host tool identification', () => {
   test('a namespaced tool name is recognised, in any separator style', async () => {
     // Each agent namespaces MCP tools differently, which is why consumers
     // get providerMetadata instead of being told to match a prefix.
-    const provider = createAcpxProvider({
-      agent: 'codex',
+    const provider = makeProvider({
       hostTools: { tools: { say: SAY } },
     })
     for (const name of [
@@ -273,8 +271,7 @@ describe('host tool identification', () => {
     // called `say` was marked `hostTool: true`. Shape cannot tell them
     // apart, so the answer comes from what the server actually served.
     reset()
-    const provider = createAcpxProvider({
-      agent: 'codex',
+    const provider = makeProvider({
       sessionKey: 'bare',
       hostTools: { tools: { say: SAY } },
     })
@@ -307,7 +304,7 @@ describe('host tool identification', () => {
   })
 
   test('nothing is a host tool when none are declared', async () => {
-    const provider = createAcpxProvider({ agent: 'codex' })
+    const provider = makeProvider()
     expect(provider.isHostTool('s1', 'say')).toBe(false)
     expect(provider.hasHostTools()).toBe(false)
     await provider.close('test')
@@ -319,8 +316,7 @@ describe('an injected runtime cannot register host tools', () => {
     // Reported in review. `mcpServers` is set when the runtime is built,
     // so a pre-built runtime never receives the resolver and the agent
     // never learns the tools exist.
-    const provider = createAcpxProvider({
-      agent: 'codex',
+    const provider = makeProvider({
       runtime: {
         ensureSession: async () => ({}),
         startTurn: () => ({
@@ -340,8 +336,7 @@ describe('an injected runtime cannot register host tools', () => {
   })
 
   test('a provider that builds its own runtime is registerable', async () => {
-    const provider = createAcpxProvider({
-      agent: 'codex',
+    const provider = makeProvider({
       hostTools: { tools: { say: SAY } },
     })
     expect(provider.hostToolsUnregisterable()).toBe(false)
@@ -371,8 +366,7 @@ describe('concurrent turns on one session', () => {
         })
       },
     }
-    const provider = createAcpxProvider({
-      agent: 'codex',
+    const provider = makeProvider({
       sessionKey: 'turns',
       hostTools: { tools: { wait: waiting } },
     })
@@ -414,8 +408,7 @@ describe('concurrent turns on one session', () => {
     // Honest rather than convenient: there is nothing for it to wait on.
     reset()
     let seen: boolean | undefined
-    const provider = createAcpxProvider({
-      agent: 'codex',
+    const provider = makeProvider({
       sessionKey: 'noturn',
       hostTools: {
         tools: {
@@ -473,8 +466,7 @@ describe('close with a call still pending', () => {
           )
         }),
     }
-    const provider = createAcpxProvider({
-      agent: 'codex',
+    const provider = makeProvider({
       sessionKey: 'hang',
       hostTools: { tools: { ask: waiting } },
     })
@@ -525,8 +517,7 @@ describe('starting the server concurrently', () => {
     // construction rather than by this test, and the cleanup is the one
     // that prevents an actual leak.
     reset()
-    const provider = createAcpxProvider({
-      agent: 'codex',
+    const provider = makeProvider({
       sessionKey: 'race',
       hostTools: { tools: { say: SAY } },
     })

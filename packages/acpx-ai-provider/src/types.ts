@@ -8,6 +8,7 @@ import type {
   AcpRuntimeDoctorReport,
   AcpRuntimeEvent,
   AcpRuntimeHandle,
+  AcpRuntimeOptions,
   AcpRuntimePlanEntry,
   AcpRuntimeSessionContext,
   AcpRuntimeSessionModels,
@@ -141,6 +142,17 @@ export interface AcpxProviderSettings {
   _internal?: {
     generateId?: () => string
     now?: () => Date
+    /**
+     * Replaces `createAcpRuntime` while keeping the options the provider
+     * built, which `runtime` does not: a pre-built `runtime` never gets
+     * `buildRuntimeOptions()` called at all.
+     *
+     * Exists so a test can assert what the provider would hand acpx
+     * without a second `mock.module('acpx/runtime')` in the suite. Bun's
+     * module mocks are process-global and irreversible, so a second one
+     * leaks into files that import the real module and they fail to link.
+     */
+    createRuntime?: (options: AcpRuntimeOptions) => AcpRuntime
   }
 }
 
