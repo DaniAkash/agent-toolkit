@@ -56,16 +56,16 @@
     "ai": ">=7.0.0-beta.0"
   },
   "dependencies": {
-    "ws": "^8.21.3",
+    "ws": "^8.22.1",
     "zod": "3.25.76"
   },
   "devDependencies": {
-    "@ai-sdk/harness": "1.0.115",
-    "@ai-sdk/provider": "4.0.17",
-    "@ai-sdk/provider-utils": "5.0.43",
-    "@ai-sdk/sandbox-vercel": "1.0.115",
+    "@ai-sdk/harness": "1.0.170",
+    "@ai-sdk/provider": "4.0.35",
+    "@ai-sdk/provider-utils": "5.0.72",
+    "@ai-sdk/sandbox-vercel": "1.0.170",
     "@types/ws": "^8",
-    "acpx": "^0.21.0",
+    "acpx": "^0.21.1",
     "acpx-test-helpers": "workspace:*",
     "bunup": "^0.16.32",
     "typescript": "^7.0.2"
