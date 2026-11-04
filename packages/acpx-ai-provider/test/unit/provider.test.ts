@@ -22,7 +22,15 @@ const createAcpRuntimeMock = mock(
     }) as unknown as AcpRuntime,
 )
 
+// Spread the real namespace and override only the three factories this
+// file stubs. `mock.module` is process-global and irreversible, so a
+// factory returning a partial namespace deletes every other export from
+// every other file's view of the module. See the note in
+// packages/acp-probe/test/unit/resolve.test.ts.
+const actualRuntime = await import('acpx/runtime')
+
 mock.module('acpx/runtime', () => ({
+  ...actualRuntime,
   createAcpRuntime: createAcpRuntimeMock,
   createAgentRegistry: () => ({}),
   createFileSessionStore: () => ({}),
