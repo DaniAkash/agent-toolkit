@@ -21,6 +21,7 @@ import type {
   SessionAgentOptions,
   SystemPromptOption,
 } from 'acpx/runtime'
+import type { AcpxHostToolsSettings } from './host-tools/types.ts'
 
 export type AcpxPermissionMode = 'approve-all' | 'approve-reads' | 'deny-all'
 export type AcpxNonInteractivePermissions = 'deny' | 'fail'
@@ -42,6 +43,13 @@ export interface AcpxMcpServerHttp {
 }
 
 export type AcpxMcpServerConfig = AcpxMcpServerStdio | AcpxMcpServerHttp
+
+export type {
+  AcpxHostTool,
+  AcpxHostToolContext,
+  AcpxHostToolSchema,
+  AcpxHostToolsSettings,
+} from './host-tools/types.ts'
 
 export interface AcpxProviderSettings {
   agent: string
@@ -70,6 +78,24 @@ export interface AcpxProviderSettings {
     ctx: { signal: AbortSignal },
   ) => Promise<AcpPermissionDecision | undefined>
   mcpServers?: AcpxMcpServerConfig[]
+  /**
+   * Functions in this application that the agent may call mid-turn,
+   * served to it as a loopback MCP server bound per session.
+   *
+   * Declared here rather than taken from `streamText({ tools })` because
+   * the AI SDK hands a provider only `{ name, description, inputSchema }`;
+   * `execute` stays on its side and is never passed down, so a provider
+   * cannot answer an out-of-band call from the tool set alone. Passing
+   * `tools` as well is still useful: the provider warns when a tool it was
+   * asked to expose has no executable here.
+   *
+   * The server is bound before `session/new` and torn down by `close()`.
+   * ACP fixes a session's MCP configuration at creation, so adding a tool
+   * later has no effect on a live persistent session; use a distinct
+   * `sessionKey` for a different tool set, exactly as with
+   * `sessionOptions`.
+   */
+  hostTools?: AcpxHostToolsSettings
   agentRegistryOverrides?: Record<string, string>
   stateDir?: string
   resumeSessionId?: string

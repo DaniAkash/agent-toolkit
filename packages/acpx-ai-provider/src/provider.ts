@@ -17,8 +17,18 @@ import {
   createAgentRegistry,
   createFileSessionStore,
 } from 'acpx/runtime'
+import type { HostToolServer } from './host-tools/serve.ts'
+import { startHostToolServer } from './host-tools/serve.ts'
 import { AcpxLanguageModel } from './language-model.ts'
 import { toRuntimeMcpServers } from './mcp-servers.ts'
+
+/**
+ * Advertised in the MCP `initialize` response. Independent of the package
+ * version on purpose: it describes the tool server's own surface, which
+ * changes on its own schedule.
+ */
+const HOST_TOOL_SERVER_VERSION = '1'
+
 import type {
   AcpxLanguageModelOptions,
   AcpxProviderSettings,
@@ -58,6 +68,18 @@ export class AcpxProvider {
   private runtimeInstance: AcpRuntime | null
   private readonly handles = new Map<string, ResolvedHandle>()
   private readonly usedKeys = new Set<string>()
+  /**
+   * One host tool server per session, not per turn: ACP fixes a session's
+   * MCP configuration at `session/new`, so the server has to be bound and
+   * reachable before `ensureSession` and lives as long as the session.
+   */
+  private readonly hostToolServers = new Map<string, HostToolServer>()
+  /**
+   * Abort controller for the turn currently in flight on a session, so a
+   * pending host tool call is cancelled when the turn is.
+   */
+  private readonly turnAborts = new Map<string, AbortController>()
+  private readonly hostToolCalls = new Map<string, Set<string>>()
   private readonly lastPlan = new Map<string, AcpRuntimePlanEntry[]>()
   private readonly lastUsage = new Map<string, AcpxUsageSnapshot>()
   private readonly lastCommands = new Map<
@@ -101,6 +123,10 @@ export class AcpxProvider {
 
     let cached = this.handles.get(sessionKey)
     if (!cached || cached.agent !== agent) {
+      // Before ensureSession, never after: the server's URL has to be in
+      // the session/new payload, and acpx cannot swap MCP config on a live
+      // session.
+      await this.ensureHostToolServer(sessionKey)
       const handle = await this.runtime.ensureSession({
         sessionKey,
         agent,
@@ -181,6 +207,141 @@ export class AcpxProvider {
       this.usedKeys.delete(key)
     }
     this.handles.clear()
+    for (const [, server] of this.hostToolServers) await server.close()
+    this.hostToolServers.clear()
+    this.turnAborts.clear()
+    this.hostToolCalls.clear()
+  }
+
+  /**
+   * Bind this session's host tool server if the caller declared any tools
+   * and it is not already up. Idempotent per session key.
+   */
+  private async ensureHostToolServer(sessionKey: string): Promise<void> {
+    const declared = this.settings.hostTools?.tools
+    if (!declared || Object.keys(declared).length === 0) return
+    if (this.hostToolServers.has(sessionKey)) return
+
+    const server = await startHostToolServer({
+      tools: declared,
+      serverName: this.settings.hostTools?.serverName ?? 'host',
+      serverVersion: HOST_TOOL_SERVER_VERSION,
+      sessionKey,
+      hostname: this.settings.hostTools?.hostname,
+      // Read lazily: the controller for the live turn is swapped per turn,
+      // so capturing one here would pin the first turn's signal forever.
+      getAbortSignal: () => this.turnAbortSignal(sessionKey),
+      onCall: (toolName, toolCallId) => {
+        this.recordHostToolCall(sessionKey, toolName, toolCallId)
+      },
+    })
+    this.hostToolServers.set(sessionKey, server)
+  }
+
+  /** Host tool entries for every live session, plus the caller's own. */
+  private resolveMcpServers(): AcpRuntimeOptions['mcpServers'] {
+    const configured = toRuntimeMcpServers(this.settings.mcpServers) ?? []
+    const hostName = this.settings.hostTools?.serverName ?? 'host'
+    if (
+      this.settings.hostTools?.tools &&
+      Object.keys(this.settings.hostTools.tools).length > 0 &&
+      configured.some((s) => s.name === hostName)
+    ) {
+      // Loudly, not silently: replacing the caller's server would break
+      // whatever it points at, and dropping ours would make `hostTools`
+      // quietly do nothing. Both are worse than refusing to start.
+      throw new Error(
+        `mcpServers already contains a server named "${hostName}", which ` +
+          'collides with the host tool server. Rename one of them, or set ' +
+          'hostTools.serverName to something else.',
+      )
+    }
+    // The resolver form, so each session contributes only its own server.
+    // acpx calls this per session; an array would hand every session every
+    // other session's URL.
+    return (session: { sessionKey?: string }) => {
+      const key = session?.sessionKey
+      const own = key ? this.hostToolServers.get(key) : undefined
+      if (!own) return configured
+      return [
+        ...configured,
+        {
+          type: 'http' as const,
+          name: own.serverName,
+          url: own.url,
+          headers: [{ name: 'Authorization', value: `Bearer ${own.token}` }],
+        },
+      ]
+    }
+  }
+
+  private turnAbortSignal(sessionKey: string): AbortSignal {
+    let controller = this.turnAborts.get(sessionKey)
+    if (!controller) {
+      controller = new AbortController()
+      this.turnAborts.set(sessionKey, controller)
+    }
+    return controller.signal
+  }
+
+  /** Called by the language model when a turn starts on this session. */
+  beginTurn(sessionKey: string, abortSignal?: AbortSignal): void {
+    const controller = new AbortController()
+    this.turnAborts.set(sessionKey, controller)
+    this.hostToolCalls.set(sessionKey, new Set())
+    if (abortSignal) {
+      if (abortSignal.aborted) controller.abort(abortSignal.reason)
+      else
+        abortSignal.addEventListener(
+          'abort',
+          () => controller.abort(abortSignal.reason),
+          { once: true },
+        )
+    }
+  }
+
+  /** Called when a turn ends, so a late host call cannot run unbounded. */
+  endTurn(sessionKey: string, reason = 'turn ended'): void {
+    this.turnAborts.get(sessionKey)?.abort(new Error(reason))
+    this.turnAborts.delete(sessionKey)
+  }
+
+  private recordHostToolCall(
+    sessionKey: string,
+    toolName: string,
+    toolCallId: string,
+  ): void {
+    let seen = this.hostToolCalls.get(sessionKey)
+    if (!seen) {
+      seen = new Set()
+      this.hostToolCalls.set(sessionKey, seen)
+    }
+    seen.add(toolName)
+    void toolCallId
+  }
+
+  /**
+   * Whether this session served a host tool of that name during the turn.
+   * Used to mark the stream's `tool-call` part, since matching on the name
+   * the agent reports is unreliable: each one namespaces MCP tools
+   * differently (`mcp__host__say`, `host__say`, the bare name).
+   */
+  isHostTool(reportedToolName: string): boolean {
+    const declared = this.settings.hostTools?.tools
+    if (!declared) return false
+    return Object.keys(declared).some(
+      (name) =>
+        reportedToolName === name || reportedToolName.endsWith(`__${name}`),
+    )
+  }
+
+  /** The host tool names declared on this provider, for warning checks. */
+  hostToolNames(): string[] {
+    return Object.keys(this.settings.hostTools?.tools ?? {})
+  }
+
+  hasHostTools(): boolean {
+    return this.hostToolNames().length > 0
   }
 
   async setMode(mode: string): Promise<void> {
@@ -434,7 +595,7 @@ export class AcpxProvider {
       nonInteractivePermissions: (this.settings.nonInteractivePermissions ??
         DEFAULT_NON_INTERACTIVE) as AcpRuntimeOptions['nonInteractivePermissions'],
       timeoutMs: this.settings.turnTimeoutMs,
-      mcpServers: toRuntimeMcpServers(this.settings.mcpServers),
+      mcpServers: this.resolveMcpServers(),
       onPermissionRequest: this.settings.onPermissionRequest,
       // Pass-through embedding controls. Each is omitted rather than set to
       // undefined when unset, because acpx treats an omitted option as

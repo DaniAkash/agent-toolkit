@@ -27,6 +27,13 @@ export type UsageUpdateEvent = Extract<AcpRuntimeEvent, { type: 'status' }> & {
 }
 
 export interface EventTranslatorOptions {
+  /**
+   * Whether a tool name the agent reported is one of this provider's host
+   * tools. Supplied as a predicate rather than a list because each agent
+   * namespaces MCP tools differently (`mcp__host__say`, `host__say`, the
+   * bare name), so the caller owns the matching.
+   */
+  isHostTool?: (reportedToolName: string) => boolean
   generateId: () => string
   /**
    * Invoked with the raw `usage_update` event (including the new `cost`
@@ -112,12 +119,14 @@ export class EventTranslator {
   private currentBlockId: string | null = null
   private readonly toolCalls = new Map<string, ToolCallState>()
   private lastUsageEvent: UsageUpdateEvent | undefined
+  private readonly isHostTool?: (reportedToolName: string) => boolean
 
   constructor(opts: EventTranslatorOptions) {
     this.generateId = opts.generateId
     this.onUsageUpdate = opts.onUsageUpdate
     this.onAvailableCommands = opts.onAvailableCommands
     this.onPlan = opts.onPlan
+    this.isHostTool = opts.isHostTool
   }
 
   translate(event: AcpRuntimeEvent): LanguageModelV2StreamPart[] {
@@ -292,12 +301,25 @@ export class EventTranslator {
       parts.push({ type: 'tool-input-end', id: state.blockId })
       state.inputClosed = true
     }
+    // Still emitted, and still `providerExecuted: true`: the agent really
+    // did call the tool, and suppressing the part would both lie and break
+    // any consumer rendering a tool timeline. A host that ran the function
+    // itself needs to tell this apart from an agent-side tool, so the
+    // provider marks it in metadata it controls rather than by name.
+    const hostTool = this.isHostTool?.(state.toolName) === true
     parts.push({
       type: 'tool-call',
       toolCallId: callId,
       toolName: state.toolName,
       input: state.emittedText,
       providerExecuted: true,
+      ...(hostTool
+        ? {
+            providerMetadata: {
+              acpx: { hostTool: true, toolName: state.toolName },
+            },
+          }
+        : {}),
     })
     parts.push({
       type: 'tool-result',

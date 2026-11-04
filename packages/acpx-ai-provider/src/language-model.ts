@@ -11,6 +11,8 @@ import type {
 import type { AcpRuntimeTurn } from 'acpx/runtime'
 import { EventTranslator } from './convert-events.ts'
 import { convertPrompt } from './convert-prompt.ts'
+import { prependStreamStart } from './host-tools/stream.ts'
+import { hostToolWarnings } from './host-tools/warnings.ts'
 import { createJsonCleanupTransform } from './json-output.ts'
 import type { AcpxProvider } from './provider.ts'
 import type { AcpxLanguageModelOptions } from './types.ts'
@@ -57,6 +59,21 @@ export class AcpxLanguageModel implements LanguageModelV2 {
     this.modelId = opts.agent ?? providerInstance.settings.agent
   }
 
+  /**
+   * Warnings about tools the caller passed that this provider cannot
+   * serve. Shared by both entrypoints so the two cannot disagree.
+   */
+  private hostToolWarnings(
+    callOptions: LanguageModelV2CallOptions,
+    sessionAlreadyLive: boolean,
+  ): LanguageModelV2CallWarning[] {
+    return hostToolWarnings({
+      tools: callOptions.tools,
+      declared: this.providerInstance.hostToolNames(),
+      sessionAlreadyLive,
+    })
+  }
+
   async doStream(
     callOptions: LanguageModelV2CallOptions,
   ): Promise<DoStreamResult> {
@@ -64,6 +81,11 @@ export class AcpxLanguageModel implements LanguageModelV2 {
       this.opts,
     )
     const isFresh = this.providerInstance.markSessionKeyUsed(sessionKey)
+    const warnings = this.hostToolWarnings(callOptions, !isFresh)
+
+    // Bind the turn's abort signal before the turn starts, so a host tool
+    // call already in flight is cancelled when the turn is.
+    this.providerInstance.beginTurn(sessionKey, callOptions.abortSignal)
 
     const { text, attachments } = convertPrompt({
       prompt: callOptions.prompt,
@@ -100,12 +122,19 @@ export class AcpxLanguageModel implements LanguageModelV2 {
       onPlan: (entries) => {
         this.providerInstance.recordPlan(sessionKey, entries)
       },
+      isHostTool: (name) => this.providerInstance.isHostTool(name),
     })
 
     let stream = createTranslatingStream(turn, translator)
     if (callOptions.responseFormat?.type === 'json') {
       stream = stream.pipeThrough(createJsonCleanupTransform())
     }
+    // `stream-start` is the V2 channel for call warnings, and it has to be
+    // the first part, so it is prepended rather than emitted by the
+    // translator (which only sees runtime events).
+    stream = prependStreamStart(stream, warnings, () => {
+      this.providerInstance.endTurn(sessionKey)
+    })
 
     return {
       stream,
@@ -152,6 +181,7 @@ function createTranslatingStream(
 
 interface Accumulator {
   content: LanguageModelV2Content[]
+  warnings: LanguageModelV2CallWarning[]
   textBuffers: Map<string, string>
   reasoningBuffers: Map<string, string>
   finishReason: LanguageModelV2FinishReason
@@ -162,6 +192,7 @@ interface Accumulator {
 function newAccumulator(): Accumulator {
   return {
     content: [],
+    warnings: [],
     textBuffers: new Map(),
     reasoningBuffers: new Map(),
     finishReason: 'unknown',
@@ -190,6 +221,9 @@ function flushBuffer(
 
 function applyPart(part: LanguageModelV2StreamPart, acc: Accumulator): void {
   switch (part.type) {
+    case 'stream-start':
+      acc.warnings.push(...part.warnings)
+      break
     case 'text-start':
       acc.textBuffers.set(part.id, '')
       return
@@ -258,6 +292,6 @@ async function accumulateStream(
     providerMetadata: acc.providerMetadata,
     request,
     response,
-    warnings: [],
+    warnings: acc.warnings,
   }
 }
