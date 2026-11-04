@@ -26,6 +26,20 @@ When `SMOKE_AGENTS` is unset (or doesn't list an agent), all five
 tests for that agent are skipped. The regular unit / integration
 suite is unaffected — it always runs.
 
+## Files
+
+| File | Covers |
+|---|---|
+| `smoke.test.ts` | the broad per-agent battery |
+| `usage-events.test.ts` | token usage arriving off the live runtime |
+| `permission-callback.test.ts` | the `onPermissionRequest` round-trip |
+| `host-tools.test.ts` | a real agent discovering and calling a host tool |
+
+`host-tools.test.ts` is codex-only and needs no API key: codex uses its
+own local auth. It is the spike that justified the feature, kept as a
+test, and it is the only place the full MCP lifecycle runs against a real
+agent rather than against the pure handler.
+
 ## Per-agent setup
 
 | Agent | Auth | First-run cost |

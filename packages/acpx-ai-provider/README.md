@@ -522,9 +522,129 @@ const provider = createAcpxProvider({
 ergonomics; the provider converts them to the ACP wire format
 (`Array<{ name, value }>`) before handing the config to the runtime.
 
-> **Note**: host-side AI SDK tools (the `acpTools()` /
-> TCP-callback story from `acp-ai-provider`) are **not** supported. See
-> [Known limitations](#known-limitations).
+> **Note**: to let the agent call back into your application, see
+> [Host tools](#host-tools). `mcpServers` is for pointing the agent at a
+> server that already exists; `hostTools` is for functions that live in
+> your process.
+
+## Host tools
+
+Functions in your application that the agent can call mid-turn, served to
+it as a loopback MCP server bound per session.
+
+`mcpServers` points the agent at capability that already exists somewhere
+else. `hostTools` is the other direction: the agent calls back into your
+process, with typed arguments, and can block on your answer.
+
+```ts
+import { createAcpxProvider } from 'acpx-ai-provider'
+import { generateText } from 'ai'
+
+const provider = createAcpxProvider({
+  agent: 'codex',
+  hostTools: {
+    tools: {
+      record_answer: {
+        description:
+          'Report the final answer back to the host. Call this exactly ' +
+          'once when you know the answer.',
+        inputSchema: {
+          type: 'object',
+          properties: { answer: { type: 'string' } },
+          required: ['answer'],
+          additionalProperties: false,
+        },
+        execute: async (input, { abortSignal }) => {
+          await db.insert(answers).values({ text: String(input.answer) })
+          return 'recorded'
+        },
+      },
+    },
+  },
+})
+
+await generateText({
+  model: provider.languageModel(),
+  prompt: 'What is 17 + 25? Report it only by calling record_answer.',
+})
+```
+
+### Why not `streamText({ tools })`
+
+Because the AI SDK does not pass the function down. A provider receives
+`LanguageModelV2FunctionTool`, which is `{ type, name, description,
+inputSchema }`; `execute` stays on the SDK's side and is invoked by
+`streamText` itself after a `tool-call` part comes back. That works for a
+tool whose result can wait for the next step, and not at all for a tool
+the agent is blocked on mid-turn.
+
+So the executable has to be given to the provider directly. You can still
+pass `tools` to the model as well, and it is useful to: the provider warns
+when a tool it was asked to expose has no entry in `hostTools`, rather
+than letting it silently never fire.
+
+### Lifetime
+
+**One server per session, bound before the session is created.** ACP
+carries `mcpServers` on `session/new`, and acpx cannot swap the MCP
+configuration of a live session. Changing `hostTools` afterwards does not
+reach a running persistent session, exactly like
+[`sessionOptions`](#session-options); use a distinct `sessionKey` for a
+different tool set. The provider emits a `LanguageModelV2CallWarning` when
+it detects this rather than leaving you to infer it.
+
+`close()` tears the server down and releases the port.
+
+### Transport
+
+Loopback HTTP on an ephemeral port, with a per-session bearer token. Both
+built-in agents advertise `mcpCapabilities.http: true`; codex advertises
+`sse: false`, so SSE is not a fallback worth having. An agent that
+advertises stdio only is not served today.
+
+The server speaks three methods, `initialize`, `tools/list` and
+`tools/call`, and is written against `fetch` with no dependency, which is
+why this package still ships `"dependencies": {}`.
+
+### Arguments are validated
+
+An incoming `tools/call` is checked against the tool's own `inputSchema`
+before `execute` runs, and a mismatch comes back to the agent as an MCP
+tool error naming what was wrong.
+
+This is not belt and braces. A real codex turn answered a `tools/list`
+that declared `answer: { type: 'string' }` with `{"answer": 42}`. Agents
+do not reliably coerce to the advertised type, so without the check your
+`execute` would receive a number where it was promised a string.
+
+### Telling host calls apart in the stream
+
+`tool-call` parts are still emitted for host tools, and still carry
+`providerExecuted: true`, because the agent really did call the tool and
+suppressing the part would break any tool timeline you render.
+
+To distinguish them, read `providerMetadata`:
+
+```ts
+providerMetadata: { acpx: { hostTool: true, toolName: 'record_answer' } }
+```
+
+Match on that rather than on the tool name. Each agent namespaces MCP
+tools differently (`mcp__host__say`, `host__say`, the bare name), so a
+name prefix that works on one runtime quietly fails on the next.
+
+### Errors and timeouts
+
+An `execute` that rejects becomes an MCP tool error the agent can read and
+react to, not a thrown turn.
+
+A pending host tool call is **not** governed by `turnTimeoutMs`. An agent
+waiting on a human answer is not wedged, and a question surface that dies
+after the default turn timeout is worse than none. The call is bounded by
+the turn's `AbortSignal`, which arrives as `context.abortSignal`, so
+cancelling the turn rejects every pending call and your `execute` can
+clean up. Set `timeoutMs` on an individual tool for a ceiling on that one;
+the default is none.
 
 ## Per-call permissions
 
@@ -840,8 +960,11 @@ Behavior varies by built-in agent. Recommended starting matrix:
 
 These are deliberate non-goals, not bugs:
 
-- Host-side AI SDK tools. The agent only learns about tools through MCP
-  servers, so `tool({ execute })` callbacks are never invoked here.
+- Honouring `streamText({ tools })` directly. The AI SDK hands a provider
+  only `{ name, description, inputSchema }` and keeps `execute` on its own
+  side, so the function never reaches us. Declare it under
+  [`hostTools`](#host-tools) instead; passing `tools` as well makes the
+  provider warn about any tool it has no executable for.
 - Mid-stream model switching from inside a single `streamText` call.
 - Provider-defined dynamic tool routing.
 - Live token-cost calculation.

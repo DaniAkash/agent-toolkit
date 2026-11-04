@@ -14,7 +14,7 @@
     },
     "packages/acp-probe": {
       "name": "acp-probe",
-      "version": "1.0.0",
+      "version": "2.0.0",
       "dependencies": {
         "@agentclientprotocol/sdk": "^2.0.2",
       },
@@ -34,7 +34,7 @@
     },
     "packages/acpx-ai-harness": {
       "name": "acpx-ai-harness",
-      "version": "0.0.3",
+      "version": "0.1.0",
       "dependencies": {
         "ws": "^8.21.3",
         "zod": "3.25.76",
@@ -58,7 +58,7 @@
     },
     "packages/acpx-ai-provider": {
       "name": "acpx-ai-provider",
-      "version": "2.0.0",
+      "version": "2.0.1",
       "devDependencies": {
         "@ai-sdk/provider": "4.0.34",
         "@ai-sdk/provider-utils": "5.0.68",
@@ -89,7 +89,7 @@
     },
     "packages/agent-mcp-manager": {
       "name": "agent-mcp-manager",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
         "jsonc-parser": "^3.3.1",
         "smol-toml": "^1.9.1",
@@ -102,7 +102,7 @@
     },
     "packages/agent-skills-manager": {
       "name": "agent-skills-manager",
-      "version": "1.0.0",
+      "version": "2.0.0",
       "dependencies": {
         "xdg-basedir": "^5.1.0",
         "yaml": "^2.9.1",
@@ -114,7 +114,7 @@
     },
     "packages/ai-sdk-microsandbox": {
       "name": "ai-sdk-microsandbox",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "devDependencies": {
         "@ai-sdk/harness": "1.0.115",
         "@ai-sdk/harness-codex": "1.0.117",
