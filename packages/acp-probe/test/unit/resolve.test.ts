@@ -33,7 +33,21 @@ import {
 //
 // The fix is the runner's, not this file's: `bun test --isolate` gives each
 // file a fresh module registry, and the package `test` scripts pass it.
+// Spread the real namespace and override only what this file stubs.
+//
+// `mock.module` is process-global and irreversible, and the whole suite
+// runs in one process, so whichever mock of a specifier registers LAST
+// wins for every other file too. A factory that returns only the exports
+// one test needs therefore deletes the rest from every other file's view:
+// this one used to omit `createAcpRuntime`, and when file ordering put it
+// after acpx-ai-provider's mock, all 23 files importing that export died
+// with "Export named 'createAcpRuntime' not found". Ordering differs
+// between macOS and linux and shifts whenever a test file is added, so it
+// failed only on CI and only sometimes. Additive mocks cannot do that.
+const actualRuntime = await import('acpx/runtime')
+
 mock.module('acpx/runtime', () => ({
+  ...actualRuntime,
   createAgentRegistry: () => ({
     list: (): string[] => ['claude', 'legacy'],
     resolve: (id: string): string | string[] =>

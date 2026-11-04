@@ -19,6 +19,19 @@ export {
   fromRuntimeError,
 } from './errors.ts'
 export {
+  createHostToolHandler,
+  DEFAULT_PROTOCOL_VERSION,
+  SUPPORTED_PROTOCOL_VERSIONS,
+} from './host-tools/handler.ts'
+export type { HostToolServer } from './host-tools/serve.ts'
+export { startHostToolServer } from './host-tools/serve.ts'
+export type {
+  AcpxHostTool,
+  AcpxHostToolContext,
+  AcpxHostToolSchema,
+  AcpxHostToolsSettings,
+} from './host-tools/types.ts'
+export {
   createJsonCleanupTransform,
   stripMarkdownFences,
 } from './json-output.ts'

@@ -45,11 +45,44 @@ jobs:
       - uses: actions/checkout@v7
 
       - uses: oven-sh/setup-bun@v2
-        # No version specified — reads `.bun-version` from the repo root.
-        # Already on the node24 runtime, so no bump needed here.
+        # `bun-version-file` is required for `.bun-version` to be honoured.
+        # Without it this action installs the LATEST bun, which is how a
+        # job running `bun install v1.4.4` ended up here while the repo
+        # pinned 1.3.13, and how CI drifted to a version nothing was
+        # tested against.
+        #
+        # `no-cache` because a restored install cache is the one input a
+        # commit cannot pin. The same commit, bun and runner image passes
+        # from a clean install and failed with the cache in play, with 23
+        # files reporting "Export named 'createAcpRuntime' not found" in a
+        # module that does export it. An install here takes ~5s, so the
+        # cache buys little and costs reproducibility.
+        with:
+          bun-version-file: .bun-version
+          no-cache: true
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
+      - name: Check the installed tree links
+        # A one-line canary. The failure above surfaced as 23 unrelated
+        # test errors with no hint at the cause, which took far longer to
+        # read than it should have. If a dependency lands half-linked
+        # again, this says so here instead.
+        # Run from the package: `acpx` is its dev dependency, not a root
+        # one, so a root-level resolve cannot see it.
+        working-directory: packages/acpx-ai-provider
+        run: |
+          echo "bun $(bun --version)"
+          bun -e "import('acpx/runtime').then(m => {
+            const missing = ['createAcpRuntime','createAgentRegistry','createFileSessionStore']
+              .filter(k => typeof m[k] !== 'function')
+            if (missing.length) {
+              console.error('acpx/runtime is missing: ' + missing.join(', '))
+              process.exit(1)
+            }
+            console.log('acpx/runtime exports look right')
+          })"
 
       - name: Biome (lint + format)
         if: ${{ !cancelled() }}
