@@ -24,9 +24,25 @@ import { formatIssues, validateToolInput } from './validate.ts'
  * is answered with something we actually implement instead of a claim we
  * cannot honour.
  */
-export const SUPPORTED_PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26'] as const
+/**
+ * The newest version we speak, and what an unknown proposal falls back to.
+ *
+ * A literal rather than `SUPPORTED_PROTOCOL_VERSIONS[0]`: an exported
+ * const whose type comes from an indexed access needs an explicit
+ * annotation under `isolatedDeclarations`.
+ */
+export const DEFAULT_PROTOCOL_VERSION = '2025-06-18'
 
-export const DEFAULT_PROTOCOL_VERSION = SUPPORTED_PROTOCOL_VERSIONS[0]
+/**
+ * Versions this server will speak, newest first.
+ *
+ * The first entry repeats `DEFAULT_PROTOCOL_VERSION` as a literal rather
+ * than referencing it. `isolatedDeclarations`, which the d.ts emit
+ * enforces, cannot infer an exported `as const` array built from another
+ * binding, and annotating it by hand is worse than the repetition. A test
+ * asserts the two agree so they cannot drift.
+ */
+export const SUPPORTED_PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26'] as const
 
 /** JSON-RPC error codes used here (spec-defined values). */
 const INVALID_REQUEST = -32600

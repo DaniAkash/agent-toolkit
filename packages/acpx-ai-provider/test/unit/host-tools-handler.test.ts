@@ -13,6 +13,7 @@ import { describe, expect, test } from 'bun:test'
 import {
   createHostToolHandler,
   DEFAULT_PROTOCOL_VERSION,
+  SUPPORTED_PROTOCOL_VERSIONS,
 } from '../../src/host-tools/handler.ts'
 import type { AcpxHostTool } from '../../src/host-tools/types.ts'
 
@@ -81,6 +82,21 @@ describe('authorization', () => {
     )
     expect(res.status).toBe(405)
     expect(res.headers.get('allow')).toBe('POST')
+  })
+})
+
+describe('protocol version constants', () => {
+  test('the default is the newest supported version', () => {
+    // They are written as separate literals because
+    // `isolatedDeclarations` cannot infer an exported `as const` array
+    // built from another binding. This is what stops them drifting.
+    expect(SUPPORTED_PROTOCOL_VERSIONS[0]).toBe(DEFAULT_PROTOCOL_VERSION)
+  })
+
+  test('every supported version is a dated revision', () => {
+    for (const v of SUPPORTED_PROTOCOL_VERSIONS) {
+      expect(v).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    }
   })
 })
 
