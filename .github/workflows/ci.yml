@@ -48,27 +48,51 @@ jobs:
         # `bun-version-file` is required for `.bun-version` to be honoured.
         # Without it this action installs the LATEST bun, which is how a
         # job running `bun install v1.4.4` ended up here while the repo
-        # pinned 1.3.13, and how CI drifted to a version nothing was
+        # pinned 1.3.13, and how CI drifted onto a version nothing was
         # tested against.
         #
-        # `no-cache` because a restored install cache is the one input a
-        # commit cannot pin. The same commit, bun and runner image passes
-        # from a clean install and failed with the cache in play, with 23
-        # files reporting "Export named 'createAcpRuntime' not found" in a
-        # module that does export it. An install here takes ~5s, so the
-        # cache buys little and costs reproducibility.
+        # Executable caching is left ON (this action's `no-cache` input
+        # covers only the downloaded bun binary, not the dependency
+        # store). Keyed by the pinned version, so it cannot serve a
+        # different bun than the one asked for.
         with:
           bun-version-file: .bun-version
-          no-cache: true
+
+      # setup-bun caches only the bun binary, so the dependencies are
+      # cached here. One path covers both, because `globalStore = true` in
+      # bunfig.toml makes this directory the package store as well as the
+      # tarball cache: `node_modules` is symlinks into its `links/`
+      # subtree.
+      #
+      # Keyed on the lockfile and the pinned bun, so a change to either
+      # starts from a clean store, and strict on purpose: no
+      # `restore-keys`. Since node_modules symlinks INTO this directory, a
+      # partially restored store is not a slow build, it is symlinks
+      # pointing at half-populated packages, which is how a module that
+      # plainly exports a name reports it missing. This repo has already
+      # paid a day for that failure shape. Either the key hits exactly or
+      # the store is rebuilt, and `--frozen-lockfile` pins the result to
+      # the lockfile either way.
+      #
+      # Measured: a cold install is ~6s and leaves ~500MB here. The cache
+      # mainly saves network, not wall clock, and GitHub's per-repo budget
+      # is 10GB with LRU eviction, so if lockfile churn starts evicting
+      # other caches, deleting this step costs about six seconds a run.
+      - name: Cache bun's dependency store
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-store-${{ runner.os }}-${{ hashFiles('.bun-version') }}-${{ hashFiles('bun.lock') }}
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
       - name: Check the installed tree links
-        # A one-line canary. The failure above surfaced as 23 unrelated
-        # test errors with no hint at the cause, which took far longer to
-        # read than it should have. If a dependency lands half-linked
-        # again, this says so here instead.
+        # A one-line canary, and the thing that makes the cache safe to
+        # keep. A half-linked dependency surfaced once as 23 unrelated
+        # test errors with no pointer at the cause; if it ever recurs,
+        # whatever the reason, it fails here with a readable message
+        # instead of deep inside the suite.
         # Run from the package: `acpx` is its dev dependency, not a root
         # one, so a root-level resolve cannot see it.
         working-directory: packages/acpx-ai-provider
