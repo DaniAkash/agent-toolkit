@@ -47,9 +47,13 @@ export interface AcpxHostTool {
     context: AcpxHostToolContext,
   ) => unknown | Promise<unknown>
   /**
-   * Ceiling for this tool specifically. Unset means none: a tool that
-   * blocks on a human answer is not wedged, and the turn's abort signal is
-   * what bounds it.
+   * Response deadline for this tool, not an execution bound. When it
+   * elapses the agent is answered with an error, but `execute` keeps
+   * running: a promise cannot be cancelled from outside. To be genuinely
+   * interruptible, honour `context.abortSignal`.
+   *
+   * Unset means none, which is the default: a tool that blocks on a human
+   * answer is not wedged, and the turn's abort signal is what bounds it.
    */
   timeoutMs?: number
 }

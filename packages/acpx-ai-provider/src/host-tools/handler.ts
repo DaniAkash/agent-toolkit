@@ -104,6 +104,16 @@ function safeStringify(value: unknown): string {
   }
 }
 
+/**
+ * Bounds how long the AGENT waits, not how long the tool runs.
+ *
+ * A promise cannot be cancelled from outside, so when `timeoutMs` elapses
+ * the agent is answered and `tool.execute` keeps running: it may still
+ * complete, perform side effects, or hold resources. The only thing that
+ * reaches into a running tool is `context.abortSignal`, which carries the
+ * turn's cancellation, so a tool that needs to be genuinely interruptible
+ * has to honour that signal. `timeoutMs` is a response deadline.
+ */
 function timingOut<T>(
   promise: Promise<T>,
   ms: number | undefined,

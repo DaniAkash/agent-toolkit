@@ -75,11 +75,14 @@ function metaOf(part: LanguageModelV2StreamPart | undefined): unknown {
 }
 
 describe('host tool marking on the stream', () => {
-  test('a bare host tool name is marked', async () => {
+  test('a bare host tool name is NOT marked on shape alone', async () => {
+    // Changed deliberately in review. A bare name cannot be told apart
+    // from an agent's own tool of the same name by shape, so it is only
+    // credited to us when the session actually served a call by that name
+    // (see the `onCall` test in test/unit/host-tools-wiring.test.ts).
+    // Here nothing was served, so it stays unmarked.
     const part = await toolCallPart('store_value', { store_value: STORE })
-    expect(metaOf(part)).toEqual({
-      acpx: { hostTool: true, toolName: 'store_value' },
-    })
+    expect(metaOf(part)).toBeUndefined()
   })
 
   test('the dotted form codex emits is marked', async () => {
@@ -95,6 +98,13 @@ describe('host tool marking on the stream', () => {
       const part = await toolCallPart(name, { store_value: STORE })
       expect(metaOf(part)).toMatchObject({ acpx: { hostTool: true } })
     }
+  })
+
+  test("an agent's own tool sharing a host tool's bare name is not marked", async () => {
+    // The false positive this change removes: previously `say` from the
+    // agent's own toolset was reported as ours.
+    const part = await toolCallPart('store_value', { store_value: STORE })
+    expect(metaOf(part)).toBeUndefined()
   })
 
   test("an agent's own tool is not marked", async () => {

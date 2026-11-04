@@ -177,7 +177,14 @@ async function startNodeServer(
     port,
     close: () =>
       new Promise<void>((resolve) => {
+        // `close()` alone waits for active requests to finish, and a host
+        // tool blocking on a human keeps its `tools/call` active, so this
+        // would never resolve on exactly the case host tools exist for.
+        // The caller aborts pending calls first; this drops whatever is
+        // still open so teardown cannot hang on a client that never
+        // disconnects.
         server.close(() => resolve())
+        server.closeAllConnections?.()
       }),
   }
 }

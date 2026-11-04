@@ -71,6 +71,7 @@ export class AcpxLanguageModel implements LanguageModelV2 {
       tools: callOptions.tools,
       declared: this.providerInstance.hostToolNames(),
       sessionAlreadyLive,
+      unregisterable: this.providerInstance.hostToolsUnregisterable(),
     })
   }
 
@@ -85,7 +86,10 @@ export class AcpxLanguageModel implements LanguageModelV2 {
 
     // Bind the turn's abort signal before the turn starts, so a host tool
     // call already in flight is cancelled when the turn is.
-    this.providerInstance.beginTurn(sessionKey, callOptions.abortSignal)
+    const turnToken = this.providerInstance.beginTurn(
+      sessionKey,
+      callOptions.abortSignal,
+    )
 
     const { text, attachments } = convertPrompt({
       prompt: callOptions.prompt,
@@ -122,7 +126,7 @@ export class AcpxLanguageModel implements LanguageModelV2 {
       onPlan: (entries) => {
         this.providerInstance.recordPlan(sessionKey, entries)
       },
-      isHostTool: (name) => this.providerInstance.isHostTool(name),
+      isHostTool: (name) => this.providerInstance.isHostTool(sessionKey, name),
     })
 
     let stream = createTranslatingStream(turn, translator)
@@ -133,7 +137,7 @@ export class AcpxLanguageModel implements LanguageModelV2 {
     // the first part, so it is prepended rather than emitted by the
     // translator (which only sees runtime events).
     stream = prependStreamStart(stream, warnings, () => {
-      this.providerInstance.endTurn(sessionKey)
+      this.providerInstance.endTurn(sessionKey, turnToken)
     })
 
     return {

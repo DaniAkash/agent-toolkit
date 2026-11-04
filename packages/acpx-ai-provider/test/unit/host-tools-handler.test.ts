@@ -360,6 +360,78 @@ describe('tools/call', () => {
   })
 })
 
+describe('required properties are own properties', () => {
+  // Reported in review: `key in value` walks the prototype chain, so a
+  // schema requiring `toString` saw `{}` as satisfying it and `execute`
+  // then received no own argument at all.
+  const PROTO_TOOL: AcpxHostTool = {
+    description: 'Takes a property that also exists on Object.prototype.',
+    inputSchema: {
+      type: 'object',
+      properties: { toString: { type: 'string' } },
+      required: ['toString'],
+    },
+    execute: (input) => `got ${String(input.toString)}`,
+  }
+
+  test('an inherited property does not satisfy required', async () => {
+    let called = false
+    const res = await makeHandler({
+      proto: {
+        ...PROTO_TOOL,
+        execute: () => {
+          called = true
+          return 'ok'
+        },
+      },
+    })(rpc('tools/call', { name: 'proto', arguments: {} }))
+    const body = (await res.json()) as {
+      result: { isError: boolean; content: Array<{ text: string }> }
+    }
+    expect(called).toBe(false)
+    expect(body.result.isError).toBe(true)
+    expect(body.result.content[0]?.text).toContain('toString: is required')
+  })
+
+  test('an own property of the same name is accepted', async () => {
+    const res = await makeHandler({ proto: PROTO_TOOL })(
+      rpc('tools/call', { name: 'proto', arguments: { toString: 'mine' } }),
+    )
+    const body = (await res.json()) as {
+      result: { isError: boolean; content: Array<{ text: string }> }
+    }
+    expect(body.result.isError).toBe(false)
+    expect(body.result.content[0]?.text).toBe('got mine')
+  })
+})
+
+describe('timeoutMs is a response deadline', () => {
+  test('the agent is answered but execute keeps running', async () => {
+    // Reported in review, and true: a promise cannot be cancelled from
+    // outside. Asserted rather than glossed, since the type now says so.
+    let finished = false
+    const res = await makeHandler({
+      slow: {
+        ...ECHO,
+        timeoutMs: 20,
+        execute: async () => {
+          await new Promise((r) => setTimeout(r, 80))
+          finished = true
+          return 'late'
+        },
+      },
+    })(rpc('tools/call', { name: 'slow', arguments: { message: 'x' } }))
+    const body = (await res.json()) as { result: { isError: boolean } }
+    expect(body.result.isError).toBe(true)
+    // Still running at the moment the agent was answered.
+    expect(finished).toBe(false)
+    await new Promise((r) => setTimeout(r, 120))
+    // And it ran to completion afterwards, which is why the docs say the
+    // abort signal is the only real bound.
+    expect(finished).toBe(true)
+  })
+})
+
 describe('malformed input', () => {
   test('a body that is not JSON is a parse error', async () => {
     const res = await makeHandler({ echo: ECHO })(

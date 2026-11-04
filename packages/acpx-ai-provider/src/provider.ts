@@ -66,12 +66,17 @@ const NAME_SEPARATORS = ['__', '.', '/', '-', ':']
  * True when `reported` is `tool`, or `tool` prefixed by the server name
  * with any of the observed separators between the segments.
  */
-function matchesHostToolName(
+/**
+ * True when `reported` is `tool` prefixed by the server name with any of
+ * the observed separators. The bare-name case is deliberately NOT handled
+ * here: it cannot be told apart from an agent's own tool of the same name
+ * by shape alone, so the caller decides it from what was actually served.
+ */
+function matchesNamespacedHostTool(
   reported: string,
   serverName: string,
   tool: string,
 ): boolean {
-  if (reported === tool) return true
   for (const sep of NAME_SEPARATORS) {
     const tail = `${serverName}${sep}${tool}`
     if (reported === tail) return true
@@ -102,7 +107,23 @@ export class AcpxProvider {
    * Abort controller for the turn currently in flight on a session, so a
    * pending host tool call is cancelled when the turn is.
    */
-  private readonly turnAborts = new Map<string, AbortController>()
+  /**
+   * Live turns per session, as a stack. The provider permits concurrent
+   * turns on one session key, so a single controller per session let one
+   * turn's completion abort another turn's pending host call.
+   */
+  private readonly turnAborts = new Map<
+    string,
+    Array<{ token: number; controller: AbortController }>
+  >()
+  private turnCounter = 0
+  /** In-flight `startHostToolServer` calls, keyed by session. */
+  private readonly hostToolServerStarts = new Map<string, Promise<void>>()
+  /**
+   * Tool names this session actually served, recorded by the server's
+   * `onCall`. A bare (unnamespaced) reported name is only credited to us
+   * when it appears here.
+   */
   private readonly hostToolCalls = new Map<string, Set<string>>()
   private readonly lastPlan = new Map<string, AcpRuntimePlanEntry[]>()
   private readonly lastUsage = new Map<string, AcpxUsageSnapshot>()
@@ -231,24 +252,53 @@ export class AcpxProvider {
       this.usedKeys.delete(key)
     }
     this.handles.clear()
+
+    // Abort BEFORE closing the listeners, not after. A host tool waiting
+    // on a human keeps its `tools/call` request active, and the Node
+    // listener's `close()` waits for active requests, so closing first
+    // made `close()` hang forever on exactly the case host tools exist
+    // for. Aborting gives the tool its cancellation and lets the request
+    // finish.
+    for (const [, live] of this.turnAborts) {
+      for (const { controller } of live) {
+        controller.abort(new Error(`provider closed: ${reason}`))
+      }
+    }
+    this.turnAborts.clear()
+
     for (const [, server] of this.hostToolServers) await server.close()
     this.hostToolServers.clear()
-    this.turnAborts.clear()
+    this.hostToolServerStarts.clear()
     this.hostToolCalls.clear()
   }
 
   /**
    * Bind this session's host tool server if the caller declared any tools
-   * and it is not already up. Idempotent per session key.
+   * and it is not already up.
+   *
+   * Guarded by an in-flight promise rather than a bare `has` check:
+   * `startHostToolServer` awaits, so two concurrent first turns on one
+   * session key could both pass a check-then-await and bind two listeners,
+   * the second overwriting the first in the map and leaking its port.
    */
   private async ensureHostToolServer(sessionKey: string): Promise<void> {
     const declared = this.settings.hostTools?.tools
     if (!declared || Object.keys(declared).length === 0) return
     if (this.hostToolServers.has(sessionKey)) return
 
-    const server = await startHostToolServer({
+    const inFlight = this.hostToolServerStarts.get(sessionKey)
+    if (inFlight) {
+      await inFlight
+      return
+    }
+
+    // Checked here rather than only in buildRuntimeOptions, which an
+    // injected runtime never reaches.
+    this.assertNoHostToolNameCollision()
+
+    const start = startHostToolServer({
       tools: declared,
-      serverName: this.settings.hostTools?.serverName ?? 'host',
+      serverName: this.hostToolServerName(),
       serverVersion: HOST_TOOL_SERVER_VERSION,
       sessionKey,
       hostname: this.settings.hostTools?.hostname,
@@ -259,30 +309,66 @@ export class AcpxProvider {
         this.recordHostToolCall(sessionKey, toolName, toolCallId)
       },
     })
-    this.hostToolServers.set(sessionKey, server)
+      .then((server) => {
+        if (this.hostToolServers.has(sessionKey)) {
+          // Lost a race that the lock should prevent; close the loser
+          // rather than orphan its port.
+          void server.close()
+          return
+        }
+        this.hostToolServers.set(sessionKey, server)
+      })
+      .finally(() => {
+        this.hostToolServerStarts.delete(sessionKey)
+      })
+
+    this.hostToolServerStarts.set(sessionKey, start)
+    await start
+  }
+
+  private hostToolServerName(): string {
+    return this.settings.hostTools?.serverName ?? 'host'
+  }
+
+  /**
+   * A caller-supplied server of the same name is a loud failure.
+   * Replacing theirs would break whatever it pointed at, and dropping
+   * ours would make `hostTools` quietly do nothing.
+   */
+  private assertNoHostToolNameCollision(): void {
+    const declared = this.settings.hostTools?.tools
+    if (!declared || Object.keys(declared).length === 0) return
+    const hostName = this.hostToolServerName()
+    const configured = toRuntimeMcpServers(this.settings.mcpServers) ?? []
+    if (!configured.some((s) => s.name === hostName)) return
+    throw new Error(
+      `mcpServers already contains a server named "${hostName}", which ` +
+        'collides with the host tool server. Rename one of them, or set ' +
+        'hostTools.serverName to something else.',
+    )
+  }
+
+  /**
+   * True when host tools were declared but this provider cannot register
+   * them, because the runtime was supplied pre-built.
+   *
+   * `mcpServers` is set when the runtime is constructed, so a runtime the
+   * provider did not build never receives the per-session resolver and the
+   * agent never learns the tools exist. Surfaced as a call warning rather
+   * than a throw, so injecting a runtime for an unrelated reason still
+   * works, but it is never silent.
+   */
+  hostToolsUnregisterable(): boolean {
+    return this.hasHostTools() && this.settings.runtime !== undefined
   }
 
   /** Host tool entries for every live session, plus the caller's own. */
   private resolveMcpServers(): AcpRuntimeOptions['mcpServers'] {
     const configured = toRuntimeMcpServers(this.settings.mcpServers) ?? []
-    const hostName = this.settings.hostTools?.serverName ?? 'host'
-    if (
-      this.settings.hostTools?.tools &&
-      Object.keys(this.settings.hostTools.tools).length > 0 &&
-      configured.some((s) => s.name === hostName)
-    ) {
-      // Loudly, not silently: replacing the caller's server would break
-      // whatever it points at, and dropping ours would make `hostTools`
-      // quietly do nothing. Both are worse than refusing to start.
-      throw new Error(
-        `mcpServers already contains a server named "${hostName}", which ` +
-          'collides with the host tool server. Rename one of them, or set ' +
-          'hostTools.serverName to something else.',
-      )
-    }
+    this.assertNoHostToolNameCollision()
     // The resolver form, so each session contributes only its own server.
     // acpx calls this per session; an array would hand every session every
-    // other session's URL.
+    // other session's URL and token.
     return (session: { sessionKey?: string }) => {
       const key = session?.sessionKey
       const own = key ? this.hostToolServers.get(key) : undefined
@@ -299,20 +385,40 @@ export class AcpxProvider {
     }
   }
 
+  /**
+   * The signal a host tool call arriving now should carry: the most
+   * recently started live turn on this session.
+   */
   private turnAbortSignal(sessionKey: string): AbortSignal {
-    let controller = this.turnAborts.get(sessionKey)
-    if (!controller) {
-      controller = new AbortController()
-      this.turnAborts.set(sessionKey, controller)
-    }
-    return controller.signal
+    const live = this.turnAborts.get(sessionKey)
+    const last = live?.[live.length - 1]
+    if (last) return last.controller.signal
+    // No live turn. An already-aborted signal is the honest answer: a call
+    // arriving outside a turn has nothing to wait for.
+    const orphan = new AbortController()
+    orphan.abort(new Error('no turn is in flight on this session'))
+    return orphan.signal
   }
 
-  /** Called by the language model when a turn starts on this session. */
-  beginTurn(sessionKey: string, abortSignal?: AbortSignal): void {
+  /**
+   * Called by the language model when a turn starts. Returns a token to
+   * hand back to `endTurn`.
+   *
+   * Tracked as a per-session stack rather than one controller per session,
+   * because the provider permits concurrent turns on one session key. With
+   * a single slot, a second `beginTurn` overwrote the first controller and
+   * the first stream's completion then aborted the second turn's pending
+   * host call.
+   */
+  beginTurn(sessionKey: string, abortSignal?: AbortSignal): number {
     const controller = new AbortController()
-    this.turnAborts.set(sessionKey, controller)
-    this.hostToolCalls.set(sessionKey, new Set())
+    const token = ++this.turnCounter
+    const live = this.turnAborts.get(sessionKey) ?? []
+    live.push({ token, controller })
+    this.turnAborts.set(sessionKey, live)
+    if (!this.hostToolCalls.has(sessionKey)) {
+      this.hostToolCalls.set(sessionKey, new Set())
+    }
     if (abortSignal) {
       if (abortSignal.aborted) controller.abort(abortSignal.reason)
       else
@@ -322,18 +428,28 @@ export class AcpxProvider {
           { once: true },
         )
     }
+    return token
   }
 
-  /** Called when a turn ends, so a late host call cannot run unbounded. */
-  endTurn(sessionKey: string, reason = 'turn ended'): void {
-    this.turnAborts.get(sessionKey)?.abort(new Error(reason))
-    this.turnAborts.delete(sessionKey)
+  /**
+   * Called when a turn ends, so a host call left pending cannot hold host
+   * code open with nothing left to answer it. Aborts only this turn's
+   * controller, identified by token.
+   */
+  endTurn(sessionKey: string, token: number, reason = 'turn ended'): void {
+    const live = this.turnAborts.get(sessionKey)
+    if (!live) return
+    const index = live.findIndex((entry) => entry.token === token)
+    if (index === -1) return
+    const [entry] = live.splice(index, 1)
+    entry?.controller.abort(new Error(reason))
+    if (live.length === 0) this.turnAborts.delete(sessionKey)
   }
 
   private recordHostToolCall(
     sessionKey: string,
     toolName: string,
-    toolCallId: string,
+    _toolCallId: string,
   ): void {
     let seen = this.hostToolCalls.get(sessionKey)
     if (!seen) {
@@ -341,7 +457,6 @@ export class AcpxProvider {
       this.hostToolCalls.set(sessionKey, seen)
     }
     seen.add(toolName)
-    void toolCallId
   }
 
   /**
@@ -351,17 +466,23 @@ export class AcpxProvider {
    * Needed because every agent renames MCP tools on the way out, and not
    * in one style: a codex run reported `mcp.host.store_value` (dots),
    * while the `mcp__host__say` and `host__say` forms use underscores.
-   * Matching is therefore anchored on the server name as well as the tool
-   * name, so a bare suffix check cannot mistake an agent's own
-   * `read_value` for a host `value`.
+   *
+   * A namespaced form is matched structurally, anchored on the server name
+   * so an agent's own `agent_store_value` is not swept up. A BARE name is
+   * only honoured when this session actually served a call by that name,
+   * recorded through the server's `onCall`. Without that check an agent's
+   * own tool named exactly `say` would be marked as ours, which is the
+   * false positive the metadata exists to avoid.
    */
-  isHostTool(reportedToolName: string): boolean {
+  isHostTool(sessionKey: string, reportedToolName: string): boolean {
     const declared = this.settings.hostTools?.tools
     if (!declared) return false
-    const serverName = this.settings.hostTools?.serverName ?? 'host'
-    return Object.keys(declared).some((name) =>
-      matchesHostToolName(reportedToolName, serverName, name),
-    )
+    const serverName = this.hostToolServerName()
+    const served = this.hostToolCalls.get(sessionKey)
+    return Object.keys(declared).some((name) => {
+      if (reportedToolName === name) return served?.has(name) === true
+      return matchesNamespacedHostTool(reportedToolName, serverName, name)
+    })
   }
 
   /** The host tool names declared on this provider, for warning checks. */

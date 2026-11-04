@@ -593,7 +593,16 @@ reach a running persistent session, exactly like
 different tool set. The provider emits a `LanguageModelV2CallWarning` when
 it detects this rather than leaving you to infer it.
 
-`close()` tears the server down and releases the port.
+`close()` aborts every pending host call first, then tears the server
+down and releases the port. That order matters: a tool waiting on a human
+keeps its `tools/call` request active, and a listener that waits for
+active requests would never finish closing.
+
+**Let the provider build the runtime.** acpx fixes `mcpServers` when the
+runtime is constructed, so a pre-built `runtime` passed to
+`createAcpxProvider` never receives the per-session resolver and the agent
+will not discover these tools. Using both together is reported as a call
+warning rather than silently doing nothing.
 
 ### Transport
 
@@ -630,13 +639,26 @@ providerMetadata: { acpx: { hostTool: true, toolName: 'record_answer' } }
 ```
 
 Match on that rather than on the tool name. Each agent namespaces MCP
-tools differently (`mcp__host__say`, `host__say`, the bare name), so a
-name prefix that works on one runtime quietly fails on the next.
+tools differently, and not in one style: codex reports
+`mcp.host.store_value`, with dots, where other forms use
+`mcp__host__say` or `host__say`. A prefix match that works on one runtime
+quietly fails on the next.
+
+A namespaced name is recognised structurally, anchored on the server name
+so an agent's own `agent_say` is not mistaken for a host `say`. A **bare**
+name is only credited to a host tool once that session has actually
+served a call by that name, because shape alone cannot tell it apart from
+an agent's own tool of the same name.
 
 ### Errors and timeouts
 
 An `execute` that rejects becomes an MCP tool error the agent can read and
 react to, not a thrown turn.
+
+`timeoutMs` is a **response deadline, not an execution bound**. When it
+elapses the agent is answered, but `execute` keeps running: a promise
+cannot be cancelled from outside. Honour `context.abortSignal` for a tool
+that must be genuinely interruptible.
 
 A pending host tool call is **not** governed by `turnTimeoutMs`. An agent
 waiting on a human answer is not wedged, and a question surface that dies

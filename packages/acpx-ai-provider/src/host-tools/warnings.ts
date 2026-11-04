@@ -22,18 +22,38 @@ export interface HostToolWarningInput {
    * fixed before this call and a newly added tool cannot have reached it.
    */
   sessionAlreadyLive: boolean
+  /**
+   * True when host tools were declared but the runtime was supplied
+   * pre-built, so the provider could not register the per-session MCP
+   * resolver on it.
+   */
+  unregisterable?: boolean
 }
 
 export function hostToolWarnings(
   input: HostToolWarningInput,
 ): LanguageModelV2CallWarning[] {
+  const declared = new Set(input.declared)
+  const warnings: LanguageModelV2CallWarning[] = []
+
+  // Reported whether or not `tools` was passed: the tools are declared on
+  // the provider, so this is wrong regardless of what the model call says.
+  if (input.unregisterable) {
+    warnings.push({
+      type: 'other',
+      message:
+        'hostTools were declared but a pre-built `runtime` was supplied, ' +
+        'so the per-session MCP server could not be registered on it and ' +
+        'the agent will not discover these tools. acpx fixes `mcpServers` ' +
+        'when the runtime is constructed, so let the provider build the ' +
+        'runtime (omit `runtime`) when using hostTools.',
+    })
+  }
+
   const requested = (input.tools ?? [])
     .filter((t) => t.type === 'function')
     .map((t) => t.name)
-  if (requested.length === 0) return []
-
-  const declared = new Set(input.declared)
-  const warnings: LanguageModelV2CallWarning[] = []
+  if (requested.length === 0) return warnings
 
   const unservable = requested.filter((name) => !declared.has(name))
   if (unservable.length > 0) {

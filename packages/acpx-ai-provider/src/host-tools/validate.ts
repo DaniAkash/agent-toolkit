@@ -132,7 +132,10 @@ function checkRequired(
   const required = Array.isArray(schema.required) ? schema.required : []
   for (const key of required) {
     if (typeof key !== 'string') continue
-    if (key in value && value[key] !== undefined) continue
+    // `Object.hasOwn`, not `in`: `in` walks the prototype chain, so a
+    // schema requiring `toString` (or `constructor`, `valueOf`, ...) saw
+    // `{}` as satisfying it and `execute` then received no own argument.
+    if (Object.hasOwn(value, key) && value[key] !== undefined) continue
     issues.push({ path: join(path, key), message: 'is required' })
   }
 }
