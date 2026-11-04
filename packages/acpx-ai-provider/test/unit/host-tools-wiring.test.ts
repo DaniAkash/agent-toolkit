@@ -248,7 +248,17 @@ describe('host tool identification', () => {
     expect(provider.isHostTool('say')).toBe(true)
     expect(provider.isHostTool('mcp__host__say')).toBe(true)
     expect(provider.isHostTool('host__say')).toBe(true)
+    // A real codex run reported `mcp.host.store_value`, with dots. An
+    // underscore-only matcher silently missed it, so the marker never
+    // fired on the one agent this was built against.
+    expect(provider.isHostTool('mcp.host.say')).toBe(true)
+    expect(provider.isHostTool('host.say')).toBe(true)
+    expect(provider.isHostTool('host/say')).toBe(true)
     expect(provider.isHostTool('read_file')).toBe(false)
+    // Anchored on the server name, so an agent's own tool whose name ends
+    // in a host tool's name is not swept up.
+    expect(provider.isHostTool('read_say')).toBe(false)
+    expect(provider.isHostTool('other__say')).toBe(false)
     await provider.close('test')
   })
 

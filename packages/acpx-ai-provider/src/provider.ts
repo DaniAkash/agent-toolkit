@@ -59,6 +59,30 @@ export interface AcpxProviderEvents {
   plan: [{ sessionKey: string; entries: AcpRuntimePlanEntry[] }]
 }
 
+/** Separators agents have been observed using between namespace segments. */
+const NAME_SEPARATORS = ['__', '.', '/', '-', ':']
+
+/**
+ * True when `reported` is `tool`, or `tool` prefixed by the server name
+ * with any of the observed separators between the segments.
+ */
+function matchesHostToolName(
+  reported: string,
+  serverName: string,
+  tool: string,
+): boolean {
+  if (reported === tool) return true
+  for (const sep of NAME_SEPARATORS) {
+    const tail = `${serverName}${sep}${tool}`
+    if (reported === tail) return true
+    // Allow a leading namespace of its own, e.g. `mcp__host__say`.
+    for (const lead of NAME_SEPARATORS) {
+      if (reported.endsWith(`${lead}${tail}`)) return true
+    }
+  }
+  return false
+}
+
 export class AcpxProvider {
   readonly settings: AcpxProviderSettings
   readonly generateId: () => string
@@ -321,17 +345,22 @@ export class AcpxProvider {
   }
 
   /**
-   * Whether this session served a host tool of that name during the turn.
-   * Used to mark the stream's `tool-call` part, since matching on the name
-   * the agent reports is unreliable: each one namespaces MCP tools
-   * differently (`mcp__host__say`, `host__say`, the bare name).
+   * Whether a tool name the agent reported is one of this provider's host
+   * tools.
+   *
+   * Needed because every agent renames MCP tools on the way out, and not
+   * in one style: a codex run reported `mcp.host.store_value` (dots),
+   * while the `mcp__host__say` and `host__say` forms use underscores.
+   * Matching is therefore anchored on the server name as well as the tool
+   * name, so a bare suffix check cannot mistake an agent's own
+   * `read_value` for a host `value`.
    */
   isHostTool(reportedToolName: string): boolean {
     const declared = this.settings.hostTools?.tools
     if (!declared) return false
-    return Object.keys(declared).some(
-      (name) =>
-        reportedToolName === name || reportedToolName.endsWith(`__${name}`),
+    const serverName = this.settings.hostTools?.serverName ?? 'host'
+    return Object.keys(declared).some((name) =>
+      matchesHostToolName(reportedToolName, serverName, name),
     )
   }
 
