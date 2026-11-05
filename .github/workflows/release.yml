@@ -122,10 +122,15 @@ jobs:
           esac
 
       - name: Install Bun
-        # Reads the version from `.bun-version` — bumping Bun is a
-        # one-line change to that file, reviewed like any other source
-        # change.
+        # `bun-version-file` is what makes `.bun-version` authoritative;
+        # without it this action resolves the version from package.json
+        # (`engines.bun: ">=1.3.0"` here) and a release would run on
+        # whatever Bun shipped last. Bumping Bun stays a one-line change
+        # to that file, reviewed like any other source change, and a
+        # release now runs the same Bun that CI gated the commit with.
         uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
 
       - name: Install Node + npm (for the staged publish)
         # All other steps use Bun. Node is here only for `npm`, whose
